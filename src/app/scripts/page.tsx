@@ -1,35 +1,67 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { scripts, objections } from '@/data/mockData'
-import { FileText, Copy, Star, ChevronRight, MessageSquare, Shield, Users, Megaphone, Heart, Zap } from 'lucide-react'
+import type { Objection, Script } from '@/types'
+import {
+  FileText,
+  Copy,
+  Star,
+  ChevronRight,
+  MessageSquare,
+  Shield,
+  Users,
+  Megaphone,
+  Heart,
+  Zap,
+  Sparkles,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
 const categoryIcons: Record<string, LucideIcon> = {
-  Davet: MessageSquare, Takip: ChevronRight, 'Müşteri İlişkileri': Heart,
-  'Sosyal Medya': Megaphone, Oryantasyon: Users, İtirazlar: Shield, 'Potansiyel Müşteri': Zap,
+  Davet: MessageSquare,
+  Takip: ChevronRight,
+  'Müşteri İlişkileri': Heart,
+  'Sosyal Medya': Megaphone,
+  Oryantasyon: Users,
+  İtirazlar: Shield,
+  'Potansiyel Müşteri': Zap,
 }
 
+type ActivePanel =
+  | { type: 'script'; script: Script }
+  | { type: 'objection'; objection: Objection }
+  | null
+
 export default function ScriptsPage() {
-  const { t } = useLanguage()
+  const router = useRouter()
+  const { t, locale } = useLanguage()
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const categories = ['all', ...new Set(scripts.map(s => s.category))]
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null)
+  const categories = ['all', ...new Set(scripts.map((script) => script.category))]
 
-  const filtered = scripts.filter(s => selectedCategory === 'all' || s.category === selectedCategory)
+  const filteredScripts = scripts.filter((script) => selectedCategory === 'all' || script.category === selectedCategory)
 
-  const handleCopy = (id: string, content: string) => {
-    navigator.clipboard.writeText(content)
+  async function handleCopy(id: string, content: string) {
+    await navigator.clipboard.writeText(content)
     setCopiedId(id)
-    setTimeout(() => setCopiedId(null), 2000)
+    window.setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  function openAIWithPrompt(prompt: string) {
+    void navigator.clipboard.writeText(prompt)
+    router.push('/ai')
   }
 
   return (
@@ -40,20 +72,27 @@ export default function ScriptsPage() {
       </motion.div>
 
       <motion.div variants={item} className="flex gap-2 overflow-x-auto pb-2">
-        {categories.map(cat => (
-          <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-primary/15 text-primary border border-primary/20' : 'bg-surface border border-border text-text-secondary hover:text-text-primary'}`}>
-            {cat === 'all' ? t.scripts.allScripts : cat}
+        {categories.map((category) => (
+          <button
+            key={category}
+            type="button"
+            onClick={() => setSelectedCategory(category)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${selectedCategory === category ? 'bg-primary/15 text-primary border border-primary/20' : 'bg-surface border border-border text-text-secondary hover:text-text-primary'}`}
+          >
+            {category === 'all' ? t.scripts.allScripts : category}
           </button>
         ))}
       </motion.div>
 
       <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {filtered.map((script) => {
+        {filteredScripts.map((script) => {
           const Icon = categoryIcons[script.category] || FileText
           return (
-            <Card key={script.id} hover>
+            <Card key={script.id} hover onClick={() => setActivePanel({ type: 'script', script })}>
               <div className="flex items-start gap-3 mb-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0"><Icon className="w-4 h-4 text-primary" /></div>
+                <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+                  <Icon className="w-4 h-4 text-primary" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold text-text-primary">{script.title}</h3>
                   <div className="flex items-center gap-2 mt-0.5">
@@ -68,10 +107,31 @@ export default function ScriptsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex flex-wrap gap-1 flex-1">
-                  {script.tags.map(tag => <Badge key={tag} variant="default" size="sm">{tag}</Badge>)}
+                  {script.tags.map((tag) => (
+                    <Badge key={tag} variant="default" size="sm">{tag}</Badge>
+                  ))}
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => handleCopy(script.id, script.content)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    void handleCopy(script.id, script.content)
+                  }}
+                >
                   {copiedId === script.id ? `✓ ${t.common.copied}` : <><Copy className="w-3 h-3" /> {t.scripts.copy}</>}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    openAIWithPrompt(`${script.title} senaryosunu bana kisilestir: ${script.content}`)
+                  }}
+                >
+                  <Sparkles className="w-3 h-3" /> AI
                 </Button>
               </div>
             </Card>
@@ -81,18 +141,55 @@ export default function ScriptsPage() {
 
       <motion.div variants={item}>
         <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Shield className="w-4 h-4 text-error" /> {t.scripts.objectionHandling}</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-error" />
+              {t.scripts.objectionHandling}
+            </CardTitle>
+          </CardHeader>
           <div className="space-y-4">
-            {objections.map(obj => (
-              <div key={obj.id} className="p-4 rounded-xl bg-surface/50 border border-border-subtle">
-                <p className="text-sm font-semibold text-text-primary mb-2">&quot;{obj.objection}&quot;</p>
+            {objections.map((objection) => (
+              <div key={objection.id} className="p-4 rounded-xl bg-surface/50 border border-border-subtle">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-2">
+                  <p className="text-sm font-semibold text-text-primary">&quot;{objection.objection}&quot;</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setActivePanel({ type: 'objection', objection })}
+                  >
+                    {t.common.view}
+                  </Button>
+                </div>
                 <div className="space-y-2">
-                  {obj.responses.map(r => (
-                    <div key={r.id} className="p-3 rounded-lg bg-card border border-border">
-                      <Badge variant={r.tone === 'empathetic' ? 'success' : r.tone === 'direct' ? 'primary' : r.tone === 'storytelling' ? 'secondary' : 'warning'} size="sm">
-                        {r.tone === 'empathetic' ? 'Empatik' : r.tone === 'direct' ? 'Doğrudan' : r.tone === 'storytelling' ? 'Hikaye' : r.tone === 'data_driven' ? 'Veriye Dayalı' : r.tone}
-                      </Badge>
-                      <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">{r.script}</p>
+                  {objection.responses.map((response) => (
+                    <div key={response.id} className="p-3 rounded-lg bg-card border border-border">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <Badge variant={response.tone === 'empathetic' ? 'success' : response.tone === 'direct' ? 'primary' : response.tone === 'storytelling' ? 'secondary' : 'warning'} size="sm">
+                          {response.tone === 'empathetic' ? 'Empatik' : response.tone === 'direct' ? 'Doğrudan' : response.tone === 'storytelling' ? 'Hikaye' : 'Veriye Dayalı'}
+                        </Badge>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              void handleCopy(response.id, response.script)
+                            }}
+                          >
+                            <Copy className="w-3 h-3" /> {copiedId === response.id ? t.common.copied : t.common.copy}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openAIWithPrompt(`Su itiraza daha guclu bir cevap yaz: "${objection.objection}". Mevcut yanit: ${response.script}`)}
+                          >
+                            <Sparkles className="w-3 h-3" /> AI
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">{response.script}</p>
                     </div>
                   ))}
                 </div>
@@ -101,6 +198,84 @@ export default function ScriptsPage() {
           </div>
         </Card>
       </motion.div>
+
+      <Modal
+        open={Boolean(activePanel)}
+        onClose={() => setActivePanel(null)}
+        title={
+          activePanel?.type === 'script'
+            ? activePanel.script.title
+            : activePanel?.type === 'objection'
+              ? activePanel.objection.objection
+              : undefined
+        }
+        description={
+          activePanel?.type === 'script'
+            ? `${activePanel.script.category} · ${activePanel.script.subcategory}`
+            : activePanel?.type === 'objection'
+              ? (locale === 'tr' ? 'İtiraz yanit paketleri' : 'Objection response pack')
+              : undefined
+        }
+      >
+        {activePanel?.type === 'script' && (
+          <div className="p-5 space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {activePanel.script.tags.map((tag) => (
+                <Badge key={tag} variant="default">{tag}</Badge>
+              ))}
+            </div>
+            <div className="rounded-xl border border-border-subtle bg-surface/50 p-4">
+              <p className="text-sm leading-relaxed text-text-secondary">{activePanel.script.content}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => { void handleCopy(activePanel.script.id, activePanel.script.content) }}>
+                <Copy className="w-3 h-3" /> {copiedId === activePanel.script.id ? t.common.copied : t.common.copy}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => openAIWithPrompt(`Bu senaryoyu kisilestir ve 2 alternatif versiyon yaz: ${activePanel.script.content}`)}
+              >
+                <Sparkles className="w-3 h-3" /> {locale === 'tr' ? 'AI Koçu ile geliştir' : 'Refine with AI Coach'}
+              </Button>
+              <Button type="button" size="sm" onClick={() => router.push('/prospects')}>
+                {locale === 'tr' ? 'Potansiyellere git' : 'Go to prospects'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {activePanel?.type === 'objection' && (
+          <div className="p-5 space-y-4">
+            <div className="space-y-3">
+              {activePanel.objection.responses.map((response) => (
+                <div key={response.id} className="rounded-xl border border-border-subtle bg-surface/50 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <Badge variant={response.tone === 'empathetic' ? 'success' : response.tone === 'direct' ? 'primary' : response.tone === 'storytelling' ? 'secondary' : 'warning'}>
+                      {response.tone === 'empathetic' ? 'Empatik' : response.tone === 'direct' ? 'Doğrudan' : response.tone === 'storytelling' ? 'Hikaye' : 'Veriye Dayalı'}
+                    </Badge>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="ghost" size="sm" onClick={() => { void handleCopy(response.id, response.script) }}>
+                        <Copy className="w-3 h-3" /> {copiedId === response.id ? t.common.copied : t.common.copy}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => openAIWithPrompt(`Su itiraz icin daha net ve ikna edici cevap yaz: "${activePanel.objection.objection}". Temel yanit: ${response.script}`)}
+                      >
+                        <Sparkles className="w-3 h-3" /> AI
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-text-secondary">{response.script}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Modal>
     </motion.div>
   )
 }
