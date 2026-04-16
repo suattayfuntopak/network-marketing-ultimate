@@ -91,9 +91,6 @@ export function Header() {
               <span className="hidden sm:inline">{t.header.aiCoach}</span>
             </motion.button>
 
-            {/* Language Switcher */}
-            <LanguageSwitcher />
-
             {/* Dark / Light Toggle */}
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -102,6 +99,9 @@ export function Header() {
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
+
+            {/* Language Switcher */}
+            <LanguageSwitcher />
 
             {/* Notifications */}
             <div className="relative">
