@@ -6,27 +6,13 @@ import type { Database } from './database.types'
 
 export type ContactRow = Database['public']['Tables']['nmu_contacts']['Row']
 export type TaskRow = Database['public']['Tables']['nmu_tasks']['Row']
+export type ProductRow = Database['public']['Tables']['nmu_products']['Row']
+export type OrderRow = Database['public']['Tables']['nmu_orders']['Row']
 
 // ─── PRODUCT ──────────────────────────────────────────────────
 
-export interface ProductRow {
-  id: string
-  user_id: string
-  name: string
-  category: string
-  description: string
-  price_try: number
-  tags: string[]
-  reorder_cycle_days: number | null
-  image_url: string | null
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
 export async function fetchProducts(): Promise<ProductRow[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('nmu_products')
     .select('*')
     .eq('is_active', true)
@@ -46,8 +32,7 @@ export async function addProduct(
     reorder_cycle_days?: number
   }
 ): Promise<ProductRow> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('nmu_products')
     .insert({
       user_id: userId,
@@ -75,8 +60,7 @@ export async function updateProduct(
     reorder_cycle_days: number | null
   }>
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('nmu_products')
     .update(input)
     .eq('id', id)
@@ -84,8 +68,7 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('nmu_products')
     .update({ is_active: false })
     .eq('id', id)
@@ -118,8 +101,7 @@ export async function addContact(
     pipeline_stage?: string
   }
 ): Promise<ContactRow> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('nmu_contacts')
     .insert({
       user_id: userId,
@@ -146,8 +128,7 @@ export async function deleteContact(id: string): Promise<void> {
 }
 
 export async function updateContactStage(id: string, stage: string): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('nmu_contacts')
     .update({ pipeline_stage: stage })
     .eq('id', id)
@@ -176,8 +157,7 @@ export async function addTask(
     contact_id?: string
   }
 ): Promise<TaskRow> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('nmu_tasks')
     .insert({
       user_id: userId,
@@ -196,8 +176,7 @@ export async function addTask(
 }
 
 export async function completeTask(id: string): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('nmu_tasks')
     .update({ status: 'completed', completed_at: new Date().toISOString() })
     .eq('id', id)
@@ -218,23 +197,8 @@ export interface OrderItem {
   unit_price_try: number
 }
 
-export interface OrderRow {
-  id: string
-  user_id: string
-  contact_id: string
-  items: OrderItem[]
-  total_try: number
-  status: 'pending' | 'processing' | 'delivered' | 'cancelled'
-  note: string | null
-  order_date: string
-  next_reorder_date: string | null
-  created_at: string
-  updated_at: string
-}
-
 export async function fetchOrdersByContact(contactId: string): Promise<OrderRow[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('nmu_orders')
     .select('*')
     .eq('contact_id', contactId)
@@ -244,8 +208,7 @@ export async function fetchOrdersByContact(contactId: string): Promise<OrderRow[
 }
 
 export async function fetchAllOrders(): Promise<OrderRow[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('nmu_orders')
     .select('*')
     .order('order_date', { ascending: false })
@@ -265,8 +228,7 @@ export async function addOrder(
     next_reorder_date?: string
   }
 ): Promise<OrderRow> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('nmu_orders')
     .insert({
       user_id: userId,
@@ -285,8 +247,7 @@ export async function addOrder(
 }
 
 export async function updateOrderStatus(id: string, status: OrderRow['status']): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('nmu_orders')
     .update({ status })
     .eq('id', id)
@@ -294,11 +255,9 @@ export async function updateOrderStatus(id: string, status: OrderRow['status']):
 }
 
 export async function deleteOrder(id: string): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('nmu_orders')
     .delete()
     .eq('id', id)
   if (error) throw error
 }
-

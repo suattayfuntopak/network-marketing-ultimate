@@ -1,10 +1,11 @@
 'use client'
 
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { forwardRef, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
+import { motion, type HTMLMotionProps } from 'framer-motion'
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
+  children?: ReactNode
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' | 'outline'
   size?: 'sm' | 'md' | 'lg' | 'xl'
   icon?: ReactNode
@@ -46,7 +47,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           className
         )}
         disabled={disabled || loading}
-        {...(props as any)}
+        {...props}
       >
         {loading ? (
           <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -21,7 +21,7 @@ export default function SettingsPage() {
   const { currentUser, setCurrentUser } = useAppStore()
   const { theme, setTheme } = useTheme()
 
-  const [name, setName] = useState(currentUser?.name ?? '')
+  const [name, setName] = useState(() => currentUser?.name ?? '')
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [reducedMotion, setReducedMotion] = useState(false)
@@ -39,17 +39,12 @@ export default function SettingsPage() {
     }
   }
 
-  useEffect(() => {
-    setName(currentUser?.name ?? '')
-  }, [currentUser?.name])
-
   async function handleSaveProfile() {
     if (!currentUser || !name.trim()) return
     setSaving(true)
     setSaveStatus('idle')
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('nmu_user_profiles')
       .update({ name: name.trim() })
       .eq('id', currentUser.id)

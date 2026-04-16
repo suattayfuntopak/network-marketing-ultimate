@@ -8,16 +8,18 @@ import { Progress } from '@/components/ui/Progress'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { academyCourses, achievements } from '@/data/mockData'
+import type { AcademyLesson } from '@/types'
 import {
   GraduationCap, Play, BookOpen, FileText, Mic, Download,
-  CheckCircle2, Clock, Star, Award, Zap, ChevronRight,
-  Trophy, Target, Sparkles, Lock
+  CheckCircle2, Clock, Award, Zap, ChevronRight,
+  Trophy, Target, Sparkles
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
-const lessonTypeIcons: Record<string, any> = {
+const lessonTypeIcons: Record<AcademyLesson['type'], LucideIcon> = {
   video: Play,
   text: BookOpen,
   audio: Mic,

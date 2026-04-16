@@ -27,14 +27,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
         .from('nmu_user_profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       let profile = data as ProfileRow | null
 
       // Trigger henüz çalışmadıysa profili kendimiz oluştur
       if (!profile) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: upserted } = await (supabase as any)
+        const { data: upserted } = await supabase
           .from('nmu_user_profiles')
           .upsert({ id: userId, email, name: email.split('@')[0] }, { onConflict: 'id' })
           .select()

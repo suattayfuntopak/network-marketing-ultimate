@@ -12,18 +12,14 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType>({ theme: 'dark', setTheme: () => {} })
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('dark')
-
-  // Sayfa yüklenince kayıtlı temayı oku
-  useEffect(() => {
-    const saved = localStorage.getItem('nmu-theme') as Theme | null
-    if (saved === 'light' || saved === 'dark') {
-      setThemeState(saved)
-      document.documentElement.setAttribute('data-theme', saved)
-    } else {
-      document.documentElement.setAttribute('data-theme', 'dark')
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window === 'undefined') {
+      return 'dark'
     }
-  }, [])
+
+    const saved = localStorage.getItem('nmu-theme') as Theme | null
+    return saved === 'light' || saved === 'dark' ? saved : 'dark'
+  })
 
   // Tema değişince uygula
   useEffect(() => {

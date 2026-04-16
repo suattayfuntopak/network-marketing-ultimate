@@ -6,19 +6,25 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { automations } from '@/data/mockData'
+import type { AutomationTrigger } from '@/types'
 import { Zap, Plus, Play, Pause, Clock, AlertTriangle, ArrowRight, Settings } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
-const triggerIcons: Record<string, any> = { stage_change: ArrowRight, date_reached: Clock, inactivity: AlertTriangle, manual: Play }
+const triggerIcons: Partial<Record<AutomationTrigger['type'], LucideIcon>> = {
+  stage_change: ArrowRight,
+  date_reached: Clock,
+  inactivity: AlertTriangle,
+  manual: Play,
+}
 
 export default function AutomationsPage() {
   const { t } = useLanguage()
 
-  const triggerLabel = (type: string) =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (t.events as any).triggerTypes?.[type] ?? type.replace(/_/g, ' ')
+  const triggerLabel = (type: AutomationTrigger['type']) =>
+    t.events.triggerTypes[type] ?? type.replace(/_/g, ' ')
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1200px] mx-auto">
@@ -85,11 +91,11 @@ export default function AutomationsPage() {
               { name: t.automations.templateNames.reorder, desc: t.automations.templateNames.reorderDesc, icon: '🔄' },
               { name: t.automations.templateNames.inactivity, desc: t.automations.templateNames.inactivityDesc, icon: '⚠️' },
               { name: t.automations.templateNames.eventFollowup, desc: t.automations.templateNames.eventFollowupDesc, icon: '📅' },
-            ].map((t, i) => (
+            ].map((template, i) => (
               <div key={i} className="p-4 rounded-xl bg-surface/50 border border-border-subtle hover:border-border cursor-pointer transition-colors text-center group">
-                <span className="text-2xl">{t.icon}</span>
-                <p className="text-sm font-medium text-text-primary mt-2">{t.name}</p>
-                <p className="text-[10px] text-text-tertiary">{t.desc}</p>
+                <span className="text-2xl">{template.icon}</span>
+                <p className="text-sm font-medium text-text-primary mt-2">{template.name}</p>
+                <p className="text-[10px] text-text-tertiary">{template.desc}</p>
               </div>
             ))}
           </div>

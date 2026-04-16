@@ -19,6 +19,11 @@ import {
   Bot, Shield, ChevronLeft, ChevronRight, Zap,
   Target, Sparkles, X, LogOut, Settings, ChevronUp
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+
+type NavDividerItem = { divider: true }
+type NavLinkItem = { divider?: false; label: string; href: string; icon: LucideIcon; badge?: string; highlight?: boolean }
+type NavItem = NavDividerItem | NavLinkItem
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -50,7 +55,7 @@ export function Sidebar() {
     router.replace('/auth/login')
   }
 
-  const navItems = [
+  const navItems: NavItem[] = [
     { label: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
     { label: t.nav.prospects, href: '/prospects', icon: Users, badge: prospectsCount?.toString() },
     { label: t.nav.contacts, href: '/contacts', icon: Contact },
@@ -101,11 +106,11 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {navItems.map((item, i) => {
-          if ('divider' in item && item.divider) {
+          if (item.divider) {
             return <div key={i} className="h-px bg-border my-3 mx-2" />
           }
 
-          const navItem = item as { label: string; href: string; icon: any; badge?: string; highlight?: boolean }
+          const navItem = item
           const isActive = pathname === navItem.href || pathname?.startsWith(navItem.href + '/')
           const Icon = navItem.icon
 

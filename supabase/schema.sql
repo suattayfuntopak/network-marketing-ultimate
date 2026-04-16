@@ -175,6 +175,45 @@ CREATE TABLE IF NOT EXISTS nmu_campaigns (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ─── 9. ÜRÜNLER ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS nmu_products (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name          TEXT NOT NULL,
+  category      TEXT NOT NULL DEFAULT '',
+  description   TEXT NOT NULL DEFAULT '',
+  price_try     NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  tags          TEXT[] NOT NULL DEFAULT '{}',
+  reorder_cycle_days INTEGER,
+  image_url     TEXT,
+  is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS nmu_products_user_idx ON nmu_products(user_id);
+CREATE INDEX IF NOT EXISTS nmu_products_active_idx ON nmu_products(user_id, is_active);
+
+-- ─── 10. SİPARİŞLER ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS nmu_orders (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id           UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  contact_id        UUID NOT NULL REFERENCES nmu_contacts(id) ON DELETE CASCADE,
+  items             JSONB NOT NULL DEFAULT '[]',
+  total_try         NUMERIC(12,2) NOT NULL DEFAULT 0,
+  status            TEXT NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending','processing','delivered','cancelled')),
+  note              TEXT,
+  order_date        DATE NOT NULL DEFAULT CURRENT_DATE,
+  next_reorder_date DATE,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS nmu_orders_user_idx    ON nmu_orders(user_id);
+CREATE INDEX IF NOT EXISTS nmu_orders_contact_idx ON nmu_orders(contact_id);
+CREATE INDEX IF NOT EXISTS nmu_orders_date_idx    ON nmu_orders(order_date);
+
 -- ─── UPDATED_AT OTOMATİK GÜNCELLEME ──────────────────────────
 CREATE OR REPLACE FUNCTION nmu_set_updated_at()
 RETURNS TRIGGER AS $$
@@ -190,7 +229,7 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'nmu_user_profiles','nmu_contacts','nmu_tasks',
-    'nmu_events','nmu_campaigns'
+    'nmu_events','nmu_campaigns','nmu_products','nmu_orders'
   ] LOOP
     EXECUTE format(
       'DROP TRIGGER IF EXISTS set_updated_at ON %I;
@@ -211,6 +250,8 @@ ALTER TABLE nmu_events        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_event_attendees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_campaigns     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nmu_products      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nmu_orders        ENABLE ROW LEVEL SECURITY;
 
 -- nmu_user_profiles policies
 CREATE POLICY "nmu_profile_own" ON nmu_user_profiles
@@ -250,6 +291,14 @@ CREATE POLICY "nmu_notifications_own" ON nmu_notifications
 CREATE POLICY "nmu_campaigns_own" ON nmu_campaigns
   FOR ALL USING (auth.uid() = user_id);
 
+-- nmu_products policies
+CREATE POLICY "nmu_products_own" ON nmu_products
+  FOR ALL USING (auth.uid() = user_id);
+
+-- nmu_orders policies
+CREATE POLICY "nmu_orders_own" ON nmu_orders
+  FOR ALL USING (auth.uid() = user_id);
+
 -- ─── YENİ KULLANICI KAYIT TRIGGER'I ──────────────────────────
 -- Supabase Auth'a kayıt olunca otomatik profil oluşturur
 CREATE OR REPLACE FUNCTION nmu_handle_new_user()
@@ -274,4 +323,4 @@ CREATE TRIGGER nmu_on_auth_user_created
 -- ─── TAMAMLANDI ───────────────────────────────────────────────
 -- Tablo listesi: nmu_user_profiles, nmu_contacts, nmu_tasks,
 -- nmu_interactions, nmu_events, nmu_event_attendees,
--- nmu_notifications, nmu_campaigns
+-- nmu_notifications, nmu_campaigns, nmu_products, nmu_orders

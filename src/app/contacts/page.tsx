@@ -19,8 +19,6 @@ import {
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
-const TEMPERATURES = ['cold', 'warm', 'hot', 'frozen'] as const
-const INTEREST_TYPES = ['unknown', 'product', 'business', 'both'] as const
 const PIPELINE_STAGES: Record<string, string> = {
   new: 'Yeni', contact_planned: 'İletişim Planlandı', first_contact: 'İlk İletişim',
   interested: 'İlgileniyor', invited: 'Davet Edildi', presentation_sent: 'Sunum Gönderildi',
@@ -34,8 +32,8 @@ type AddForm = {
   email: string
   location: string
   profession: string
-  temperature: typeof TEMPERATURES[number]
-  interest_type: typeof INTEREST_TYPES[number]
+  temperature: 'cold' | 'warm' | 'hot' | 'frozen'
+  interest_type: 'unknown' | 'product' | 'business' | 'both'
   source: string
 }
 
@@ -322,7 +320,7 @@ export default function ContactsPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-text-secondary mb-1.5">Sıcaklık</label>
-                    <select value={form.temperature} onChange={e => setForm(f => ({ ...f, temperature: e.target.value as typeof TEMPERATURES[number] }))}
+                    <select value={form.temperature} onChange={e => setForm(f => ({ ...f, temperature: e.target.value as AddForm['temperature'] }))}
                       className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all">
                       <option value="cold">Soğuk</option>
                       <option value="warm">Ilık</option>
@@ -332,7 +330,7 @@ export default function ContactsPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-text-secondary mb-1.5">İlgi Alanı</label>
-                    <select value={form.interest_type} onChange={e => setForm(f => ({ ...f, interest_type: e.target.value as typeof INTEREST_TYPES[number] }))}
+                    <select value={form.interest_type} onChange={e => setForm(f => ({ ...f, interest_type: e.target.value as AddForm['interest_type'] }))}
                       className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all">
                       <option value="unknown">Bilinmiyor</option>
                       <option value="product">Ürün</option>

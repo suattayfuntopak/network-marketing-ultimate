@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Progress, CircularProgress } from '@/components/ui/Progress'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { ranks, currentUser } from '@/data/mockData'
-import { Trophy, Target, TrendingUp, Award, ChevronRight, Star, Zap, Users, DollarSign } from 'lucide-react'
+import { Trophy, Target, TrendingUp, Award, Star, Zap, Users } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -86,7 +86,7 @@ export default function RankPage() {
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-400" /> {t.rank.rankLadder}</CardTitle></CardHeader>
           <div className="space-y-3">
-            {ranks.map((rank, i) => {
+            {ranks.map((rank) => {
               const isCurrent = rank.name === currentUser.rank
               const isPast = rank.level < currentRank.level
               return (

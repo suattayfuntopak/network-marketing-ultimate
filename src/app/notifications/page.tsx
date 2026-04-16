@@ -1,17 +1,19 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { notifications } from '@/data/mockData'
-import { Bell, CheckCircle2, Bot, Users, Calendar, Award, Zap, Target, Settings } from 'lucide-react'
+import type { Notification } from '@/types'
+import { Bell, Bot, Users, Calendar, Award, Target, Settings } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
-const typeIcons: Record<string, any> = {
+const typeIcons: Partial<Record<Notification['type'], LucideIcon>> = {
   follow_up_due: Target, team_alert: Users, achievement: Award,
   ai_suggestion: Bot, event_reminder: Calendar, system: Settings,
 }
@@ -74,7 +76,7 @@ export default function NotificationsPage() {
         <motion.div variants={item}>
           <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-3">{t.notificationsPage.earlier}</p>
           <div className="space-y-2">
-            {read.map((notif, i) => {
+            {read.map((notif) => {
               const Icon = typeIcons[notif.type] || Bell
               return (
                 <Card key={notif.id} hover className="opacity-70 hover:opacity-100 transition-opacity">

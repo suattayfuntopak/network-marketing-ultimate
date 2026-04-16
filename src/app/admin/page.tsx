@@ -1,11 +1,9 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
 import { useLanguage } from '@/components/common/LanguageProvider'
-import { Shield, Users, Settings, Database, Key, Globe, Palette, Bell, Lock, BarChart3, FileText, Zap } from 'lucide-react'
+import { Users, Settings, Globe, Lock, BarChart3, FileText, Zap } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }

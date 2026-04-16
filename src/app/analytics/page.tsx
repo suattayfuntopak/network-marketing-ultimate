@@ -2,30 +2,33 @@
 
 import { motion } from 'framer-motion'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Progress } from '@/components/ui/Progress'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { weeklyActivityData, monthlyConversionData, pipelineDistribution, teamActivityHeatmap } from '@/data/mockData'
 import {
-  BarChart3, TrendingUp, Users, Target, ShoppingBag, GraduationCap,
-  Calendar, ArrowUpRight, ArrowDownRight, Activity
+  Users, Target, ShoppingBag, GraduationCap,
+  ArrowUpRight, ArrowDownRight, Activity
 } from 'lucide-react'
 import {
-  AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid,
-  PolarAngleAxis, PolarRadiusAxis
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
+import type { TooltipContentProps, TooltipValueType } from 'recharts'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+type TeamActivityRow = (typeof teamActivityHeatmap)[number]
+type TeamActivityDay = Exclude<keyof TeamActivityRow, 'name'>
+
+const teamActivityDays: TeamActivityDay[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+
+const CustomTooltip = ({ active, payload, label }: TooltipContentProps<TooltipValueType, string | number>) => {
   if (!active || !payload) return null
   return (
     <div className="bg-elevated border border-border rounded-xl p-3 shadow-float">
       <p className="text-xs font-semibold text-text-primary mb-1">{label}</p>
-      {payload.map((p: any, i: number) => (
-        <p key={i} className="text-xs text-text-secondary">{p.name}: <span className="font-semibold text-text-primary">{p.value}</span></p>
+      {payload.map((item, index) => (
+        <p key={index} className="text-xs text-text-secondary">{item.name}: <span className="font-semibold text-text-primary">{item.value}</span></p>
       ))}
     </div>
   )
@@ -77,7 +80,7 @@ export default function AnalyticsPage() {
                 <BarChart data={weeklyActivityData}>
                   <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={CustomTooltip} />
                   <Bar dataKey="contacts" fill="#00d4ff" radius={[4, 4, 0, 0]} name={t.analytics.contacted} />
                   <Bar dataKey="followUps" fill="#8b5cf6" radius={[4, 4, 0, 0]} name={t.rank.followUps} />
                   <Bar dataKey="newLeads" fill="#10b981" radius={[4, 4, 0, 0]} name={t.rank.newLeads} />
@@ -101,7 +104,7 @@ export default function AnalyticsPage() {
                   </defs>
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={CustomTooltip} />
                   <Area type="monotone" dataKey="leads" stroke="#00d4ff" fill="url(#gLeads)" strokeWidth={2} name={t.analytics.totalLeads} />
                   <Area type="monotone" dataKey="customers" stroke="#10b981" fill="url(#gCustomers)" strokeWidth={2} name={t.customers.title} />
                   <Area type="monotone" dataKey="recruits" stroke="#8b5cf6" fill="url(#gRecruits)" strokeWidth={2} name={t.team.title} />
@@ -121,7 +124,7 @@ export default function AnalyticsPage() {
                   <Pie data={pipelineDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="count" paddingAngle={2}>
                     {pipelineDistribution.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie>
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={CustomTooltip} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-2 flex-1">
@@ -155,8 +158,8 @@ export default function AnalyticsPage() {
                   {teamActivityHeatmap.map((row, i) => (
                     <tr key={i}>
                       <td className="text-xs text-text-primary font-medium py-1 pr-4">{row.name}</td>
-                      {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map(day => {
-                        const val = (row as any)[day]
+                      {teamActivityDays.map(day => {
+                        const val = row[day]
                         const opacity = val === 0 ? 0 : 0.15 + (val / 5) * 0.85
                         return (
                           <td key={day} className="py-1 px-0.5">

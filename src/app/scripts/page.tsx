@@ -7,12 +7,13 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { scripts, objections } from '@/data/mockData'
-import { FileText, Search, Copy, Star, ChevronRight, MessageSquare, Shield, Users, Megaphone, Heart, Zap } from 'lucide-react'
+import { FileText, Copy, Star, ChevronRight, MessageSquare, Shield, Users, Megaphone, Heart, Zap } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
-const categoryIcons: Record<string, any> = {
+const categoryIcons: Record<string, LucideIcon> = {
   Davet: MessageSquare, Takip: ChevronRight, 'Müşteri İlişkileri': Heart,
   'Sosyal Medya': Megaphone, Oryantasyon: Users, İtirazlar: Shield, 'Potansiyel Müşteri': Zap,
 }
@@ -47,7 +48,7 @@ export default function ScriptsPage() {
       </motion.div>
 
       <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {filtered.map((script, i) => {
+        {filtered.map((script) => {
           const Icon = categoryIcons[script.category] || FileText
           return (
             <Card key={script.id} hover>
@@ -84,7 +85,7 @@ export default function ScriptsPage() {
           <div className="space-y-4">
             {objections.map(obj => (
               <div key={obj.id} className="p-4 rounded-xl bg-surface/50 border border-border-subtle">
-                <p className="text-sm font-semibold text-text-primary mb-2">"{obj.objection}"</p>
+                <p className="text-sm font-semibold text-text-primary mb-2">&quot;{obj.objection}&quot;</p>
                 <div className="space-y-2">
                   {obj.responses.map(r => (
                     <div key={r.id} className="p-3 rounded-lg bg-card border border-border">

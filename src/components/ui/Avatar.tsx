@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { cn, getInitials } from '@/lib/utils'
 
 interface AvatarProps {
@@ -33,6 +34,14 @@ const statusSizes = {
   xl: 'w-3.5 h-3.5',
 }
 
+const imageSizes = {
+  xs: 24,
+  sm: 32,
+  md: 40,
+  lg: 48,
+  xl: 64,
+}
+
 const gradients = [
   'from-cyan-500 to-blue-600',
   'from-violet-500 to-purple-600',
@@ -57,9 +66,12 @@ export function Avatar({ name, src, size = 'md', className, status }: AvatarProp
   return (
     <div className={cn('relative inline-flex shrink-0', className)}>
       {src ? (
-        <img
+        <Image
           src={src}
           alt={name}
+          width={imageSizes[size]}
+          height={imageSizes[size]}
+          unoptimized
           className={cn('rounded-full object-cover', sizes[size])}
         />
       ) : (

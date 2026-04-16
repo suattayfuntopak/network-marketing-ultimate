@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -10,9 +9,8 @@ import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { teamMembers } from '@/data/mockData'
 import {
-  Users, UserPlus, TrendingUp, AlertTriangle, Shield, Target,
-  ChevronRight, Phone, MessageCircle, Award, Flame, Activity,
-  BarChart3, Zap, CheckCircle2, Clock
+  Users, UserPlus, AlertTriangle, Shield, Target,
+  Activity, BarChart3, CheckCircle2, Clock
 } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
@@ -20,8 +18,6 @@ const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
 export default function TeamPage() {
   const { t } = useLanguage()
-  const [selectedMember, setSelectedMember] = useState<string | null>(null)
-  const member = selectedMember ? teamMembers.find(m => m.user.id === selectedMember) : null
 
   const activeCount = teamMembers.filter(m => m.riskLevel === 'low').length
   const atRiskCount = teamMembers.filter(m => m.riskLevel === 'high' || m.riskLevel === 'medium').length
@@ -57,9 +53,9 @@ export default function TeamPage() {
 
       {/* Team Members */}
       <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {teamMembers.map((tm, i) => (
+        {teamMembers.map((tm) => (
           <motion.div key={tm.user.id} variants={item}>
-            <Card hover onClick={() => setSelectedMember(tm.user.id)} glow={tm.riskLevel === 'high' ? 'error' : 'none'}>
+            <Card hover glow={tm.riskLevel === 'high' ? 'error' : 'none'}>
               <div className="flex items-start gap-4">
                 <Avatar name={tm.user.name} size="lg" status={tm.activityScore > 50 ? 'online' : tm.activityScore > 20 ? 'away' : 'offline'} />
                 <div className="flex-1 min-w-0">

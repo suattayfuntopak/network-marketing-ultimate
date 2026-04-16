@@ -635,7 +635,7 @@ export default function CustomersPage() {
             <div className="text-center py-16 text-text-tertiary">
               <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p className="text-sm">Henüz hiç müşteri yok.</p>
-              <p className="text-xs mt-1">Sağ üstteki "Müşteri Ekle" butonunu kullan.</p>
+              <p className="text-xs mt-1">Sağ üstteki &quot;Müşteri Ekle&quot; butonunu kullan.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -706,7 +706,7 @@ export default function CustomersPage() {
               <div className="text-center py-12 text-text-tertiary">
                 <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">Henüz ürün eklenmedi.</p>
-                <p className="text-xs mt-1">Yukarıdaki "Ürün Ekle" butonunu kullan.</p>
+                <p className="text-xs mt-1">Yukarıdaki &quot;Ürün Ekle&quot; butonunu kullan.</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
