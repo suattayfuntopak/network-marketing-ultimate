@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
 import { useRouter } from 'next/navigation'
-import { fetchContacts, fetchTasks } from '@/lib/queries'
+import { completeTask, fetchContacts, fetchTasks } from '@/lib/queries'
 import type { ContactRow, TaskRow } from '@/lib/queries'
 import {
   Flame, TrendingUp, Users, Phone, ShoppingBag,
@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const { t } = useLanguage()
   const { currentUser, toggleAIPanel } = useAppStore()
   const router = useRouter()
+  const qc = useQueryClient()
 
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -52,9 +53,19 @@ export default function DashboardPage() {
     queryFn: fetchTasks,
   })
 
-  const urgentTasks = tasks.filter(t => (t.priority === 'urgent' || t.priority === 'high') && t.status === 'pending')
+  const urgentTasks = tasks.filter(task =>
+    (task.priority === 'urgent' || task.priority === 'high') &&
+    (task.status === 'pending' || task.status === 'overdue')
+  )
   const hotLeads = contacts.filter(c => c.temperature === 'hot' && c.status === 'active')
   const pendingTasks = tasks.filter(t => t.status === 'pending')
+
+  const completeTaskMutation = useMutation({
+    mutationFn: completeTask,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+    },
+  })
 
   // Pipeline dağılımı — gerçek veriden hesaplanır
   const pipelineCounts = contacts.reduce<Record<string, number>>((acc, c) => {
@@ -191,16 +202,26 @@ export default function DashboardPage() {
                     <motion.div key={task.id}
                       initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
                       className="flex items-center gap-3 p-3 rounded-xl bg-surface/50 border border-border-subtle hover:border-border cursor-pointer group transition-all"
+                      onClick={() => router.push('/tasks')}
                     >
-                      <button className="w-5 h-5 rounded-md border-2 border-border-strong hover:border-primary hover:bg-primary/10 transition-colors shrink-0 flex items-center justify-center">
+                      <button
+                        onClick={event => {
+                          event.stopPropagation()
+                          completeTaskMutation.mutate(task.id)
+                        }}
+                        disabled={completeTaskMutation.isPending}
+                        className="w-5 h-5 rounded-md border-2 border-border-strong hover:border-primary hover:bg-primary/10 transition-colors shrink-0 flex items-center justify-center"
+                      >
                         <CheckCircle2 className="w-3 h-3 text-transparent group-hover:text-primary/50" />
                       </button>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-text-primary truncate">{task.title}</p>
                         {task.description && <p className="text-xs text-text-tertiary truncate">{task.description}</p>}
                       </div>
-                      <Badge variant={task.priority === 'urgent' ? 'error' : 'warning'} size="sm">
-                        {t.tasks.priority[task.priority as keyof typeof t.tasks.priority]}
+                      <Badge variant={task.status === 'overdue' ? 'error' : task.priority === 'urgent' ? 'error' : 'warning'} size="sm">
+                        {task.status === 'overdue'
+                          ? t.tasks.overdueTasks
+                          : t.tasks.priority[task.priority as keyof typeof t.tasks.priority]}
                       </Badge>
                       <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-text-secondary transition-colors" />
                     </motion.div>
@@ -235,6 +256,7 @@ export default function DashboardPage() {
                     <motion.div key={stage.stage}
                       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
                       className="flex-1 min-w-[90px] bg-surface/50 border border-border-subtle rounded-xl p-3 text-center hover:border-border cursor-pointer transition-all"
+                      onClick={() => router.push('/pipeline')}
                     >
                       <div className="w-8 h-8 rounded-lg mx-auto mb-2 flex items-center justify-center text-sm font-bold"
                         style={{ backgroundColor: `${stage.color}15`, color: stage.color }}>
@@ -333,6 +355,7 @@ export default function DashboardPage() {
                     <motion.div key={lead.id}
                       initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
                       className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface/50 cursor-pointer group transition-colors"
+                      onClick={() => router.push('/contacts')}
                     >
                       <Avatar name={lead.full_name} size="sm" />
                       <div className="flex-1 min-w-0">

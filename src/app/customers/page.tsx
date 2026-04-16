@@ -255,6 +255,18 @@ function AddOrderModal({ onClose, userId, contact, products }: {
 
   const total = items.reduce((s, i) => s + i.quantity * i.unit_price_try, 0)
 
+  function calculateNextReorderDate(orderDateValue: string, orderItems: AddOrderItem[]) {
+    const reorderCandidates = orderItems
+      .map(item => products.find(product => product.id === item.product_id)?.reorder_cycle_days ?? null)
+      .filter((value): value is number => typeof value === 'number' && value > 0)
+
+    if (reorderCandidates.length === 0) return undefined
+
+    const nextDate = new Date(orderDateValue)
+    nextDate.setDate(nextDate.getDate() + Math.min(...reorderCandidates))
+    return nextDate.toISOString().split('T')[0]
+  }
+
   function selectProduct(idx: number, productId: string) {
     const p = products.find(p => p.id === productId)
     if (!p) return
@@ -274,9 +286,11 @@ function AddOrderModal({ onClose, userId, contact, products }: {
         status,
         note: note || undefined,
         order_date: orderDate,
+        next_reorder_date: calculateNextReorderDate(orderDate, validItems),
       })
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contacts'] })
       qc.invalidateQueries({ queryKey: ['orders', contact.id] })
       qc.invalidateQueries({ queryKey: ['orders-all'] })
       onClose()
@@ -405,12 +419,18 @@ function CustomerDetail({ customer, products, userId, onBack }: {
 
   const deleteOrderMutation = useMutation({
     mutationFn: (id: string) => deleteOrder(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['orders', customer.id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orders', customer.id] })
+      qc.invalidateQueries({ queryKey: ['orders-all'] })
+    },
   })
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: OrderRow['status'] }) => updateOrderStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['orders', customer.id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orders', customer.id] })
+      qc.invalidateQueries({ queryKey: ['orders-all'] })
+    },
   })
 
   return (
@@ -519,6 +539,11 @@ function CustomerDetail({ customer, products, userId, onBack }: {
                         </div>
                       ))}
                     </div>
+                    {order.next_reorder_date && order.status !== 'cancelled' && (
+                      <div className="mt-2 pt-2 border-t border-border-subtle text-xs text-text-secondary">
+                        Sonraki yeniden siparis: <span className="font-medium text-text-primary">{formatDate(order.next_reorder_date)}</span>
+                      </div>
+                    )}
                     {order.note && (
                       <p className="mt-2 pt-2 border-t border-border-subtle text-xs text-text-tertiary italic">{order.note}</p>
                     )}
@@ -569,9 +594,18 @@ export default function CustomersPage() {
     queryFn: fetchAllOrders,
   })
 
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
   const totalRevenue = allOrders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + o.total_try, 0)
   const avgOrder = allOrders.filter(o => o.status !== 'cancelled').length > 0
     ? totalRevenue / allOrders.filter(o => o.status !== 'cancelled').length : 0
+  const reordersDue = allOrders.filter(order => {
+    if (order.status === 'cancelled' || !order.next_reorder_date) return false
+    const reorderDate = new Date(order.next_reorder_date)
+    reorderDate.setHours(0, 0, 0, 0)
+    return reorderDate <= today
+  }).length
 
   const deleteProductMutation = useMutation({
     mutationFn: (id: string) => deleteProduct(id),
@@ -612,7 +646,7 @@ export default function CustomersPage() {
             { label: t.customers.activeCustomers, value: customers.length, icon: ShoppingBag, color: 'text-success' },
             { label: 'Toplam Gelir', value: formatTRY(totalRevenue), icon: TrendingUp, color: 'text-primary' },
             { label: 'Ort. Sipariş', value: formatTRY(avgOrder), icon: TrendingUp, color: 'text-secondary' },
-            { label: 'Sipariş Sayısı', value: allOrders.filter(o => o.status !== 'cancelled').length, icon: RefreshCw, color: 'text-warning' },
+            { label: t.customers.reordersDue, value: reordersDue, icon: RefreshCw, color: 'text-warning' },
           ].map((s, i) => {
             const Icon = s.icon
             return (
