@@ -28,6 +28,9 @@ const PIPELINE_STAGES = [
   { stage: 'became_customer',    label: 'Müşteri',              color: '#10b981' },
   { stage: 'ready_to_join',      label: 'Katılmaya Hazır',      color: '#a855f7' },
   { stage: 'became_member',      label: 'Ekip Üyesi',           color: '#d946ef' },
+  { stage: 'nurture_later',      label: 'Sonra İlgilen',        color: '#64748b' },
+  { stage: 'dormant',            label: 'Pasif',                color: '#475569' },
+  { stage: 'lost',               label: 'Kaybedildi',           color: '#334155' },
 ]
 
 const INTEREST_LABELS: Record<string, { tr: string; en: string }> = {

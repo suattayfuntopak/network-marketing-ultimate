@@ -81,6 +81,36 @@ export default function DashboardPage() {
   const fullName = currentUser?.name ?? ''
   const streak = currentUser?.streak ?? 0
   const momentum = currentUser?.momentumScore ?? 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const weeklyBuckets = EMPTY_WEEK.map((entry, index) => {
+    const date = new Date(today)
+    date.setDate(today.getDate() - (6 - index))
+    return {
+      ...entry,
+      dateKey: date.toISOString().split('T')[0],
+    }
+  })
+
+  const contactCounts = contacts.reduce<Record<string, number>>((accumulator, contact) => {
+    const key = new Date(contact.created_at).toISOString().split('T')[0]
+    accumulator[key] = (accumulator[key] ?? 0) + 1
+    return accumulator
+  }, {})
+
+  const presentationCounts = tasks.reduce<Record<string, number>>((accumulator, task) => {
+    if (task.type !== 'presentation') return accumulator
+    const key = new Date(task.due_date).toISOString().split('T')[0]
+    accumulator[key] = (accumulator[key] ?? 0) + 1
+    return accumulator
+  }, {})
+
+  const weeklyActivity = weeklyBuckets.map(bucket => ({
+    day: bucket.day,
+    contacts: contactCounts[bucket.dateKey] ?? 0,
+    presentations: presentationCounts[bucket.dateKey] ?? 0,
+  }))
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
@@ -289,7 +319,7 @@ export default function DashboardPage() {
               </CardHeader>
               <div className="h-[200px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={EMPTY_WEEK}>
+                  <AreaChart data={weeklyActivity}>
                     <defs>
                       <linearGradient id="cC" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#00d4ff" stopOpacity={0.3} />
@@ -355,7 +385,7 @@ export default function DashboardPage() {
                     <motion.div key={lead.id}
                       initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
                       className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface/50 cursor-pointer group transition-colors"
-                      onClick={() => router.push('/contacts')}
+                      onClick={() => router.push(`/contacts?contact=${lead.id}`)}
                     >
                       <Avatar name={lead.full_name} size="sm" />
                       <div className="flex-1 min-w-0">

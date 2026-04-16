@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
@@ -54,6 +54,7 @@ export default function ProspectsPage() {
   const { currentUser } = useAppStore()
   const queryClient = useQueryClient()
   const router = useRouter()
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const interestLabel = (type: string) =>
     t.interest?.[INTEREST_KEY[type] ?? 'unknown'] ?? type
@@ -65,6 +66,108 @@ export default function ProspectsPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importMessage, setImportMessage] = useState('')
+
+  function exportContacts() {
+    const headers = [
+      'full_name',
+      'phone',
+      'email',
+      'profession',
+      'location',
+      'temperature',
+      'interest_type',
+      'source',
+      'pipeline_stage',
+      'last_contact_date',
+      'next_follow_up_date',
+      'notes',
+    ]
+
+    const rows = contacts.map(contact => ([
+      contact.full_name,
+      contact.phone ?? '',
+      contact.email ?? '',
+      contact.profession ?? '',
+      contact.location ?? '',
+      contact.temperature,
+      contact.interest_type,
+      contact.source ?? '',
+      contact.pipeline_stage,
+      contact.last_contact_date ?? '',
+      contact.next_follow_up_date ?? '',
+      contact.goals_notes ?? '',
+    ]))
+
+    const csv = [headers, ...rows]
+      .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `nmu-prospects-${new Date().toISOString().split('T')[0]}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file || !currentUser) return
+
+    setImporting(true)
+    setImportMessage('')
+
+    try {
+      const text = await file.text()
+      const [headerLine, ...lines] = text.split(/\r?\n/).filter(Boolean)
+
+      if (!headerLine) {
+        throw new Error('CSV bos.')
+      }
+
+      const headers = headerLine.split(',').map(header => header.trim().replace(/^"|"$/g, ''))
+      const importedRows = lines
+        .map(line => {
+          const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)|(?<=,)(?=,)/g) ?? []
+          const normalizedValues = values.map(value => value.replace(/^"|"$/g, '').replace(/""/g, '"'))
+          return headers.reduce<Record<string, string>>((accumulator, header, index) => {
+            accumulator[header] = normalizedValues[index] ?? ''
+            return accumulator
+          }, {})
+        })
+        .filter(row => row.full_name?.trim())
+
+      if (importedRows.length === 0) {
+        throw new Error('Iceride aktarilacak gecerli kayit bulunamadi.')
+      }
+
+      for (const row of importedRows) {
+        await addContact(currentUser.id, {
+          full_name: row.full_name.trim(),
+          phone: row.phone || undefined,
+          email: row.email || undefined,
+          profession: row.profession || undefined,
+          location: row.location || undefined,
+          temperature: (row.temperature as 'cold' | 'warm' | 'hot' | 'frozen') || 'cold',
+          interest_type: (row.interest_type as 'product' | 'business' | 'both' | 'unknown') || 'unknown',
+          source: row.source || undefined,
+          notes: row.notes || undefined,
+          pipeline_stage: row.pipeline_stage || undefined,
+        })
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      setImportMessage(`${importedRows.length} kayit ice aktarildi.`)
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : 'Ice aktarma sirasinda hata olustu.')
+    } finally {
+      setImporting(false)
+      event.target.value = ''
+    }
+  }
 
   const { data: contacts = [], isLoading } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -120,11 +223,36 @@ export default function ProspectsPage() {
           <p className="text-sm text-text-secondary mt-0.5">{contacts.length} {t.prospects.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" icon={<Upload className="w-3.5 h-3.5" />}>{t.prospects.importContacts}</Button>
-          <Button variant="outline" size="sm" icon={<Download className="w-3.5 h-3.5" />}>{t.prospects.exportContacts}</Button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            icon={<Upload className="w-3.5 h-3.5" />}
+            onClick={() => importInputRef.current?.click()}
+            loading={importing}
+          >
+            {t.prospects.importContacts}
+          </Button>
+          <Button variant="outline" size="sm" icon={<Download className="w-3.5 h-3.5" />} onClick={exportContacts}>
+            {t.prospects.exportContacts}
+          </Button>
           <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setModalOpen(true)}>{t.prospects.addProspect}</Button>
         </div>
       </motion.div>
+
+      {importMessage && (
+        <motion.div variants={item}>
+          <div className="rounded-xl border border-border bg-surface/50 px-4 py-3 text-sm text-text-secondary">
+            {importMessage}
+          </div>
+        </motion.div>
+      )}
 
       {/* Temperature Summary */}
       <motion.div variants={item} className="grid grid-cols-3 gap-3">
