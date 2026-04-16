@@ -1,12 +1,16 @@
 'use client'
 
 import { type ReactNode, useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { usePathname, useRouter } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { deriveNotifications } from '@/lib/coach'
+import { fetchAllOrders, fetchContacts, fetchTasks } from '@/lib/queries'
 import { useAppStore } from '@/store/appStore'
 import type { User, UserSettings } from '@/types'
 import type { Database } from '@/lib/database.types'
+import { useLanguage } from '@/components/common/LanguageProvider'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { AIPanel } from './AIPanel'
@@ -14,10 +18,34 @@ import { AIPanel } from './AIPanel'
 export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { currentUser, setCurrentUser } = useAppStore()
+  const { locale } = useLanguage()
+  const { currentUser, setCurrentUser, setNotifications } = useAppStore()
   const [authReady, setAuthReady] = useState(false)
 
   const isAuthRoute = pathname?.startsWith('/auth')
+
+  const notificationsEnabled = authReady && Boolean(currentUser) && !isAuthRoute
+
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['contacts'],
+    queryFn: fetchContacts,
+    enabled: notificationsEnabled,
+    staleTime: 30_000,
+  })
+
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['tasks'],
+    queryFn: fetchTasks,
+    enabled: notificationsEnabled,
+    staleTime: 30_000,
+  })
+
+  const { data: orders = [] } = useQuery({
+    queryKey: ['orders-all'],
+    queryFn: fetchAllOrders,
+    enabled: notificationsEnabled,
+    staleTime: 30_000,
+  })
 
   useEffect(() => {
     type ProfileRow = Database['public']['Tables']['nmu_user_profiles']['Row']
@@ -86,6 +114,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
       router.replace('/auth/login')
     }
   }, [authReady, currentUser, isAuthRoute, router])
+
+  useEffect(() => {
+    if (!notificationsEnabled) {
+      setNotifications([])
+      return
+    }
+
+    setNotifications(deriveNotifications(contacts, tasks, orders, currentUser, locale))
+  }, [contacts, currentUser, locale, notificationsEnabled, orders, setNotifications, tasks])
 
   // Auth sayfaları — sidebar/header olmadan render et
   if (isAuthRoute) {
