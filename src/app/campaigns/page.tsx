@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/Progress'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { usePersistentState } from '@/hooks/usePersistentState'
 import { campaigns } from '@/data/mockData'
 import type { Campaign } from '@/types'
 import { Plus, Users, Calendar, Zap, ArrowRight, ExternalLink, Pause, Play } from 'lucide-react'
@@ -65,7 +66,7 @@ function campaignDestination(type: Campaign['type']) {
 export default function CampaignsPage() {
   const router = useRouter()
   const { t, locale } = useLanguage()
-  const [campaignItems, setCampaignItems] = useState<Campaign[]>(campaigns)
+  const [campaignItems, setCampaignItems] = usePersistentState<Campaign[]>('nmu-campaigns', campaigns)
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState(blankCampaign)
   const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null)
@@ -95,6 +96,8 @@ export default function CampaignsPage() {
       enrollments: [],
       metrics: { totalEnrolled: 0, totalCompleted: 0, conversionRate: 0 },
       ...createForm,
+      name: createForm.name.trim() || (locale === 'tr' ? 'Yeni Kampanya' : 'New Campaign'),
+      description: createForm.description.trim(),
     }
     setCampaignItems((current) => [newCampaign, ...current])
     setCreateOpen(false)
@@ -117,6 +120,7 @@ export default function CampaignsPage() {
     const nextCampaign = { ...activeCampaign, ...editForm }
     setActiveCampaign(nextCampaign)
     setCampaignItems((current) => current.map((campaign) => (campaign.id === activeCampaign.id ? nextCampaign : campaign)))
+    setActiveCampaign(null)
   }
 
   function toggleCampaignStatus(campaign: Campaign) {
@@ -190,7 +194,7 @@ export default function CampaignsPage() {
             <h3 className="text-base font-semibold text-text-primary mb-1">{campaign.name}</h3>
             <p className="text-xs text-text-tertiary mb-4">{campaign.description}</p>
             <div className="flex flex-wrap items-center gap-4 text-xs text-text-tertiary mb-4">
-              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(campaign.startDate).toLocaleDateString('tr-TR', { month: 'short', day: 'numeric' })} - {new Date(campaign.endDate).toLocaleDateString('tr-TR', { month: 'short', day: 'numeric' })}</span>
+              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(campaign.startDate).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { month: 'short', day: 'numeric' })} - {new Date(campaign.endDate).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { month: 'short', day: 'numeric' })}</span>
               <span className="flex items-center gap-1"><Users className="w-3 h-3" />{campaign.metrics.totalEnrolled} {t.campaigns.enrolled}</span>
             </div>
             <Progress value={campaignProgress(campaign)} size="sm" variant="primary" showLabel label={t.common.progress} />

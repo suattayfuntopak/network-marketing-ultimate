@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { deriveNotifications } from '@/lib/coach'
+import { readNotificationReadIds } from '@/lib/clientStorage'
 import { fetchAllOrders, fetchContacts, fetchTasks } from '@/lib/queries'
 import { useAppStore } from '@/store/appStore'
 import type { User, UserSettings } from '@/types'
@@ -121,7 +122,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
       return
     }
 
-    setNotifications(deriveNotifications(contacts, tasks, orders, currentUser, locale))
+    const readIds = new Set(readNotificationReadIds())
+    const notifications = deriveNotifications(contacts, tasks, orders, currentUser, locale).map((notification) => ({
+      ...notification,
+      isRead: readIds.has(notification.id) ? true : notification.isRead,
+    }))
+
+    setNotifications(notifications)
   }, [contacts, currentUser, locale, notificationsEnabled, orders, setNotifications, tasks])
 
   // Auth sayfaları — sidebar/header olmadan render et

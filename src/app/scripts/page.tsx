@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { usePersistentState } from '@/hooks/usePersistentState'
+import { queueCoachPrompt } from '@/lib/clientStorage'
 import { scripts, objections } from '@/data/mockData'
 import type { Objection, Script } from '@/types'
 import {
@@ -49,9 +51,15 @@ export default function ScriptsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [activePanel, setActivePanel] = useState<ActivePanel>(null)
-  const categories = ['all', ...new Set(scripts.map((script) => script.category))]
+  const [favoriteIds, setFavoriteIds] = usePersistentState<string[]>('nmu-script-favorites', [])
+  const favoritesLabel = locale === 'tr' ? 'Favoriler' : 'Favorites'
+  const categories = ['all', 'favorites', ...new Set(scripts.map((script) => script.category))]
 
-  const filteredScripts = scripts.filter((script) => selectedCategory === 'all' || script.category === selectedCategory)
+  const filteredScripts = scripts.filter((script) => {
+    if (selectedCategory === 'all') return true
+    if (selectedCategory === 'favorites') return favoriteIds.includes(script.id)
+    return script.category === selectedCategory
+  })
 
   async function handleCopy(id: string, content: string) {
     await navigator.clipboard.writeText(content)
@@ -60,8 +68,16 @@ export default function ScriptsPage() {
   }
 
   function openAIWithPrompt(prompt: string) {
-    void navigator.clipboard.writeText(prompt)
+    queueCoachPrompt(prompt)
     router.push('/ai')
+  }
+
+  function toggleFavorite(scriptId: string) {
+    setFavoriteIds((current) =>
+      current.includes(scriptId)
+        ? current.filter((id) => id !== scriptId)
+        : [scriptId, ...current],
+    )
   }
 
   return (
@@ -79,7 +95,7 @@ export default function ScriptsPage() {
             onClick={() => setSelectedCategory(category)}
             className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${selectedCategory === category ? 'bg-primary/15 text-primary border border-primary/20' : 'bg-surface border border-border text-text-secondary hover:text-text-primary'}`}
           >
-            {category === 'all' ? t.scripts.allScripts : category}
+            {category === 'all' ? t.scripts.allScripts : category === 'favorites' ? favoritesLabel : category}
           </button>
         ))}
       </motion.div>
@@ -87,6 +103,7 @@ export default function ScriptsPage() {
       <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredScripts.map((script) => {
           const Icon = categoryIcons[script.category] || FileText
+          const isFavorite = favoriteIds.includes(script.id)
           return (
             <Card key={script.id} hover onClick={() => setActivePanel({ type: 'script', script })}>
               <div className="flex items-start gap-3 mb-3">
@@ -111,6 +128,17 @@ export default function ScriptsPage() {
                     <Badge key={tag} variant="default" size="sm">{tag}</Badge>
                   ))}
                 </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    toggleFavorite(script.id)
+                  }}
+                >
+                  <Star className={`w-3 h-3 ${isFavorite ? 'fill-warning text-warning' : ''}`} />
+                </Button>
                 <Button
                   type="button"
                   size="sm"
@@ -228,6 +256,12 @@ export default function ScriptsPage() {
               <p className="text-sm leading-relaxed text-text-secondary">{activePanel.script.content}</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={() => toggleFavorite(activePanel.script.id)}>
+                <Star className={`w-3 h-3 ${favoriteIds.includes(activePanel.script.id) ? 'fill-warning text-warning' : ''}`} />
+                {favoriteIds.includes(activePanel.script.id)
+                  ? (locale === 'tr' ? 'Favoriden çıkar' : 'Remove favorite')
+                  : (locale === 'tr' ? 'Favoriye ekle' : 'Add favorite')}
+              </Button>
               <Button type="button" variant="outline" size="sm" onClick={() => { void handleCopy(activePanel.script.id, activePanel.script.content) }}>
                 <Copy className="w-3 h-3" /> {copiedId === activePanel.script.id ? t.common.copied : t.common.copy}
               </Button>

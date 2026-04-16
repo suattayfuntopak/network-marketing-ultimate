@@ -10,6 +10,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
 import { deriveCoachInsights } from '@/lib/coach'
+import { consumeCoachPrompt } from '@/lib/clientStorage'
 import { fetchAllOrders, fetchContacts, fetchTasks, type ContactRow, type OrderRow, type TaskRow } from '@/lib/queries'
 import { Bot, Sparkles, Send, Target, TrendingUp, ShoppingBag, GraduationCap, Lightbulb, MessageSquare, Zap, ArrowRight } from 'lucide-react'
 
@@ -67,6 +68,15 @@ export default function AIPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages])
+
+  useEffect(() => {
+    const prompt = consumeCoachPrompt()
+    if (prompt) {
+      void handleSend(prompt)
+    }
+  // We intentionally consume a queued prompt only once when the page mounts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleSend(text?: string) {
     const userText = (text ?? message).trim()

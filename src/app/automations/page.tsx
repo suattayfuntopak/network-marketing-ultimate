@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { usePersistentState } from '@/hooks/usePersistentState'
 import { automations } from '@/data/mockData'
 import type { Automation, AutomationTrigger } from '@/types'
 import { Zap, Plus, Play, Pause, Clock, AlertTriangle, ArrowRight, Settings, ExternalLink } from 'lucide-react'
@@ -46,7 +47,7 @@ function automationDestination(automation: Automation) {
 export default function AutomationsPage() {
   const router = useRouter()
   const { t, locale } = useLanguage()
-  const [automationItems, setAutomationItems] = useState<Automation[]>(automations)
+  const [automationItems, setAutomationItems] = usePersistentState<Automation[]>('nmu-automations', automations)
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState(blankAutomation)
   const [activeAutomation, setActiveAutomation] = useState<Automation | null>(null)
@@ -72,6 +73,7 @@ export default function AutomationsPage() {
       actions: [],
       runCount: 0,
       ...createForm,
+      name: createForm.name.trim() || (locale === 'tr' ? 'Yeni Otomasyon' : 'New Automation'),
     }
     setAutomationItems((current) => [nextAutomation, ...current])
     setCreateOpen(false)
@@ -101,6 +103,7 @@ export default function AutomationsPage() {
     const updated = { ...activeAutomation, ...editForm }
     setActiveAutomation(updated)
     setAutomationItems((current) => current.map((item) => (item.id === activeAutomation.id ? updated : item)))
+    setActiveAutomation(null)
   }
 
   function testAutomation() {

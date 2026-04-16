@@ -9,6 +9,8 @@ import { Progress } from '@/components/ui/Progress'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { usePersistentState } from '@/hooks/usePersistentState'
+import { queueCoachPrompt } from '@/lib/clientStorage'
 import { academyCourses, achievements } from '@/data/mockData'
 import type { AcademyCourse, AcademyLesson } from '@/types'
 import {
@@ -60,19 +62,19 @@ export default function AcademyPage() {
   const { t, locale } = useLanguage()
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
   const [selectedLesson, setSelectedLesson] = useState<LessonSelection | null>(null)
-  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>(initialCompletedLessonIds)
+  const [completedLessonIds, setCompletedLessonIds] = usePersistentState<string[]>('nmu-academy-completed-lessons', initialCompletedLessonIds)
   const [copiedLessonId, setCopiedLessonId] = useState<string | null>(null)
 
   const selectedCourse = selectedCourseId
     ? academyCourses.find((course) => course.id === selectedCourseId) ?? null
     : null
 
-  const totalLessons = academyCourses.reduce(
-    (count, course) => count + course.modules.reduce((moduleCount, module) => moduleCount + module.lessons.length, 0),
-    0,
-  )
+  const allLessons = academyCourses.flatMap((course) => course.modules.flatMap((module) => module.lessons))
+  const totalLessons = allLessons.length
   const completedLessons = completedLessonIds.length
-  const totalXP = achievements.reduce((count, achievement) => count + achievement.xpReward, 0)
+  const totalXP = allLessons
+    .filter((lesson) => completedLessonIds.includes(lesson.id))
+    .reduce((count, lesson) => count + lesson.xpReward, 0)
 
   function courseProgress(course: AcademyCourse) {
     const lessonIds = course.modules.flatMap((module) => module.lessons.map((lesson) => lesson.id))
@@ -83,6 +85,11 @@ export default function AcademyPage() {
       percentage: lessonIds.length === 0 ? 0 : Math.round((completed / lessonIds.length) * 100),
     }
   }
+
+  const completedCourses = academyCourses.filter((course) => {
+    const progress = courseProgress(course)
+    return progress.total > 0 && progress.completed === progress.total
+  }).length
 
   function openLesson(course: AcademyCourse, lesson: AcademyLesson) {
     setSelectedLesson({ course, lesson })
@@ -131,7 +138,7 @@ export default function AcademyPage() {
           { label: t.academy.courses, value: academyCourses.length, icon: GraduationCap, color: 'text-primary' },
           { label: t.academy.completed, value: `${completedLessons}/${totalLessons}`, icon: CheckCircle2, color: 'text-success' },
           { label: t.academy.xpEarned, value: totalXP.toLocaleString(), icon: Zap, color: 'text-warning' },
-          { label: t.academy.certifications, value: 2, icon: Award, color: 'text-secondary' },
+          { label: t.academy.certifications, value: completedCourses, icon: Award, color: 'text-secondary' },
         ].map((stat, index) => {
           const Icon = stat.icon
           return (
@@ -362,6 +369,7 @@ export default function AcademyPage() {
                   icon={<Sparkles className="w-3.5 h-3.5" />}
                   onClick={() => {
                     setSelectedLesson(null)
+                    queueCoachPrompt(`${selectedLesson.lesson.title} için benimle bir rol canlandirma yap. Ders baglami: ${selectedLesson.lesson.content}`)
                     router.push('/ai')
                   }}
                 >

@@ -9,6 +9,7 @@ import { AvatarGroup } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { usePersistentState } from '@/hooks/usePersistentState'
 import { events } from '@/data/mockData'
 import type { Event } from '@/types'
 import { Calendar, MapPin, Video, Clock, Plus, Users, ExternalLink } from 'lucide-react'
@@ -57,7 +58,7 @@ function toInputDateTime(value: string) {
 export default function EventsPage() {
   const router = useRouter()
   const { t, locale } = useLanguage()
-  const [eventItems, setEventItems] = useState<Event[]>(events)
+  const [eventItems, setEventItems] = usePersistentState<Event[]>('nmu-events', events)
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState(blankEvent)
   const [activeEvent, setActiveEvent] = useState<Event | null>(null)
@@ -97,6 +98,8 @@ export default function EventsPage() {
       userId: 'u1',
       attendees: [],
       ...createForm,
+      title: createForm.title.trim() || (locale === 'tr' ? 'Yeni Etkinlik' : 'New Event'),
+      description: createForm.description.trim(),
     }
     setEventItems((current) => [nextEvent, ...current])
     setCreateOpen(false)
@@ -113,6 +116,7 @@ export default function EventsPage() {
       ),
     )
     setActiveEvent((current) => (current ? { ...current, ...editForm } : current))
+    setActiveEvent(null)
   }
 
   function updateEventStatus(status: Event['status']) {

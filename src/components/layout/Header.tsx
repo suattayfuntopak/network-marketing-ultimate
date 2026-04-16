@@ -18,14 +18,13 @@ export function Header() {
   const {
     toggleMobileSidebar, aiPanelOpen, toggleAIPanel,
     searchOpen, setSearchOpen, searchQuery, setSearchQuery,
-    currentUser, notifications, markAllNotificationsRead,
+    currentUser, notifications, markAllNotificationsRead, markNotificationRead, unreadCount,
   } = useAppStore()
   const { t } = useLanguage()
   const { theme, setTheme } = useTheme()
   const router = useRouter()
   const [notifOpen, setNotifOpen] = useState(false)
 
-  const unreadCount = notifications.filter(n => !n.isRead).length
   const streak = currentUser?.streak ?? 0
   const momentum = currentUser?.momentumScore ?? 0
 
@@ -140,6 +139,11 @@ export function Header() {
                           notifications.map(notif => (
                             <div
                               key={notif.id}
+                              onClick={() => {
+                                markNotificationRead(notif.id)
+                                setNotifOpen(false)
+                                router.push(notif.actionUrl ?? '/notifications')
+                              }}
                               className={cn(
                                 'flex gap-3 p-4 border-b border-border-subtle hover:bg-surface-hover/50 transition-colors cursor-pointer',
                                 !notif.isRead && 'bg-primary/5'

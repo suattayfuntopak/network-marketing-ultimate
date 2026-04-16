@@ -2,11 +2,17 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { usePersistentState } from '@/hooks/usePersistentState'
+import { fetchContacts, fetchTasks } from '@/lib/queries'
+import { academyCourses, automations as defaultAutomations, objections, scripts } from '@/data/mockData'
+import { useAppStore } from '@/store/appStore'
+import type { Automation } from '@/types'
 import { Users, Settings, Globe, Lock, BarChart3, FileText, Zap, ArrowRight } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -23,7 +29,21 @@ type AdminAction = {
 export default function AdminPage() {
   const router = useRouter()
   const { t, locale } = useLanguage()
+  const { currentUser } = useAppStore()
   const [activeAction, setActiveAction] = useState<AdminAction | null>(null)
+  const [automationItems] = usePersistentState<Automation[]>('nmu-automations', defaultAutomations)
+
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['contacts'],
+    queryFn: fetchContacts,
+    staleTime: 30_000,
+  })
+
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['tasks'],
+    queryFn: fetchTasks,
+    staleTime: 30_000,
+  })
 
   const sections: Array<{
     title: string
@@ -99,11 +119,19 @@ export default function AdminPage() {
     },
   ]
 
+  const today = new Date().toISOString().slice(0, 10)
+  const totalUsers = contacts.filter((contact) => contact.pipeline_stage === 'became_member').length + (currentUser ? 1 : 0)
+  const activeToday = contacts.filter((contact) => contact.last_contact_date?.slice(0, 10) === today).length
+    + tasks.filter((task) => task.due_date.slice(0, 10) === today || task.completed_at?.slice(0, 10) === today).length
+  const contentItems = academyCourses.reduce((count, course) => count + course.modules.reduce((moduleCount, module) => moduleCount + module.lessons.length, 0), 0)
+    + scripts.length
+    + objections.length
+
   const statCards = [
-    { label: t.admin.totalUsers, value: '1,247', icon: Users, color: 'text-primary', route: '/team' },
-    { label: t.admin.activeToday, value: '892', icon: BarChart3, color: 'text-success', route: '/dashboard' },
-    { label: t.admin.contentItems, value: '156', icon: FileText, color: 'text-secondary', route: '/academy' },
-    { label: t.automations.title, value: '34', icon: Zap, color: 'text-warning', route: '/automations' },
+    { label: t.admin.totalUsers, value: totalUsers.toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US'), icon: Users, color: 'text-primary', route: '/team' },
+    { label: t.admin.activeToday, value: activeToday.toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US'), icon: BarChart3, color: 'text-success', route: '/dashboard' },
+    { label: t.admin.contentItems, value: contentItems.toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US'), icon: FileText, color: 'text-secondary', route: '/academy' },
+    { label: t.automations.title, value: automationItems.length.toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US'), icon: Zap, color: 'text-warning', route: '/automations' },
   ]
 
   return (

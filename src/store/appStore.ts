@@ -1,5 +1,12 @@
+'use client'
+
 import { create } from 'zustand'
 import type { User, Contact, Task, Notification, AIRecommendation, PipelineStage } from '@/types'
+import { markAllNotificationReadIds, markNotificationReadId } from '@/lib/clientStorage'
+
+function countUnreadNotifications(notifications: Notification[]) {
+  return notifications.filter((notification) => !notification.isRead).length
+}
 
 interface AppState {
   // User
@@ -99,16 +106,18 @@ export const useAppStore = create<AppState>((set) => ({
   })),
 
   notifications: [],
-  setNotifications: (notifications) => set({ notifications }),
-  markNotificationRead: (id) => set((s) => ({
-    notifications: s.notifications.map(n => n.id === id ? { ...n, isRead: true } : n)
-  })),
-  markAllNotificationsRead: () => set((s) => ({
-    notifications: s.notifications.map(n => ({ ...n, isRead: true }))
-  })),
-  get unreadCount() {
-    return 0
-  },
+  setNotifications: (notifications) => set({ notifications, unreadCount: countUnreadNotifications(notifications) }),
+  markNotificationRead: (id) => set((s) => {
+    markNotificationReadId(id)
+    const notifications = s.notifications.map(n => n.id === id ? { ...n, isRead: true } : n)
+    return { notifications, unreadCount: countUnreadNotifications(notifications) }
+  }),
+  markAllNotificationsRead: () => set((s) => {
+    markAllNotificationReadIds(s.notifications.map((notification) => notification.id))
+    const notifications = s.notifications.map(n => ({ ...n, isRead: true }))
+    return { notifications, unreadCount: 0 }
+  }),
+  unreadCount: 0,
 
   aiRecommendations: [],
   setAIRecommendations: (recs) => set({ aiRecommendations: recs }),
