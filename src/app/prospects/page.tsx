@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
@@ -54,6 +54,7 @@ export default function ProspectsPage() {
   const { currentUser } = useAppStore()
   const queryClient = useQueryClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const importInputRef = useRef<HTMLInputElement>(null)
 
   const interestLabel = (type: string) =>
@@ -68,6 +69,15 @@ export default function ProspectsPage() {
   const [formError, setFormError] = useState('')
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState('')
+  const routeModalOpen = searchParams.get('new') === '1'
+  const isModalOpen = modalOpen || routeModalOpen
+
+  function closeModal() {
+    setModalOpen(false)
+    if (routeModalOpen) {
+      router.push('/prospects')
+    }
+  }
 
   function exportContacts() {
     const headers = [
@@ -193,7 +203,7 @@ export default function ProspectsPage() {
         notes: form.notes || undefined,
       })
       await queryClient.invalidateQueries({ queryKey: ['contacts'] })
-      setModalOpen(false)
+      closeModal()
       setForm(EMPTY_FORM)
     } catch {
       setFormError('Kayıt sırasında hata oluştu.')
@@ -485,11 +495,11 @@ export default function ProspectsPage() {
       {/* Add Contact Modal */}
 
       <AnimatePresence>
-        {modalOpen && (
+        {isModalOpen && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setModalOpen(false)}
+            onClick={closeModal}
           >
             <motion.div
               initial={{ opacity: 0, y: -16, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -16, scale: 0.97 }}
@@ -498,7 +508,7 @@ export default function ProspectsPage() {
             >
               <div className="flex items-center justify-between p-5 border-b border-border">
                 <h2 className="text-base font-semibold text-text-primary">{t.prospects.addProspect}</h2>
-                <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors">
+                <button onClick={closeModal} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -619,7 +629,7 @@ export default function ProspectsPage() {
                 </div>
 
                 <div className="flex items-center justify-end gap-3 pt-1">
-                  <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
+                  <button type="button" onClick={closeModal} className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
                     İptal
                   </button>
                   <Button type="submit" size="sm" disabled={saving}>

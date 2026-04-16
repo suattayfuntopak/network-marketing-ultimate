@@ -98,7 +98,7 @@ export default function PipelinePage() {
           <h1 className="text-2xl font-bold text-text-primary">{t.pipeline.title}</h1>
           <p className="text-sm text-text-secondary mt-0.5">{t.pipeline.subtitle}</p>
         </div>
-        <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => router.push('/prospects')}>{t.pipeline.addToPipeline}</Button>
+        <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => router.push('/prospects?new=1')}>{t.pipeline.addToPipeline}</Button>
       </motion.div>
 
       {/* Kanban Board */}
@@ -120,7 +120,7 @@ export default function PipelinePage() {
                   <span className="text-sm font-semibold text-text-primary">{stage.label}</span>
                   <span className="text-[10px] font-bold text-text-tertiary bg-surface-hover px-1.5 py-0.5 rounded-full">{stageContacts.length}</span>
                 </div>
-                <button onClick={() => router.push('/prospects')} className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors">
+                <button onClick={() => router.push('/prospects?new=1')} className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors">
                   <Plus className="w-4 h-4" />
                 </button>
               </div>

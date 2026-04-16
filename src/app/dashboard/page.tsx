@@ -144,7 +144,7 @@ export default function DashboardPage() {
                 </p>
                 <div className="flex flex-wrap gap-2 mt-5">
                   <Button size="sm" icon={<Phone className="w-3.5 h-3.5" />} onClick={() => router.push('/contacts')}>{t.dashboard.logCall}</Button>
-                  <Button size="sm" variant="outline" icon={<UserPlus className="w-3.5 h-3.5" />} onClick={() => router.push('/prospects')}>{t.dashboard.addProspect}</Button>
+                  <Button size="sm" variant="outline" icon={<UserPlus className="w-3.5 h-3.5" />} onClick={() => router.push('/prospects?new=1')}>{t.dashboard.addProspect}</Button>
                   <Button size="sm" variant="outline" icon={<Presentation className="w-3.5 h-3.5" />} onClick={() => router.push('/events')}>{t.dashboard.bookPresentation}</Button>
                   <Button size="sm" variant="ghost" icon={<Bot className="w-3.5 h-3.5" />} onClick={toggleAIPanel}>{t.dashboard.askAI}</Button>
                 </div>
@@ -192,9 +192,20 @@ export default function DashboardPage() {
           { label: t.dashboard.kpi.rankProgress, value: currentUser?.xp ?? 0, icon: Award, color: 'text-amber-400' },
         ].map((kpi, i) => {
           const Icon = kpi.icon
+          const routeMap = [
+            '/prospects',
+            '/tasks',
+            '/pipeline',
+            '/customers',
+            '/customers',
+            '/team',
+            '/academy',
+            '/rank',
+          ]
           return (
             <motion.div key={i} whileHover={{ y: -2 }}
               className="bg-card border border-border rounded-xl p-3 cursor-pointer hover:bg-card-hover hover:border-border-strong transition-all"
+              onClick={() => router.push(routeMap[i])}
             >
               <div className="flex items-center gap-1.5 mb-2">
                 <Icon className={`w-3.5 h-3.5 ${kpi.color}`} />
