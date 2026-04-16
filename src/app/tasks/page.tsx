@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -46,6 +47,7 @@ export default function TasksPage() {
   const { t } = useLanguage()
   const { currentUser } = useAppStore()
   const qc = useQueryClient()
+  const router = useRouter()
 
   const [filter, setFilter] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
@@ -188,7 +190,14 @@ export default function TasksPage() {
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {task.description && <p className="text-xs text-text-tertiary truncate">{task.description}</p>}
-                        {contactName && <span className="text-xs text-primary/70">· {contactName}</span>}
+                        {contactName && (
+                          <button
+                            onClick={() => router.push(`/contacts?contact=${task.contact_id}`)}
+                            className="text-xs text-primary/70 hover:text-primary"
+                          >
+                            · {contactName}
+                          </button>
+                        )}
                       </div>
                     </div>
                     <Badge variant={PRIORITY_VARIANT[task.priority] as 'error' | 'warning' | 'primary' | 'default'} size="sm">

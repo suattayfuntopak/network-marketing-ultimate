@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
@@ -39,6 +40,7 @@ const INTEREST_LABELS: Record<string, { tr: string; en: string }> = {
 export default function PipelinePage() {
   const { t, locale } = useLanguage()
   const qc = useQueryClient()
+  const router = useRouter()
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
 
@@ -93,7 +95,7 @@ export default function PipelinePage() {
           <h1 className="text-2xl font-bold text-text-primary">{t.pipeline.title}</h1>
           <p className="text-sm text-text-secondary mt-0.5">{t.pipeline.subtitle}</p>
         </div>
-        <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => window.location.href = '/prospects'}>{t.pipeline.addToPipeline}</Button>
+        <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => router.push('/prospects')}>{t.pipeline.addToPipeline}</Button>
       </motion.div>
 
       {/* Kanban Board */}
@@ -115,7 +117,7 @@ export default function PipelinePage() {
                   <span className="text-sm font-semibold text-text-primary">{stage.label}</span>
                   <span className="text-[10px] font-bold text-text-tertiary bg-surface-hover px-1.5 py-0.5 rounded-full">{stageContacts.length}</span>
                 </div>
-                <button className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors">
+                <button onClick={() => router.push('/prospects')} className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors">
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
@@ -138,6 +140,7 @@ export default function PipelinePage() {
                     onDragEnd={() => setDraggedId(null)}
                     className="bg-card border border-border rounded-xl p-3 cursor-grab active:cursor-grabbing hover:border-border-strong hover:bg-card-hover transition-all group"
                     style={{ opacity: draggedId === contact.id ? 0.5 : 1 }}
+                    onClick={() => router.push(`/contacts?contact=${contact.id}`)}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
@@ -163,8 +166,18 @@ export default function PipelinePage() {
                       </p>
                     )}
                     <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-1 rounded text-text-tertiary hover:text-primary hover:bg-primary/10 transition-colors"><Phone className="w-3 h-3" /></button>
-                      <button className="p-1 rounded text-text-tertiary hover:text-success hover:bg-success/10 transition-colors"><MessageCircle className="w-3 h-3" /></button>
+                      <button
+                        onClick={event => { event.stopPropagation(); if (contact.phone) window.location.href = `tel:${contact.phone}` }}
+                        className="p-1 rounded text-text-tertiary hover:text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        <Phone className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={event => { event.stopPropagation(); if (contact.phone) window.open(`https://wa.me/${contact.phone.replace(/\D/g, '')}`, '_blank') }}
+                        className="p-1 rounded text-text-tertiary hover:text-success hover:bg-success/10 transition-colors"
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                      </button>
                     </div>
                   </motion.div>
                 ))}

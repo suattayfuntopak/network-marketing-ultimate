@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
@@ -471,8 +472,10 @@ export default function ContactsPage() {
   const { t } = useLanguage()
   const { currentUser } = useAppStore()
   const qc = useQueryClient()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const selectedId = searchParams.get('contact')
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [showInteractionModal, setShowInteractionModal] = useState(false)
@@ -516,7 +519,7 @@ export default function ContactsPage() {
       qc.invalidateQueries({ queryKey: ['contacts'] })
       qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
       qc.invalidateQueries({ queryKey: ['contact-tasks', selectedId] })
-      setSelectedId(null)
+      router.push('/contacts')
     },
   })
 
@@ -583,12 +586,20 @@ export default function ContactsPage() {
   const openTasks = contactTasks.filter(task => task.status !== 'completed' && task.status !== 'skipped')
   const completedTasks = contactTasks.filter(task => task.status === 'completed')
 
+  function openContactDetail(contactId: string) {
+    router.push(`/contacts?contact=${contactId}`)
+  }
+
+  function closeContactDetail() {
+    router.push('/contacts')
+  }
+
   if (selected) {
     return (
       <>
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-[1320px] mx-auto">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <Button variant="ghost" size="sm" onClick={() => setSelectedId(null)} icon={<ArrowLeft className="w-3.5 h-3.5" />}>
+            <Button variant="ghost" size="sm" onClick={closeContactDetail} icon={<ArrowLeft className="w-3.5 h-3.5" />}>
               {t.common.backToContacts}
             </Button>
 
@@ -1001,7 +1012,7 @@ export default function ContactsPage() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.03 }}
             >
-              <Card hover padding="sm" className="cursor-pointer group" onClick={() => setSelectedId(contact.id)}>
+              <Card hover padding="sm" className="cursor-pointer group" onClick={() => openContactDetail(contact.id)}>
                 <div className="flex items-center gap-4">
                   <Avatar name={contact.full_name} size="md" />
                   <div className="flex-1 min-w-0">

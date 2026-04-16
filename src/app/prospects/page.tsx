@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
@@ -52,6 +53,7 @@ export default function ProspectsPage() {
   const { t } = useLanguage()
   const { currentUser } = useAppStore()
   const queryClient = useQueryClient()
+  const router = useRouter()
 
   const interestLabel = (type: string) =>
     t.interest?.[INTEREST_KEY[type] ?? 'unknown'] ?? type
@@ -225,6 +227,7 @@ export default function ProspectsPage() {
                         key={contact.id}
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
                         className="border-b border-border-subtle hover:bg-surface/50 cursor-pointer group transition-colors"
+                        onClick={() => router.push(`/contacts?contact=${contact.id}`)}
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -274,9 +277,24 @@ export default function ProspectsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button className="p-1.5 rounded-lg text-text-tertiary hover:text-primary hover:bg-primary/10 transition-colors"><Phone className="w-3.5 h-3.5" /></button>
-                            <button className="p-1.5 rounded-lg text-text-tertiary hover:text-success hover:bg-success/10 transition-colors"><MessageCircle className="w-3.5 h-3.5" /></button>
-                            <button className="p-1.5 rounded-lg text-text-tertiary hover:text-secondary hover:bg-secondary/10 transition-colors"><Mail className="w-3.5 h-3.5" /></button>
+                            <button
+                              onClick={event => { event.stopPropagation(); if (contact.phone) window.location.href = `tel:${contact.phone}` }}
+                              className="p-1.5 rounded-lg text-text-tertiary hover:text-primary hover:bg-primary/10 transition-colors"
+                            >
+                              <Phone className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={event => { event.stopPropagation(); if (contact.phone) window.open(`https://wa.me/${contact.phone.replace(/\D/g, '')}`, '_blank') }}
+                              className="p-1.5 rounded-lg text-text-tertiary hover:text-success hover:bg-success/10 transition-colors"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={event => { event.stopPropagation(); if (contact.email) window.location.href = `mailto:${contact.email}` }}
+                              className="p-1.5 rounded-lg text-text-tertiary hover:text-secondary hover:bg-secondary/10 transition-colors"
+                            >
+                              <Mail className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </td>
                       </motion.tr>
@@ -293,7 +311,7 @@ export default function ProspectsPage() {
               const stage = PIPELINE_STAGES[contact.pipeline_stage]
               return (
                 <motion.div key={contact.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-                  <Card hover className="group">
+                  <Card hover className="group" onClick={() => router.push(`/contacts?contact=${contact.id}`)}>
                     <div className="flex items-start justify-between mb-3">
                       <Avatar name={contact.full_name} size="lg" />
                       <TemperatureBadge temperature={contact.temperature} score={contact.temperature_score} />
@@ -314,10 +332,16 @@ export default function ProspectsPage() {
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border-subtle">
-                      <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-medium text-text-secondary hover:text-primary hover:bg-primary/10 transition-colors">
+                      <button
+                        onClick={event => { event.stopPropagation(); if (contact.phone) window.location.href = `tel:${contact.phone}` }}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-medium text-text-secondary hover:text-primary hover:bg-primary/10 transition-colors"
+                      >
                         <Phone className="w-3 h-3" /> {t.prospects.call}
                       </button>
-                      <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-medium text-text-secondary hover:text-success hover:bg-success/10 transition-colors">
+                      <button
+                        onClick={event => { event.stopPropagation(); if (contact.phone) window.open(`https://wa.me/${contact.phone.replace(/\D/g, '')}`, '_blank') }}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-medium text-text-secondary hover:text-success hover:bg-success/10 transition-colors"
+                      >
                         <MessageCircle className="w-3 h-3" /> {t.prospects.message}
                       </button>
                     </div>
