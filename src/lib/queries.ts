@@ -6,8 +6,27 @@ import type { Database } from './database.types'
 
 export type ContactRow = Database['public']['Tables']['nmu_contacts']['Row']
 export type TaskRow = Database['public']['Tables']['nmu_tasks']['Row']
+export type InteractionRow = Database['public']['Tables']['nmu_interactions']['Row']
 export type ProductRow = Database['public']['Tables']['nmu_products']['Row']
 export type OrderRow = Database['public']['Tables']['nmu_orders']['Row']
+
+function normalizeTaskStatus(task: TaskRow): TaskRow {
+  if (task.status === 'completed' || task.status === 'skipped') {
+    return task
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const dueDate = new Date(task.due_date)
+  dueDate.setHours(0, 0, 0, 0)
+
+  if (dueDate < today) {
+    return { ...task, status: 'overdue' }
+  }
+
+  return task
+}
 
 // ─── PRODUCT ──────────────────────────────────────────────────
 
@@ -135,6 +154,69 @@ export async function updateContactStage(id: string, stage: string): Promise<voi
   if (error) throw error
 }
 
+export async function fetchInteractionsByContact(contactId: string): Promise<InteractionRow[]> {
+  const { data, error } = await supabase
+    .from('nmu_interactions')
+    .select('*')
+    .eq('contact_id', contactId)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as InteractionRow[]
+}
+
+export async function addInteraction(
+  userId: string,
+  input: {
+    contact_id: string
+    type: InteractionRow['type']
+    channel?: string
+    content: string
+    outcome?: InteractionRow['outcome']
+    next_action?: string
+    date?: string
+    duration_minutes?: number
+    next_follow_up_date?: string
+  }
+): Promise<InteractionRow> {
+  const interactionDate = input.date ?? new Date().toISOString()
+
+  const { data, error } = await supabase
+    .from('nmu_interactions')
+    .insert({
+      user_id: userId,
+      contact_id: input.contact_id,
+      type: input.type,
+      channel: input.channel ?? 'manual',
+      content: input.content,
+      outcome: input.outcome ?? null,
+      next_action: input.next_action ?? null,
+      date: interactionDate,
+      duration_minutes: input.duration_minutes ?? null,
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+
+  const contactUpdate: Database['public']['Tables']['nmu_contacts']['Update'] = {
+    last_contact_date: interactionDate,
+  }
+
+  if (input.next_follow_up_date !== undefined) {
+    contactUpdate.next_follow_up_date = input.next_follow_up_date || null
+  }
+
+  const { error: contactError } = await supabase
+    .from('nmu_contacts')
+    .update(contactUpdate)
+    .eq('id', input.contact_id)
+
+  if (contactError) throw contactError
+
+  return data as InteractionRow
+}
+
 // ─── TASKS ───────────────────────────────────────────────────
 
 export async function fetchTasks(): Promise<TaskRow[]> {
@@ -143,7 +225,17 @@ export async function fetchTasks(): Promise<TaskRow[]> {
     .select('*')
     .order('due_date', { ascending: true })
   if (error) throw error
-  return (data ?? []) as TaskRow[]
+  return ((data ?? []) as TaskRow[]).map(normalizeTaskStatus)
+}
+
+export async function fetchTasksByContact(contactId: string): Promise<TaskRow[]> {
+  const { data, error } = await supabase
+    .from('nmu_tasks')
+    .select('*')
+    .eq('contact_id', contactId)
+    .order('due_date', { ascending: true })
+  if (error) throw error
+  return ((data ?? []) as TaskRow[]).map(normalizeTaskStatus)
 }
 
 export async function addTask(
