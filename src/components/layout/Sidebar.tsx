@@ -77,7 +77,7 @@ export function Sidebar() {
   ]
 
   const sidebarContent = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 h-16 shrink-0">
         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
@@ -157,7 +157,7 @@ export function Sidebar() {
       </nav>
 
       {/* User Profile + Dropdown */}
-      <div className="px-3 pb-4 shrink-0 relative" ref={profileMenuRef}>
+      <div className={cn('px-3 pb-4 shrink-0 relative', profileMenuOpen && 'z-[90]')} ref={profileMenuRef}>
         {/* Dropdown Menu */}
         <AnimatePresence>
           {profileMenuOpen && (
@@ -166,7 +166,12 @@ export function Sidebar() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.96 }}
               transition={{ duration: 0.15 }}
-              className="absolute bottom-full left-0 right-0 mb-2 mx-0 bg-elevated border border-border rounded-xl shadow-float z-50 overflow-hidden"
+              className={cn(
+                'absolute mb-2 bg-elevated border border-border rounded-xl shadow-float overflow-hidden z-[100]',
+                sidebarCollapsed
+                  ? 'bottom-0 left-full ml-3 w-60'
+                  : 'bottom-full left-0 right-0 mx-0'
+              )}
             >
               {/* Settings */}
               <Link
@@ -259,7 +264,7 @@ export function Sidebar() {
     <>
       {/* Desktop Sidebar */}
       <aside className={cn(
-        'hidden lg:flex flex-col h-screen bg-graphite border-r border-border sticky top-0 transition-all duration-300 z-30',
+        'hidden lg:flex flex-col h-screen bg-graphite border-r border-border sticky top-0 transition-all duration-300 z-40 overflow-visible',
         sidebarCollapsed ? 'w-[72px]' : 'w-[260px]'
       )}>
         {sidebarContent}
