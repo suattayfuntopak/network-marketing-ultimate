@@ -15,7 +15,7 @@ import { events } from '@/data/mockData'
 import { fetchContacts, type ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import type { Event } from '@/types'
-import { Calendar, Clock, MapPin, Plus, Search, Send, Trash2, Users, Video } from 'lucide-react'
+import { Calendar, CheckSquare, Clock, Mail, MapPin, MessageCircle, Plus, Search, Send, Smartphone, Square, Trash2, Users, Video } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -69,6 +69,8 @@ export default function EventsPage() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteSearch, setInviteSearch] = useState('')
   const [selectedInviteIds, setSelectedInviteIds] = useState<string[]>([])
+  const [inviteChannel, setInviteChannel] = useState<'whatsapp' | 'telegram' | 'email' | 'sms'>('whatsapp')
+  const [inviteFeedback, setInviteFeedback] = useState('')
 
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -84,6 +86,12 @@ export default function EventsPage() {
         inviteSearch: 'Kontak ara...',
         inviteEmpty: 'Bu etkinlik için yeni davetli bulunamadı.',
         inviteSubmit: 'Gönder',
+        inviteNow: 'Tekli Gönder',
+        selectAll: 'Tümünü Seç',
+        selectEligible: 'Uygunları Seç',
+        clearSelection: 'Temizle',
+        sendChannel: 'Gönderim Kanalı',
+        channelHint: 'WhatsApp ve SMS telefon, e-posta ise mail adresi ister. Telegram paylaşım ekranı açar.',
         delete: 'Etkinliği Sil',
         attendees: 'Katılımcılar',
         attendeesEmpty: 'Henüz katılımcı eklenmedi.',
@@ -96,10 +104,14 @@ export default function EventsPage() {
         location: 'Konum',
         meetingUrl: 'Toplantı linki',
         description: 'Açıklama',
+        selected: 'Seçili',
         openMeeting: 'Toplantıyı Aç',
         openMap: 'Haritada Aç',
         viewContacts: 'Kontakları Gör',
         selectedCount: 'seçili',
+        sentTo: 'gönderim hazırlandı',
+        noCompatibleContacts: 'Seçilen kanala uygun iletişim bilgisi bulunamadı.',
+        telegramNotice: 'Telegram bağlantısı paylaşım ekranında açıldı.',
       }
     : {
         details: 'Details',
@@ -109,6 +121,12 @@ export default function EventsPage() {
         inviteSearch: 'Search contacts...',
         inviteEmpty: 'No additional contacts are available for this event.',
         inviteSubmit: 'Send',
+        inviteNow: 'Send Now',
+        selectAll: 'Select All',
+        selectEligible: 'Select Eligible',
+        clearSelection: 'Clear',
+        sendChannel: 'Delivery Channel',
+        channelHint: 'WhatsApp and SMS need phone numbers, email needs an address, Telegram opens the share flow.',
         delete: 'Delete Event',
         attendees: 'Attendees',
         attendeesEmpty: 'No attendees added yet.',
@@ -121,10 +139,14 @@ export default function EventsPage() {
         location: 'Location',
         meetingUrl: 'Meeting URL',
         description: 'Description',
+        selected: 'Selected',
         openMeeting: 'Open Meeting',
         openMap: 'Open Map',
         viewContacts: 'View Contacts',
         selectedCount: 'selected',
+        sentTo: 'delivery prepared',
+        noCompatibleContacts: 'No compatible contact info is available for the selected channel.',
+        telegramNotice: 'Telegram share flow has been opened.',
       }
 
   const eventTypeLabel = (type: string) => {
@@ -149,6 +171,10 @@ export default function EventsPage() {
           cancelled: 'Cancelled',
         }
     return map[status]
+  }
+
+  function resolveAttendeeName(contactId: string, fallback: string) {
+    return contacts.find((contact) => contact.id === contactId)?.full_name ?? fallback
   }
 
   function openCreateModal(prefill?: Partial<typeof blankEvent>) {
@@ -211,6 +237,7 @@ export default function EventsPage() {
     if (!activeEvent) return
     setInviteSearch('')
     setSelectedInviteIds([])
+    setInviteFeedback('')
     setInviteOpen(true)
   }
 
@@ -222,21 +249,61 @@ export default function EventsPage() {
     )
   }
 
-  function inviteSelectedContacts() {
-    if (!activeEvent || selectedInviteIds.length === 0) return
+  function eventMessage(contactName: string, event: Event) {
+    const eventDate = new Date(event.startDate).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+    const eventTime = `${new Date(event.startDate).toLocaleTimeString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })} - ${new Date(event.endDate).toLocaleTimeString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })}`
 
-    const selectedContacts = contacts.filter((contact) => selectedInviteIds.includes(contact.id))
+    return locale === 'tr'
+      ? `Merhaba ${contactName}, seni "${event.title}" etkinliğimize davet etmek istiyorum. ${eventDate} tarihinde ${eventTime} arasında ${event.location || 'online'} olarak planlandı. ${event.meetingUrl ? `Katılım linki: ${event.meetingUrl}` : ''}`.trim()
+      : `Hi ${contactName}, I'd like to invite you to "${event.title}". It is planned for ${eventDate}, ${eventTime}, at ${event.location || 'online'}. ${event.meetingUrl ? `Join link: ${event.meetingUrl}` : ''}`.trim()
+  }
+
+  function contactLink(contact: ContactRow, event: Event, channel: typeof inviteChannel) {
+    const message = eventMessage(contact.full_name, event)
+    const encodedMessage = encodeURIComponent(message)
+    const normalizedPhone = contact.phone?.replace(/\D/g, '') ?? ''
+
+    if (channel === 'whatsapp') {
+      return normalizedPhone ? `https://wa.me/${normalizedPhone}?text=${encodedMessage}` : null
+    }
+
+    if (channel === 'sms') {
+      return normalizedPhone ? `sms:${normalizedPhone}?body=${encodedMessage}` : null
+    }
+
+    if (channel === 'email') {
+      return contact.email
+        ? `mailto:${contact.email}?subject=${encodeURIComponent(event.title)}&body=${encodedMessage}`
+        : null
+    }
+
+    return `https://t.me/share/url?url=${encodeURIComponent(event.meetingUrl || window.location.href)}&text=${encodedMessage}`
+  }
+
+  function syncInvitedContacts(contactIds: string[], markAsSent = false) {
+    if (!activeEvent) return activeEvent
+
+    const selectedContacts = contacts.filter((contact) => contactIds.includes(contact.id))
     const attendeeMap = new Map(activeEvent.attendees.map((attendee) => [attendee.contactId, attendee]))
 
     selectedContacts.forEach((contact) => {
-      if (!attendeeMap.has(contact.id)) {
-        attendeeMap.set(contact.id, {
-          contactId: contact.id,
-          name: contact.full_name,
-          rsvpStatus: 'invited',
-          followUpStatus: 'pending',
-        })
-      }
+      const existing = attendeeMap.get(contact.id)
+      attendeeMap.set(contact.id, {
+        contactId: contact.id,
+        name: contact.full_name,
+        rsvpStatus: existing?.rsvpStatus ?? 'invited',
+        followUpStatus: markAsSent ? 'sent' : existing?.followUpStatus ?? 'pending',
+      })
     })
 
     const nextEvent: Event = {
@@ -248,8 +315,50 @@ export default function EventsPage() {
       current.map((event) => (event.id === activeEvent.id ? nextEvent : event)),
     )
     setActiveEvent(nextEvent)
-    setInviteOpen(false)
-    setSelectedInviteIds([])
+    return nextEvent
+  }
+
+  function sendInvites(contactIds: string[], closeAfter = false) {
+    if (!activeEvent || contactIds.length === 0) return
+
+    const selectedContacts = contacts.filter((contact) => contactIds.includes(contact.id))
+    const links = selectedContacts
+      .map((contact) => ({ contact, link: contactLink(contact, activeEvent, inviteChannel) }))
+      .filter((entry) => Boolean(entry.link))
+
+    if (links.length === 0) {
+      setInviteFeedback(labels.noCompatibleContacts)
+      return
+    }
+
+    syncInvitedContacts(contactIds, true)
+
+    if (inviteChannel === 'telegram') {
+      window.open(links[0].link!, '_blank', 'noopener,noreferrer')
+      setInviteFeedback(labels.telegramNotice)
+    } else {
+      links.forEach((entry) => {
+        window.open(entry.link!, '_blank', 'noopener,noreferrer')
+      })
+      setInviteFeedback(`${links.length} ${labels.sentTo}`)
+    }
+
+    if (closeAfter) {
+      setSelectedInviteIds([])
+    }
+  }
+
+  function selectAllInvites() {
+    setSelectedInviteIds(inviteableContacts.map((contact) => contact.id))
+  }
+
+  function selectEligibleInvites() {
+    if (!activeEvent) return
+    const eligibleIds = inviteableContacts
+      .filter((contact) => Boolean(contactLink(contact, activeEvent, inviteChannel)))
+      .map((contact) => contact.id)
+
+    setSelectedInviteIds(eligibleIds)
   }
 
   const inviteableContacts = useMemo(() => {
@@ -325,7 +434,7 @@ export default function EventsPage() {
                 <div className="mt-auto pt-3 border-t border-border-subtle">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
-                      <AvatarGroup names={event.attendees.slice(0, 3).map((attendee) => attendee.name)} size="xs" />
+                      <AvatarGroup names={event.attendees.slice(0, 3).map((attendee) => resolveAttendeeName(attendee.contactId, attendee.name))} size="xs" />
                       <span className="text-xs text-text-tertiary truncate">{confirmed}/{invited} {t.common.confirmed}</span>
                     </div>
                     <Button
@@ -475,7 +584,7 @@ export default function EventsPage() {
                 {activeEvent.attendees.length > 0 ? (
                   activeEvent.attendees.map((attendee) => (
                     <Badge key={attendee.contactId} variant={attendee.rsvpStatus === 'confirmed' || attendee.rsvpStatus === 'attended' ? 'success' : 'default'} size="md">
-                      {attendee.name}
+                      {resolveAttendeeName(attendee.contactId, attendee.name)}
                     </Badge>
                   ))
                 ) : (
@@ -526,15 +635,52 @@ export default function EventsPage() {
       >
         {activeEvent && (
           <div className="p-5 space-y-4">
-            <div className="relative">
-              <Search className="w-4 h-4 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                value={inviteSearch}
-                onChange={(event) => setInviteSearch(event.target.value)}
-                placeholder={labels.inviteSearch}
-                className="w-full h-10 rounded-xl border border-border bg-surface pl-9 pr-3 text-sm text-text-primary outline-none focus:border-primary/50"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px] gap-3">
+              <div className="relative">
+                <Search className="w-4 h-4 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  value={inviteSearch}
+                  onChange={(event) => setInviteSearch(event.target.value)}
+                  placeholder={labels.inviteSearch}
+                  className="w-full h-10 rounded-xl border border-border bg-surface pl-9 pr-3 text-sm text-text-primary outline-none focus:border-primary/50"
+                />
+              </div>
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-text-secondary">{labels.sendChannel}</span>
+                <select
+                  value={inviteChannel}
+                  onChange={(event) => {
+                    setInviteChannel(event.target.value as typeof inviteChannel)
+                    setInviteFeedback('')
+                  }}
+                  className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50"
+                >
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="telegram">Telegram</option>
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                </select>
+              </label>
             </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+              <Button type="button" variant="ghost" size="sm" onClick={selectAllInvites}>
+                <CheckSquare className="w-3.5 h-3.5" /> {labels.selectAll}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={selectEligibleInvites}>
+                <Users className="w-3.5 h-3.5" /> {labels.selectEligible}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedInviteIds([])}>
+                <Square className="w-3.5 h-3.5" /> {labels.clearSelection}
+              </Button>
+              <span className="text-text-tertiary">{labels.channelHint}</span>
+            </div>
+
+            {inviteFeedback && (
+              <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
+                {inviteFeedback}
+              </div>
+            )}
 
             <div className="max-h-[360px] overflow-y-auto space-y-2 pr-1">
               {inviteableContacts.length === 0 ? (
@@ -545,27 +691,42 @@ export default function EventsPage() {
                 inviteableContacts.map((contact) => {
                   const selected = selectedInviteIds.includes(contact.id)
                   return (
-                    <button
+                    <div
                       key={contact.id}
-                      type="button"
-                      onClick={() => toggleInvite(contact.id)}
                       className={cn(
-                        'w-full rounded-2xl border p-3 text-left transition-colors',
+                        'w-full rounded-2xl border p-3 transition-colors',
                         selected ? 'border-primary/40 bg-primary/8' : 'border-border-subtle bg-surface/40 hover:border-border',
                       )}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <button type="button" onClick={() => toggleInvite(contact.id)} className="flex-1 text-left min-w-0">
                           <p className="text-sm font-semibold text-text-primary truncate">{contact.full_name}</p>
                           <p className="text-xs text-text-tertiary mt-1 truncate">
                             {[contact.profession, contact.location].filter(Boolean).join(' · ') || contact.source}
                           </p>
+                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge variant={selected ? 'primary' : 'default'} size="sm">
+                            {selected ? labels.selected : stageLabel(contact)}
+                          </Badge>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => sendInvites([contact.id])}
+                            icon={inviteChannel === 'whatsapp'
+                              ? <MessageCircle className="w-3.5 h-3.5" />
+                              : inviteChannel === 'telegram'
+                                ? <Send className="w-3.5 h-3.5" />
+                                : inviteChannel === 'email'
+                                  ? <Mail className="w-3.5 h-3.5" />
+                                  : <Smartphone className="w-3.5 h-3.5" />}
+                          >
+                            {labels.inviteNow}
+                          </Button>
                         </div>
-                        <Badge variant={selected ? 'primary' : 'default'} size="sm">
-                          {selected ? 'Seçili' : stageLabel(contact)}
-                        </Badge>
                       </div>
-                    </button>
+                    </div>
                   )
                 })
               )}
@@ -577,7 +738,7 @@ export default function EventsPage() {
               </p>
               <div className="flex gap-2">
                 <Button type="button" variant="ghost" onClick={() => setInviteOpen(false)}>{t.common.cancel}</Button>
-                <Button type="button" disabled={selectedInviteIds.length === 0} onClick={inviteSelectedContacts}>
+                <Button type="button" disabled={selectedInviteIds.length === 0} onClick={() => sendInvites(selectedInviteIds, true)}>
                   <Send className="w-3.5 h-3.5" /> {labels.inviteSubmit}
                 </Button>
               </div>

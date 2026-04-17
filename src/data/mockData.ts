@@ -334,9 +334,9 @@ export const events: Event[] = [
     type: 'local', startDate: '2026-04-19T14:00:00', endDate: '2026-04-19T16:00:00',
     location: 'Downtown Community Center, Austin TX', maxAttendees: 30,
     attendees: [
-      { contactId: 'c1', name: 'Marcus Johnson', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
-      { contactId: 'c4', name: 'Aisha Williams', rsvpStatus: 'invited', followUpStatus: 'pending' },
-      { contactId: 'c10', name: 'Rachel Green', rsvpStatus: 'invited', followUpStatus: 'pending' },
+      { contactId: 'c1', name: 'Elif Kaya', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
+      { contactId: 'c4', name: 'Rabia Aça', rsvpStatus: 'invited', followUpStatus: 'pending' },
+      { contactId: 'c10', name: 'Ezgi Şağar', rsvpStatus: 'invited', followUpStatus: 'pending' },
     ],
     status: 'published'
   },
@@ -345,8 +345,8 @@ export const events: Event[] = [
     type: 'team_zoom', startDate: '2026-04-16T19:00:00', endDate: '2026-04-16T20:00:00',
     meetingUrl: 'https://zoom.us/j/team-call', maxAttendees: 50,
     attendees: [
-      { contactId: 'c6', name: 'Priya Sharma', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
-      { contactId: 'c11', name: 'Michael Foster', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
+      { contactId: 'c6', name: 'Sibel Yıldız', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
+      { contactId: 'c11', name: 'Merve Akın', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
     ],
     status: 'published'
   },
@@ -355,8 +355,8 @@ export const events: Event[] = [
     type: 'online_presentation', startDate: '2026-04-22T20:00:00', endDate: '2026-04-22T21:30:00',
     meetingUrl: 'https://zoom.us/j/opportunity', maxAttendees: 100,
     attendees: [
-      { contactId: 'c1', name: 'Marcus Johnson', rsvpStatus: 'invited', followUpStatus: 'pending' },
-      { contactId: 'c7', name: 'Tom Bradley', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
+      { contactId: 'c1', name: 'Elif Kaya', rsvpStatus: 'invited', followUpStatus: 'pending' },
+      { contactId: 'c7', name: 'Tuğba Demir', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
     ],
     status: 'published'
   },
