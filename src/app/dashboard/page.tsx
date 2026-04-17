@@ -6,14 +6,13 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
 import { CircularProgress } from '@/components/ui/Progress'
-import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
 import { useRouter } from 'next/navigation'
 import { completeTask, fetchContacts, fetchTasks } from '@/lib/queries'
 import type { ContactRow, TaskRow } from '@/lib/queries'
 import {
-  Flame, TrendingUp, Users, Phone, ShoppingBag,
+  Flame, TrendingUp, Users, ShoppingBag,
   UserPlus, GraduationCap, Target, ArrowRight, Clock,
   Zap, Bot, Calendar, ChevronRight, Sparkles, Award, BarChart3,
   CheckCircle2, Presentation
@@ -78,7 +77,7 @@ const PIPELINE_COLORS: Record<string, string> = {
 
 export default function DashboardPage() {
   const { t, locale } = useLanguage()
-  const { currentUser, toggleAIPanel } = useAppStore()
+  const { currentUser } = useAppStore()
   const router = useRouter()
   const qc = useQueryClient()
   const weekDays = WEEK_DAYS[locale]
@@ -123,7 +122,6 @@ export default function DashboardPage() {
   }))
 
   const fullName = currentUser?.name ?? ''
-  const streak = currentUser?.streak ?? 0
   const momentum = currentUser?.momentumScore ?? 0
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -166,15 +164,7 @@ export default function DashboardPage() {
           <div className="relative">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="primary" dot>{t.dashboard.title}</Badge>
-                  {streak > 0 && (
-                    <Badge variant="warning">
-                      <Flame className="w-3 h-3 mr-1" />{streak} {t.dashboard.streak}
-                    </Badge>
-                  )}
-                </div>
-                <h1 className="text-2xl lg:text-3xl font-bold text-text-primary mb-1">
+                <h1 className="text-2xl lg:text-3xl font-bold text-text-primary mb-2">
                   {t.dashboard.greeting}{fullName ? `, ${fullName}` : ''}
                 </h1>
                 <p className="text-sm text-text-secondary max-w-lg">
@@ -186,12 +176,6 @@ export default function DashboardPage() {
                     : null}
                   {pendingTasks.length === 0 && hotLeads.length === 0 && t.dashboard.momentumStrong}
                 </p>
-                <div className="flex flex-wrap gap-2 mt-5">
-                  <Button size="sm" icon={<Phone className="w-3.5 h-3.5" />} onClick={() => router.push('/contacts')}>{t.dashboard.logCall}</Button>
-                  <Button size="sm" variant="outline" icon={<UserPlus className="w-3.5 h-3.5" />} onClick={() => router.push('/prospects?new=1')}>{t.dashboard.addProspect}</Button>
-                  <Button size="sm" variant="outline" icon={<Presentation className="w-3.5 h-3.5" />} onClick={() => router.push('/events')}>{t.dashboard.bookPresentation}</Button>
-                  <Button size="sm" variant="ghost" icon={<Bot className="w-3.5 h-3.5" />} onClick={toggleAIPanel}>{t.dashboard.askAI}</Button>
-                </div>
               </div>
               <div className="flex items-center gap-6">
                 <div className="text-center">
