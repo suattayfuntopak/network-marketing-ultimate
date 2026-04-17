@@ -4,13 +4,17 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
+import { usePersistentState } from '@/hooks/usePersistentState'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { ActionCalendarPanel } from '@/components/tasks/ActionCalendarPanel'
 import { useAppStore } from '@/store/appStore'
 import { fetchTasks, addTask, deleteTask, fetchContacts, setTaskStatus, updateTask } from '@/lib/queries'
 import type { TaskRow, ContactRow } from '@/lib/queries'
+import { events as defaultEvents } from '@/data/mockData'
+import type { Event } from '@/types'
 import {
   Plus, X, CheckCircle2, Circle, Clock, Phone, Users,
   MessageCircle, GraduationCap, ListTodo, AlertCircle, Pencil, Trash2,
@@ -44,7 +48,7 @@ const EMPTY_FORM: AddForm = {
 }
 
 export default function TasksPage() {
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const { currentUser } = useAppStore()
   const qc = useQueryClient()
   const router = useRouter()
@@ -54,6 +58,7 @@ export default function TasksPage() {
   const [form, setForm] = useState<AddForm>(EMPTY_FORM)
   const [formError, setFormError] = useState('')
   const [editingTask, setEditingTask] = useState<TaskRow | null>(null)
+  const [eventItems] = usePersistentState<Event[]>('nmu-events', defaultEvents)
 
   const { data: tasks = [], isLoading } = useQuery<TaskRow[]>({
     queryKey: ['tasks'],
@@ -181,6 +186,17 @@ export default function TasksPage() {
             {f.label} <span className="ml-1 text-xs opacity-70">{f.count}</span>
           </button>
         ))}
+      </motion.div>
+
+      <motion.div variants={item}>
+        <ActionCalendarPanel
+          locale={locale}
+          tasks={tasks}
+          events={eventItems}
+          contactMap={contactMap}
+          onOpenEvents={() => router.push('/events')}
+          onCreateTask={openCreateModal}
+        />
       </motion.div>
 
       {/* Task List */}

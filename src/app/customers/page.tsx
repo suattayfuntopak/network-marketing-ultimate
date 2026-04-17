@@ -717,13 +717,14 @@ export default function CustomersPage() {
         <motion.div variants={itemAnim}>
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="w-4 h-4 text-primary" />
-                  {t.common.productCatalog}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2 flex-wrap">
+                  <Package className="w-4 h-4 text-primary shrink-0" />
+                  <span>{t.common.productCatalog}</span>
                   <Badge variant="default" size="sm">{products.length} ürün</Badge>
                 </CardTitle>
                 <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />}
+                  className="sm:ml-auto shrink-0"
                   onClick={() => { setEditingProduct(null); setShowProductModal(true) }} id="btn-add-product">
                   Ürün Ekle
                 </Button>

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
@@ -11,8 +12,10 @@ import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { events } from '@/data/mockData'
+import { fetchContacts, type ContactRow } from '@/lib/queries'
+import { cn } from '@/lib/utils'
 import type { Event } from '@/types'
-import { Calendar, MapPin, Video, Clock, Plus, Users } from 'lucide-react'
+import { Calendar, Clock, MapPin, Plus, Search, Send, Trash2, Users, Video } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -63,22 +66,101 @@ export default function EventsPage() {
   const [createForm, setCreateForm] = useState(blankEvent)
   const [activeEvent, setActiveEvent] = useState<Event | null>(null)
   const [editForm, setEditForm] = useState(blankEvent)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteSearch, setInviteSearch] = useState('')
+  const [selectedInviteIds, setSelectedInviteIds] = useState<string[]>([])
+
+  const { data: contacts = [] } = useQuery<ContactRow[]>({
+    queryKey: ['contacts'],
+    queryFn: fetchContacts,
+  })
+
+  const labels = locale === 'tr'
+    ? {
+        details: 'Detaylar',
+        invite: 'Kişilere Gönder',
+        inviteTitle: 'Etkinliği Kişilere Gönder',
+        inviteDesc: 'Seçtiğin kontaklar davetli olarak etkinliğe eklenecek.',
+        inviteSearch: 'Kontak ara...',
+        inviteEmpty: 'Bu etkinlik için yeni davetli bulunamadı.',
+        inviteSubmit: 'Gönder',
+        delete: 'Etkinliği Sil',
+        attendees: 'Katılımcılar',
+        attendeesEmpty: 'Henüz katılımcı eklenmedi.',
+        manageHint: 'Etkinliği düzenle, davet gönder veya gerekirse akıştan kaldır.',
+        eventName: 'Etkinlik adı',
+        status: 'Durum',
+        type: 'Tür',
+        start: 'Başlangıç',
+        end: 'Bitiş',
+        location: 'Konum',
+        meetingUrl: 'Toplantı linki',
+        description: 'Açıklama',
+        openMeeting: 'Toplantıyı Aç',
+        openMap: 'Haritada Aç',
+        viewContacts: 'Kontakları Gör',
+        selectedCount: 'seçili',
+      }
+    : {
+        details: 'Details',
+        invite: 'Send to Contacts',
+        inviteTitle: 'Send Event to Contacts',
+        inviteDesc: 'Selected contacts will be added as invited attendees.',
+        inviteSearch: 'Search contacts...',
+        inviteEmpty: 'No additional contacts are available for this event.',
+        inviteSubmit: 'Send',
+        delete: 'Delete Event',
+        attendees: 'Attendees',
+        attendeesEmpty: 'No attendees added yet.',
+        manageHint: 'Update the event, send invitations, or remove it from the flow.',
+        eventName: 'Event name',
+        status: 'Status',
+        type: 'Type',
+        start: 'Start',
+        end: 'End',
+        location: 'Location',
+        meetingUrl: 'Meeting URL',
+        description: 'Description',
+        openMeeting: 'Open Meeting',
+        openMap: 'Open Map',
+        viewContacts: 'View Contacts',
+        selectedCount: 'selected',
+      }
 
   const eventTypeLabel = (type: string) => {
     const key = EVENT_TYPE_KEY[type]
     return key ? (t.events.types as Record<string, string>)[key] ?? type.replace(/_/g, ' ') : type.replace(/_/g, ' ')
   }
 
-  const eventStatusLabel = (status: string) =>
-    (t.events.status as Record<string, string>)[status] ?? status
+  const eventStatusLabel = (status: Event['status']) => {
+    const map = locale === 'tr'
+      ? {
+          draft: 'Taslak',
+          published: 'Yayında',
+          live: 'Canlı',
+          completed: 'Tamamlandı',
+          cancelled: 'İptal Edildi',
+        }
+      : {
+          draft: 'Draft',
+          published: 'Published',
+          live: 'Live',
+          completed: 'Completed',
+          cancelled: 'Cancelled',
+        }
+    return map[status]
+  }
 
   function openCreateModal(prefill?: Partial<typeof blankEvent>) {
     setCreateForm({ ...blankEvent, ...prefill })
     setCreateOpen(true)
   }
 
-  function openManageModal(event: Event) {
+  function openDetails(event: Event) {
     setActiveEvent(event)
+    setInviteOpen(false)
+    setInviteSearch('')
+    setSelectedInviteIds([])
     setEditForm({
       title: event.title,
       description: event.description,
@@ -108,25 +190,86 @@ export default function EventsPage() {
   function saveEvent() {
     if (!activeEvent) return
 
+    const nextEvent: Event = {
+      ...activeEvent,
+      ...editForm,
+    }
+
     setEventItems((current) =>
-      current.map((event) =>
-        event.id === activeEvent.id
-          ? { ...event, ...editForm }
-          : event,
-      ),
+      current.map((event) => (event.id === activeEvent.id ? nextEvent : event)),
     )
-    setActiveEvent((current) => (current ? { ...current, ...editForm } : current))
+    setActiveEvent(nextEvent)
+  }
+
+  function deleteEvent(eventId: string) {
+    setEventItems((current) => current.filter((event) => event.id !== eventId))
+    setInviteOpen(false)
     setActiveEvent(null)
   }
 
-  function updateEventStatus(status: Event['status']) {
+  function openInviteModal() {
     if (!activeEvent) return
-
-    const nextEvent = { ...activeEvent, status }
-    setActiveEvent(nextEvent)
-    setEditForm((current) => ({ ...current, status }))
-    setEventItems((current) => current.map((event) => (event.id === activeEvent.id ? nextEvent : event)))
+    setInviteSearch('')
+    setSelectedInviteIds([])
+    setInviteOpen(true)
   }
+
+  function toggleInvite(contactId: string) {
+    setSelectedInviteIds((current) =>
+      current.includes(contactId)
+        ? current.filter((id) => id !== contactId)
+        : [...current, contactId],
+    )
+  }
+
+  function inviteSelectedContacts() {
+    if (!activeEvent || selectedInviteIds.length === 0) return
+
+    const selectedContacts = contacts.filter((contact) => selectedInviteIds.includes(contact.id))
+    const attendeeMap = new Map(activeEvent.attendees.map((attendee) => [attendee.contactId, attendee]))
+
+    selectedContacts.forEach((contact) => {
+      if (!attendeeMap.has(contact.id)) {
+        attendeeMap.set(contact.id, {
+          contactId: contact.id,
+          name: contact.full_name,
+          rsvpStatus: 'invited',
+          followUpStatus: 'pending',
+        })
+      }
+    })
+
+    const nextEvent: Event = {
+      ...activeEvent,
+      attendees: Array.from(attendeeMap.values()),
+    }
+
+    setEventItems((current) =>
+      current.map((event) => (event.id === activeEvent.id ? nextEvent : event)),
+    )
+    setActiveEvent(nextEvent)
+    setInviteOpen(false)
+    setSelectedInviteIds([])
+  }
+
+  const inviteableContacts = useMemo(() => {
+    if (!activeEvent) return []
+
+    const attendeeIds = new Set(activeEvent.attendees.map((attendee) => attendee.contactId))
+    const query = inviteSearch.trim().toLocaleLowerCase(locale === 'tr' ? 'tr-TR' : 'en-US')
+
+    return contacts
+      .filter((contact) => !attendeeIds.has(contact.id))
+      .filter((contact) => {
+        if (!query) return true
+        const haystack = [contact.full_name, contact.location, contact.profession, contact.source]
+          .filter(Boolean)
+          .join(' ')
+          .toLocaleLowerCase(locale === 'tr' ? 'tr-TR' : 'en-US')
+        return haystack.includes(query)
+      })
+      .sort((left, right) => left.full_name.localeCompare(right.full_name))
+  }, [activeEvent, contacts, inviteSearch, locale])
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
@@ -142,16 +285,16 @@ export default function EventsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {eventItems.map((event) => {
-          const confirmed = event.attendees.filter((attendee) => attendee.rsvpStatus === 'confirmed').length
+          const confirmed = event.attendees.filter((attendee) => attendee.rsvpStatus === 'confirmed' || attendee.rsvpStatus === 'attended').length
           const invited = event.attendees.length
           return (
             <motion.div key={event.id} variants={item}>
-              <Card hover onClick={() => openManageModal(event)} className="h-full flex flex-col">
+              <Card hover onClick={() => openDetails(event)} className="h-full flex flex-col">
                 <div className="flex items-start justify-between mb-3">
                   <Badge className={eventTypeColors[event.type] || 'bg-surface-hover text-text-secondary'} size="md">
                     {eventTypeLabel(event.type)}
                   </Badge>
-                  <Badge variant={event.status === 'published' || event.status === 'live' ? 'success' : 'default'} size="sm">
+                  <Badge variant={event.status === 'published' || event.status === 'live' ? 'success' : event.status === 'cancelled' ? 'error' : 'default'} size="sm">
                     {eventStatusLabel(event.status)}
                   </Badge>
                 </div>
@@ -180,10 +323,10 @@ export default function EventsPage() {
                   )}
                 </div>
                 <div className="mt-auto pt-3 border-t border-border-subtle">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
                       <AvatarGroup names={event.attendees.slice(0, 3).map((attendee) => attendee.name)} size="xs" />
-                      <span className="text-xs text-text-tertiary">{confirmed}/{invited} {t.common.confirmed}</span>
+                      <span className="text-xs text-text-tertiary truncate">{confirmed}/{invited} {t.common.confirmed}</span>
                     </div>
                     <Button
                       type="button"
@@ -191,10 +334,10 @@ export default function EventsPage() {
                       variant="ghost"
                       onClick={(eventElement) => {
                         eventElement.stopPropagation()
-                        openManageModal(event)
+                        openDetails(event)
                       }}
                     >
-                      {t.common.manage}
+                      {labels.details}
                     </Button>
                   </div>
                 </div>
@@ -223,11 +366,11 @@ export default function EventsPage() {
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-text-secondary">{locale === 'tr' ? 'Etkinlik adı' : 'Event name'}</span>
+              <span className="text-xs font-medium text-text-secondary">{labels.eventName}</span>
               <input value={createForm.title} onChange={(event) => setCreateForm((current) => ({ ...current, title: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-text-secondary">{locale === 'tr' ? 'Tur' : 'Type'}</span>
+              <span className="text-xs font-medium text-text-secondary">{labels.type}</span>
               <select value={createForm.type} onChange={(event) => setCreateForm((current) => ({ ...current, type: event.target.value as Event['type'] }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50">
                 {Object.keys(EVENT_TYPE_KEY).map((type) => (
                   <option key={type} value={type}>{eventTypeLabel(type)}</option>
@@ -235,24 +378,24 @@ export default function EventsPage() {
               </select>
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-text-secondary">{locale === 'tr' ? 'Baslangic' : 'Start'}</span>
+              <span className="text-xs font-medium text-text-secondary">{labels.start}</span>
               <input type="datetime-local" value={createForm.startDate} onChange={(event) => setCreateForm((current) => ({ ...current, startDate: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-text-secondary">{locale === 'tr' ? 'Bitis' : 'End'}</span>
+              <span className="text-xs font-medium text-text-secondary">{labels.end}</span>
               <input type="datetime-local" value={createForm.endDate} onChange={(event) => setCreateForm((current) => ({ ...current, endDate: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-text-secondary">{locale === 'tr' ? 'Konum' : 'Location'}</span>
+              <span className="text-xs font-medium text-text-secondary">{labels.location}</span>
               <input value={createForm.location ?? ''} onChange={(event) => setCreateForm((current) => ({ ...current, location: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-text-secondary">{locale === 'tr' ? 'Toplanti linki' : 'Meeting URL'}</span>
+              <span className="text-xs font-medium text-text-secondary">{labels.meetingUrl}</span>
               <input value={createForm.meetingUrl ?? ''} onChange={(event) => setCreateForm((current) => ({ ...current, meetingUrl: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
             </label>
           </div>
           <label className="space-y-1.5 block">
-            <span className="text-xs font-medium text-text-secondary">{locale === 'tr' ? 'Aciklama' : 'Description'}</span>
+            <span className="text-xs font-medium text-text-secondary">{labels.description}</span>
             <textarea value={createForm.description} onChange={(event) => setCreateForm((current) => ({ ...current, description: event.target.value }))} rows={4} className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm text-text-primary outline-none focus:border-primary/50" />
           </label>
           <div className="flex justify-end gap-2">
@@ -264,46 +407,79 @@ export default function EventsPage() {
 
       <Modal
         open={Boolean(activeEvent)}
-        onClose={() => setActiveEvent(null)}
+        onClose={() => {
+          setInviteOpen(false)
+          setActiveEvent(null)
+        }}
         title={activeEvent?.title}
-        description={activeEvent ? `${eventTypeLabel(activeEvent.type)} · ${eventStatusLabel(activeEvent.status)}` : undefined}
+        description={activeEvent ? labels.manageHint : undefined}
       >
         {activeEvent && (
-          <div className="p-5 space-y-4">
+          <div className="p-5 space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label className="space-y-1.5">
-                <span className="text-xs font-medium text-text-secondary">{locale === 'tr' ? 'Etkinlik adı' : 'Event name'}</span>
+                <span className="text-xs font-medium text-text-secondary">{labels.eventName}</span>
                 <input value={editForm.title} onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
               </label>
               <label className="space-y-1.5">
-                <span className="text-xs font-medium text-text-secondary">{locale === 'tr' ? 'Durum' : 'Status'}</span>
-                <select value={editForm.status} onChange={(event) => updateEventStatus(event.target.value as Event['status'])} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50">
-                  {['draft', 'published', 'live', 'completed', 'cancelled'].map((status) => (
+                <span className="text-xs font-medium text-text-secondary">{labels.status}</span>
+                <select value={editForm.status} onChange={(event) => setEditForm((current) => ({ ...current, status: event.target.value as Event['status'] }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50">
+                  {(['draft', 'published', 'live', 'completed', 'cancelled'] as Event['status'][]).map((status) => (
                     <option key={status} value={status}>{eventStatusLabel(status)}</option>
                   ))}
                 </select>
               </label>
+              <label className="space-y-1.5">
+                <span className="text-xs font-medium text-text-secondary">{labels.type}</span>
+                <select value={editForm.type} onChange={(event) => setEditForm((current) => ({ ...current, type: event.target.value as Event['type'] }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50">
+                  {Object.keys(EVENT_TYPE_KEY).map((type) => (
+                    <option key={type} value={type}>{eventTypeLabel(type)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1.5">
+                <span className="text-xs font-medium text-text-secondary">{labels.location}</span>
+                <input value={editForm.location ?? ''} onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
+              </label>
+              <label className="space-y-1.5">
+                <span className="text-xs font-medium text-text-secondary">{labels.start}</span>
+                <input type="datetime-local" value={editForm.startDate} onChange={(event) => setEditForm((current) => ({ ...current, startDate: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
+              </label>
+              <label className="space-y-1.5">
+                <span className="text-xs font-medium text-text-secondary">{labels.end}</span>
+                <input type="datetime-local" value={editForm.endDate} onChange={(event) => setEditForm((current) => ({ ...current, endDate: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
+              </label>
+              <label className="space-y-1.5 sm:col-span-2">
+                <span className="text-xs font-medium text-text-secondary">{labels.meetingUrl}</span>
+                <input value={editForm.meetingUrl ?? ''} onChange={(event) => setEditForm((current) => ({ ...current, meetingUrl: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
+              </label>
             </div>
 
             <label className="space-y-1.5 block">
-              <span className="text-xs font-medium text-text-secondary">{locale === 'tr' ? 'Aciklama' : 'Description'}</span>
+              <span className="text-xs font-medium text-text-secondary">{labels.description}</span>
               <textarea value={editForm.description} onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))} rows={4} className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm text-text-primary outline-none focus:border-primary/50" />
             </label>
 
-            <div className="rounded-xl border border-border-subtle bg-surface/50 p-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm text-text-primary">
-                <Users className="w-4 h-4 text-primary" />
-                {activeEvent.attendees.length} {locale === 'tr' ? 'katilimci' : 'attendees'}
+            <div className="rounded-2xl border border-border-subtle bg-surface/40 p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2 text-sm text-text-primary">
+                  <Users className="w-4 h-4 text-primary" />
+                  {labels.attendees}
+                  <Badge size="sm" variant="default">{activeEvent.attendees.length}</Badge>
+                </div>
+                <Button type="button" size="sm" variant="outline" icon={<Send className="w-3.5 h-3.5" />} onClick={openInviteModal}>
+                  {labels.invite}
+                </Button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {activeEvent.attendees.length > 0 ? (
                   activeEvent.attendees.map((attendee) => (
-                    <Badge key={attendee.contactId} variant={attendee.rsvpStatus === 'confirmed' ? 'success' : 'default'}>
+                    <Badge key={attendee.contactId} variant={attendee.rsvpStatus === 'confirmed' || attendee.rsvpStatus === 'attended' ? 'success' : 'default'} size="md">
                       {attendee.name}
                     </Badge>
                   ))
                 ) : (
-                  <p className="text-sm text-text-tertiary">{locale === 'tr' ? 'Henüz katilimci eklenmedi.' : 'No attendees yet.'}</p>
+                  <p className="text-sm text-text-tertiary">{labels.attendeesEmpty}</p>
                 )}
               </div>
             </div>
@@ -311,7 +487,7 @@ export default function EventsPage() {
             <div className="flex flex-wrap gap-2">
               {activeEvent.meetingUrl && (
                 <Button type="button" variant="secondary" size="sm" onClick={() => window.open(activeEvent.meetingUrl, '_blank', 'noopener,noreferrer')}>
-                  <Video className="w-3.5 h-3.5" /> {locale === 'tr' ? 'Toplantiyi ac' : 'Open meeting'}
+                  <Video className="w-3.5 h-3.5" /> {labels.openMeeting}
                 </Button>
               )}
               {activeEvent.location && (
@@ -321,21 +497,106 @@ export default function EventsPage() {
                   size="sm"
                   onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeEvent.location ?? '')}`, '_blank', 'noopener,noreferrer')}
                 >
-                  <MapPin className="w-3.5 h-3.5" /> {locale === 'tr' ? 'Haritada ac' : 'Open map'}
+                  <MapPin className="w-3.5 h-3.5" /> {labels.openMap}
                 </Button>
               )}
               <Button type="button" variant="ghost" size="sm" onClick={() => router.push('/contacts')}>
-                <Users className="w-3.5 h-3.5" /> {locale === 'tr' ? 'Kisileri gor' : 'View contacts'}
+                <Users className="w-3.5 h-3.5" /> {labels.viewContacts}
               </Button>
             </div>
 
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setActiveEvent(null)}>{t.common.cancel}</Button>
-              <Button type="button" onClick={saveEvent}>{t.common.save}</Button>
+            <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">
+              <Button type="button" variant="danger" size="sm" onClick={() => deleteEvent(activeEvent.id)}>
+                <Trash2 className="w-3.5 h-3.5" /> {labels.delete}
+              </Button>
+              <div className="flex gap-2">
+                <Button type="button" variant="ghost" onClick={() => setActiveEvent(null)}>{t.common.cancel}</Button>
+                <Button type="button" onClick={saveEvent}>{t.common.saveChanges}</Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={inviteOpen && Boolean(activeEvent)}
+        onClose={() => setInviteOpen(false)}
+        title={labels.inviteTitle}
+        description={labels.inviteDesc}
+      >
+        {activeEvent && (
+          <div className="p-5 space-y-4">
+            <div className="relative">
+              <Search className="w-4 h-4 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                value={inviteSearch}
+                onChange={(event) => setInviteSearch(event.target.value)}
+                placeholder={labels.inviteSearch}
+                className="w-full h-10 rounded-xl border border-border bg-surface pl-9 pr-3 text-sm text-text-primary outline-none focus:border-primary/50"
+              />
+            </div>
+
+            <div className="max-h-[360px] overflow-y-auto space-y-2 pr-1">
+              {inviteableContacts.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-text-tertiary">
+                  {labels.inviteEmpty}
+                </div>
+              ) : (
+                inviteableContacts.map((contact) => {
+                  const selected = selectedInviteIds.includes(contact.id)
+                  return (
+                    <button
+                      key={contact.id}
+                      type="button"
+                      onClick={() => toggleInvite(contact.id)}
+                      className={cn(
+                        'w-full rounded-2xl border p-3 text-left transition-colors',
+                        selected ? 'border-primary/40 bg-primary/8' : 'border-border-subtle bg-surface/40 hover:border-border',
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-text-primary truncate">{contact.full_name}</p>
+                          <p className="text-xs text-text-tertiary mt-1 truncate">
+                            {[contact.profession, contact.location].filter(Boolean).join(' · ') || contact.source}
+                          </p>
+                        </div>
+                        <Badge variant={selected ? 'primary' : 'default'} size="sm">
+                          {selected ? 'Seçili' : stageLabel(contact)}
+                        </Badge>
+                      </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
+              <p className="text-sm text-text-secondary">
+                {selectedInviteIds.length} {labels.selectedCount}
+              </p>
+              <div className="flex gap-2">
+                <Button type="button" variant="ghost" onClick={() => setInviteOpen(false)}>{t.common.cancel}</Button>
+                <Button type="button" disabled={selectedInviteIds.length === 0} onClick={inviteSelectedContacts}>
+                  <Send className="w-3.5 h-3.5" /> {labels.inviteSubmit}
+                </Button>
+              </div>
             </div>
           </div>
         )}
       </Modal>
     </motion.div>
   )
+
+  function stageLabel(contact: ContactRow) {
+    if (locale === 'tr') {
+      if (contact.pipeline_stage === 'became_customer') return 'Müşteri'
+      if (contact.pipeline_stage === 'became_member') return 'Ekip'
+      return 'Potansiyel'
+    }
+
+    if (contact.pipeline_stage === 'became_customer') return 'Customer'
+    if (contact.pipeline_stage === 'became_member') return 'Team'
+    return 'Prospect'
+  }
 }
