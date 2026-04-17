@@ -11,6 +11,7 @@ import { useLanguage } from '@/components/common/LanguageProvider'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { fetchContacts, fetchTasks } from '@/lib/queries'
 import { academyCourses, automations as defaultAutomations, objections, scripts } from '@/data/mockData'
+import { academyLibraryItems, academyObjectionGuides } from '@/data/academyLibrary'
 import { useAppStore } from '@/store/appStore'
 import type { Automation } from '@/types'
 import { Users, Settings, Globe, Lock, BarChart3, FileText, Zap, ArrowRight } from 'lucide-react'
@@ -67,9 +68,9 @@ export default function AdminPage() {
       desc: t.admin.sections.contentManagementDesc,
       icon: FileText,
       items: [
-        { title: t.admin.items.academyCourses, description: locale === 'tr' ? 'Akademi icerigini ve ogrenci akislarini yonet.' : 'Manage academy content and learner flows.', route: '/academy', cta: locale === 'tr' ? 'Akademiyi aç' : 'Open academy' },
-        { title: t.admin.items.scriptLibrary, description: locale === 'tr' ? 'Senaryo kutuphanesini duzenle ve kullan.' : 'Maintain and use the script library.', route: '/scripts', cta: locale === 'tr' ? 'Havuzu aç' : 'Open library' },
-        { title: t.admin.items.emailTemplates, description: locale === 'tr' ? 'Takip ve iletisim mesajlarini senaryo havuzunda yonet.' : 'Manage follow-up and communication messages in the script library.', route: '/scripts', cta: locale === 'tr' ? 'Mesajlari aç' : 'Open messages' },
+        { title: t.admin.items.academyCourses, description: locale === 'tr' ? 'Öğrenme yolu ve kurs akışlarını tek merkezden yönet.' : 'Manage the learning path and course flows from one center.', route: '/academy', cta: locale === 'tr' ? 'Öğrenme yolunu aç' : 'Open learning path' },
+        { title: t.admin.items.scriptLibrary, description: locale === 'tr' ? 'Saha senaryoları ve içerik kütüphanesini birleşik Akademi içinde düzenle.' : 'Maintain field scripts and the content library inside the unified Academy.', route: '/academy?tab=library', cta: locale === 'tr' ? 'Kütüphaneyi aç' : 'Open library' },
+        { title: t.admin.items.emailTemplates, description: locale === 'tr' ? 'İtiraz bankası ve cevap akışlarını Akademi içinde yönet.' : 'Manage the objection bank and response flows inside Academy.', route: '/academy?tab=objections', cta: locale === 'tr' ? 'İtiraz bankasını aç' : 'Open objection bank' },
         { title: t.admin.items.campaignAssets, description: locale === 'tr' ? 'Etkinlik akislari, davetler ve paylasim varliklarini etkinliklerde incele.' : 'Review event flows, invites, and shareable assets in events.', route: '/events', cta: locale === 'tr' ? 'Etkinlikleri aç' : 'Open events' },
       ],
     },
@@ -126,6 +127,8 @@ export default function AdminPage() {
   const contentItems = academyCourses.reduce((count, course) => count + course.modules.reduce((moduleCount, module) => moduleCount + module.lessons.length, 0), 0)
     + scripts.length
     + objections.length
+    + academyLibraryItems.length
+    + academyObjectionGuides.length
 
   const statCards = [
     { label: t.admin.totalUsers, value: totalUsers.toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US'), icon: Users, color: 'text-primary', route: '/team' },
