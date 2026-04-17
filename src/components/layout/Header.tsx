@@ -214,7 +214,7 @@ export function Header() {
                 <p className="text-xs text-text-tertiary mb-3">{t.common.quickActions}</p>
                 <div className="space-y-1">
                   {[
-                    { label: t.common.addNewProspect, icon: UserPlus, route: '/prospects' },
+                    { label: t.common.addNewProspect, icon: UserPlus, route: '/contacts?segment=prospects&new=1' },
                     { label: t.common.createTask,      icon: ListTodo,  route: '/tasks' },
                     { label: t.common.startAISession,  icon: Bot,       route: '/ai' },
                     { label: t.common.viewTodaysPipeline, icon: GitBranch, route: '/pipeline' },

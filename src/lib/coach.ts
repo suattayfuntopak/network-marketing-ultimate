@@ -290,7 +290,7 @@ export function deriveCoachInsights(
         locale === 'tr'
           ? 'Bugun yeni potansiyel kazanmak icin kullanabilecegim kisa bir mesaj ve aksiyon plani hazirla.'
           : 'Prepare a short message and action plan I can use to win new prospects today.',
-      route: '/prospects?new=1',
+      route: '/contacts?segment=prospects&new=1',
     },
   ]
 

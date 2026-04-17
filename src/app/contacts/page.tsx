@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { type Dispatch, type FormEvent, type SetStateAction, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -22,46 +22,93 @@ import {
   deleteTask,
   updateContactStage,
 } from '@/lib/queries'
+import { cn } from '@/lib/utils'
 import type { ContactRow, InteractionRow, TaskRow } from '@/lib/queries'
 import {
-  Search, Phone, Mail, MapPin, Plus, X, ArrowLeft,
-  ChevronRight, Trash2, User, Briefcase, AlertCircle,
-  CheckCircle2, Clock, MessageSquareText, CalendarDays,
+  AlertCircle,
+  ArrowLeft,
+  CalendarClock,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Contact,
+  Download,
+  Flame,
+  LayoutGrid,
+  LayoutList,
+  ListChecks,
+  Mail,
+  MapPin,
+  MessageCircle,
+  MessageSquareText,
+  Phone,
+  Plus,
+  ShoppingBag,
+  Upload,
+  UserPlus,
+  Users,
+  X,
 } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
+const validSegments = ['all', 'prospects', 'customers', 'team', 'follow_up', 'hot'] as const
+type SegmentKey = (typeof validSegments)[number]
+
 const PIPELINE_STAGE_OPTIONS = [
-  { value: 'new', label: 'Yeni' },
-  { value: 'contact_planned', label: 'Iletisim Planlandi' },
-  { value: 'first_contact', label: 'Ilk Iletisim' },
-  { value: 'interested', label: 'Ilgileniyor' },
-  { value: 'invited', label: 'Davet Edildi' },
-  { value: 'presentation_sent', label: 'Sunum Gonderildi' },
-  { value: 'followup_pending', label: 'Takip Bekleniyor' },
-  { value: 'objection_handling', label: 'Itiraz Yonetimi' },
-  { value: 'ready_to_buy', label: 'Satin Almaya Hazir' },
-  { value: 'became_customer', label: 'Musteri' },
-  { value: 'ready_to_join', label: 'Katilmaya Hazir' },
-  { value: 'became_member', label: 'Ekip Uyesi' },
-  { value: 'nurture_later', label: 'Sonra Islenecek' },
-  { value: 'dormant', label: 'Pasif' },
-  { value: 'lost', label: 'Kaybedildi' },
+  'new',
+  'contact_planned',
+  'first_contact',
+  'interested',
+  'invited',
+  'presentation_sent',
+  'followup_pending',
+  'objection_handling',
+  'ready_to_buy',
+  'became_customer',
+  'ready_to_join',
+  'became_member',
+  'nurture_later',
+  'dormant',
+  'lost',
 ] as const
 
-const PIPELINE_STAGE_LABELS = Object.fromEntries(
-  PIPELINE_STAGE_OPTIONS.map(option => [option.value, option.label])
-) as Record<string, string>
+type PipelineStage = (typeof PIPELINE_STAGE_OPTIONS)[number]
 
-const INTERACTION_TYPE_LABELS: Record<InteractionRow['type'], string> = {
-  call: 'Arama',
-  message: 'Mesaj',
-  meeting: 'Toplanti',
-  email: 'E-posta',
-  note: 'Not',
-  presentation: 'Sunum',
-  follow_up: 'Takip',
+const TASK_TYPE_LABELS: Record<TaskRow['type'], { tr: string; en: string }> = {
+  follow_up: { tr: 'Takip', en: 'Follow-up' },
+  call: { tr: 'Arama', en: 'Call' },
+  meeting: { tr: 'Toplantı', en: 'Meeting' },
+  presentation: { tr: 'Sunum', en: 'Presentation' },
+  onboarding: { tr: 'Oryantasyon', en: 'Onboarding' },
+  training: { tr: 'Eğitim', en: 'Training' },
+  custom: { tr: 'Özel', en: 'Custom' },
+}
+
+const TASK_PRIORITY_LABELS: Record<TaskRow['priority'], { tr: string; en: string }> = {
+  low: { tr: 'Düşük', en: 'Low' },
+  medium: { tr: 'Orta', en: 'Medium' },
+  high: { tr: 'Yüksek', en: 'High' },
+  urgent: { tr: 'Acil', en: 'Urgent' },
+}
+
+const TASK_PRIORITY_VARIANTS: Record<TaskRow['priority'], 'default' | 'primary' | 'warning' | 'error'> = {
+  low: 'default',
+  medium: 'primary',
+  high: 'warning',
+  urgent: 'error',
+}
+
+const INTERACTION_TYPE_LABELS: Record<InteractionRow['type'], { tr: string; en: string }> = {
+  call: { tr: 'Arama', en: 'Call' },
+  message: { tr: 'Mesaj', en: 'Message' },
+  meeting: { tr: 'Toplantı', en: 'Meeting' },
+  email: { tr: 'E-posta', en: 'Email' },
+  note: { tr: 'Not', en: 'Note' },
+  presentation: { tr: 'Sunum', en: 'Presentation' },
+  follow_up: { tr: 'Takip', en: 'Follow-up' },
 }
 
 const OUTCOME_VARIANTS: Record<NonNullable<InteractionRow['outcome']>, 'success' | 'default' | 'error' | 'warning'> = {
@@ -71,28 +118,11 @@ const OUTCOME_VARIANTS: Record<NonNullable<InteractionRow['outcome']>, 'success'
   no_response: 'warning',
 }
 
-const OUTCOME_LABELS: Record<NonNullable<InteractionRow['outcome']>, string> = {
-  positive: 'Olumlu',
-  neutral: 'Notr',
-  negative: 'Olumsuz',
-  no_response: 'Donus Yok',
-}
-
-const TASK_TYPE_LABELS: Record<TaskRow['type'], string> = {
-  follow_up: 'Takip',
-  call: 'Arama',
-  meeting: 'Toplanti',
-  presentation: 'Sunum',
-  onboarding: 'Oryantasyon',
-  training: 'Egitim',
-  custom: 'Ozel',
-}
-
-const TASK_PRIORITY_VARIANTS: Record<TaskRow['priority'], 'default' | 'primary' | 'warning' | 'error'> = {
-  low: 'default',
-  medium: 'primary',
-  high: 'warning',
-  urgent: 'error',
+const OUTCOME_LABELS: Record<NonNullable<InteractionRow['outcome']>, { tr: string; en: string }> = {
+  positive: { tr: 'Olumlu', en: 'Positive' },
+  neutral: { tr: 'Nötr', en: 'Neutral' },
+  negative: { tr: 'Olumsuz', en: 'Negative' },
+  no_response: { tr: 'Dönüş Yok', en: 'No Response' },
 }
 
 type AddForm = {
@@ -104,6 +134,8 @@ type AddForm = {
   temperature: 'cold' | 'warm' | 'hot' | 'frozen'
   interest_type: 'unknown' | 'product' | 'business' | 'both'
   source: string
+  notes: string
+  pipeline_stage: PipelineStage
 }
 
 type InteractionFormValues = {
@@ -125,18 +157,44 @@ type ContactTaskFormValues = {
   description?: string
 }
 
-const EMPTY_FORM: AddForm = {
-  full_name: '', phone: '', email: '', location: '',
-  profession: '', temperature: 'cold', interest_type: 'unknown', source: '',
+function createEmptyForm(segment: SegmentKey): AddForm {
+  return {
+    full_name: '',
+    phone: '',
+    email: '',
+    location: '',
+    profession: '',
+    temperature: 'cold',
+    interest_type: 'unknown',
+    source: '',
+    notes: '',
+    pipeline_stage: segment === 'customers'
+      ? 'became_customer'
+      : segment === 'team'
+        ? 'became_member'
+        : 'new',
+  }
 }
 
-function formatDate(value: string | null) {
+function isProspectStage(stage: string) {
+  return !['became_customer', 'became_member'].includes(stage)
+}
+
+function isFollowUpDue(contact: ContactRow, todayKey: string) {
+  return Boolean(contact.next_follow_up_date) && contact.next_follow_up_date!.slice(0, 10) <= todayKey
+}
+
+function formatDate(value: string | null | undefined, locale: 'tr' | 'en') {
   if (!value) return '—'
-  return new Date(value).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(value).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString('tr-TR', {
+function formatDateTime(value: string, locale: 'tr' | 'en') {
+  return new Date(value).toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -145,17 +203,268 @@ function formatDateTime(value: string) {
   })
 }
 
-function humanizeChannel(value: string) {
-  return value.replace(/_/g, ' ')
+function stageMeta(stage: string) {
+  const labels: Record<string, { tr: string; en: string; className: string }> = {
+    new: { tr: 'Yeni Potansiyel', en: 'New Lead', className: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20' },
+    contact_planned: { tr: 'İletişim Planlandı', en: 'Contact Planned', className: 'bg-blue-500/10 text-blue-300 border-blue-500/20' },
+    first_contact: { tr: 'İlk İletişim', en: 'First Contact', className: 'bg-violet-500/10 text-violet-300 border-violet-500/20' },
+    interested: { tr: 'İlgileniyor', en: 'Interested', className: 'bg-purple-500/10 text-purple-300 border-purple-500/20' },
+    invited: { tr: 'Davet Edildi', en: 'Invited', className: 'bg-amber-500/10 text-amber-300 border-amber-500/20' },
+    presentation_sent: { tr: 'Sunum Gönderildi', en: 'Presentation Sent', className: 'bg-orange-500/10 text-orange-300 border-orange-500/20' },
+    followup_pending: { tr: 'Takip Bekleniyor', en: 'Follow-up Pending', className: 'bg-red-500/10 text-red-300 border-red-500/20' },
+    objection_handling: { tr: 'İtiraz Yönetimi', en: 'Objection Handling', className: 'bg-rose-500/10 text-rose-300 border-rose-500/20' },
+    ready_to_buy: { tr: 'Satın Almaya Hazır', en: 'Ready to Buy', className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' },
+    became_customer: { tr: 'Müşteri', en: 'Customer', className: 'bg-teal-500/10 text-teal-300 border-teal-500/20' },
+    ready_to_join: { tr: 'Katılmaya Hazır', en: 'Ready to Join', className: 'bg-sky-500/10 text-sky-300 border-sky-500/20' },
+    became_member: { tr: 'Ekip Üyesi', en: 'Team Member', className: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' },
+    nurture_later: { tr: 'Sonra İlgilen', en: 'Nurture Later', className: 'bg-slate-500/10 text-slate-300 border-slate-500/20' },
+    dormant: { tr: 'Pasif', en: 'Dormant', className: 'bg-slate-600/10 text-slate-300 border-slate-600/20' },
+    lost: { tr: 'Kaybedildi', en: 'Lost', className: 'bg-zinc-500/10 text-zinc-300 border-zinc-500/20' },
+  }
+
+  return labels[stage] ?? { tr: stage, en: stage, className: 'bg-surface-hover text-text-secondary border-border' }
+}
+
+function buildContactsHref(segment: SegmentKey, options?: { contactId?: string; newModal?: boolean }) {
+  const params = new URLSearchParams()
+  if (segment !== 'all') params.set('segment', segment)
+  if (options?.contactId) params.set('contact', options.contactId)
+  if (options?.newModal) params.set('new', '1')
+  const query = params.toString()
+  return query ? `/contacts?${query}` : '/contacts'
+}
+
+function ChannelButtons({ contact }: { contact: ContactRow }) {
+  const phoneDigits = contact.phone?.replace(/\D/g, '') ?? ''
+
+  return (
+    <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+      {contact.phone && (
+        <>
+          <a
+            href={`tel:${contact.phone}`}
+            className="w-8 h-8 rounded-lg border border-border-subtle bg-surface/50 flex items-center justify-center text-text-secondary hover:text-primary"
+          >
+            <Phone className="w-3.5 h-3.5" />
+          </a>
+          <a
+            href={`https://wa.me/${phoneDigits}`}
+            target="_blank"
+            rel="noreferrer"
+            className="w-8 h-8 rounded-lg border border-border-subtle bg-surface/50 flex items-center justify-center text-text-secondary hover:text-success"
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+          </a>
+        </>
+      )}
+      {contact.email && (
+        <a
+          href={`mailto:${contact.email}`}
+          className="w-8 h-8 rounded-lg border border-border-subtle bg-surface/50 flex items-center justify-center text-text-secondary hover:text-primary"
+        >
+          <Mail className="w-3.5 h-3.5" />
+        </a>
+      )}
+    </div>
+  )
+}
+
+function ContactCreateModal({
+  currentLocale,
+  form,
+  setForm,
+  error,
+  loading,
+  onClose,
+  onSubmit,
+}: {
+  currentLocale: 'tr' | 'en'
+  form: AddForm
+  setForm: Dispatch<SetStateAction<AddForm>>
+  error: string
+  loading: boolean
+  onClose: () => void
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="w-full max-w-3xl bg-elevated border border-border rounded-2xl shadow-float overflow-hidden"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <div>
+            <h2 className="text-base font-semibold text-text-primary">
+              {currentLocale === 'tr' ? 'Yeni Kontak Ekle' : 'Add New Contact'}
+            </h2>
+            <p className="text-xs text-text-tertiary mt-0.5">
+              {currentLocale === 'tr'
+                ? 'Tek sayfalık kontak merkezine yeni kayıt oluştur.'
+                : 'Create a new contact inside the unified workspace.'}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+          {error && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" />{error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Ad Soyad *' : 'Full Name *'}
+              </label>
+              <input
+                value={form.full_name}
+                onChange={(event) => setForm((current) => ({ ...current, full_name: event.target.value }))}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Telefon' : 'Phone'}
+              </label>
+              <input
+                value={form.phone}
+                onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'E-posta' : 'Email'}
+              </label>
+              <input
+                value={form.email}
+                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Konum' : 'Location'}
+              </label>
+              <input
+                value={form.location}
+                onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Meslek' : 'Profession'}
+              </label>
+              <input
+                value={form.profession}
+                onChange={(event) => setForm((current) => ({ ...current, profession: event.target.value }))}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Kaynak' : 'Source'}
+              </label>
+              <input
+                value={form.source}
+                onChange={(event) => setForm((current) => ({ ...current, source: event.target.value }))}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Sıcaklık' : 'Temperature'}
+              </label>
+              <select
+                value={form.temperature}
+                onChange={(event) => setForm((current) => ({ ...current, temperature: event.target.value as AddForm['temperature'] }))}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+              >
+                <option value="hot">{currentLocale === 'tr' ? 'Sıcak' : 'Hot'}</option>
+                <option value="warm">{currentLocale === 'tr' ? 'Ilık' : 'Warm'}</option>
+                <option value="cold">{currentLocale === 'tr' ? 'Soğuk' : 'Cold'}</option>
+                <option value="frozen">{currentLocale === 'tr' ? 'Donuk' : 'Frozen'}</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'İlgi Türü' : 'Interest Type'}
+              </label>
+              <select
+                value={form.interest_type}
+                onChange={(event) => setForm((current) => ({ ...current, interest_type: event.target.value as AddForm['interest_type'] }))}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+              >
+                <option value="unknown">{currentLocale === 'tr' ? 'Belirsiz' : 'Unknown'}</option>
+                <option value="product">{currentLocale === 'tr' ? 'Ürün' : 'Product'}</option>
+                <option value="business">{currentLocale === 'tr' ? 'İş' : 'Business'}</option>
+                <option value="both">{currentLocale === 'tr' ? 'Her İkisi' : 'Both'}</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Aşama' : 'Stage'}
+              </label>
+              <select
+                value={form.pipeline_stage}
+                onChange={(event) => setForm((current) => ({ ...current, pipeline_stage: event.target.value as PipelineStage }))}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+              >
+                {PIPELINE_STAGE_OPTIONS.map((stage) => (
+                  <option key={stage} value={stage}>{stageMeta(stage)[currentLocale]}</option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Notlar' : 'Notes'}
+              </label>
+              <textarea
+                value={form.notes}
+                onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+                rows={4}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all resize-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+              {currentLocale === 'tr' ? 'İptal' : 'Cancel'}
+            </Button>
+            <Button type="submit" className="flex-1" loading={loading}>
+              {currentLocale === 'tr' ? 'Kontağı Kaydet' : 'Save Contact'}
+            </Button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  )
 }
 
 function InteractionModal({
+  currentLocale,
   contactName,
   onClose,
   onSubmit,
   loading,
   error,
 }: {
+  currentLocale: 'tr' | 'en'
   contactName: string
   onClose: () => void
   onSubmit: (values: InteractionFormValues) => void
@@ -201,12 +510,14 @@ function InteractionModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="w-full max-w-xl bg-elevated border border-border rounded-2xl shadow-float overflow-hidden"
-        onClick={event => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
-            <h2 className="text-base font-semibold text-text-primary">Iletisim Kaydi</h2>
-            <p className="text-xs text-text-tertiary mt-0.5">{contactName} icin yeni kayit</p>
+            <h2 className="text-base font-semibold text-text-primary">
+              {currentLocale === 'tr' ? 'İletişim Kaydı' : 'Interaction Log'}
+            </h2>
+            <p className="text-xs text-text-tertiary mt-0.5">{contactName}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover">
             <X className="w-4 h-4" />
@@ -222,66 +533,75 @@ function InteractionModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Tur</label>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Tür' : 'Type'}
+              </label>
               <select
                 value={form.type}
-                onChange={event => setForm(current => ({ ...current, type: event.target.value as InteractionRow['type'] }))}
+                onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as InteractionRow['type'] }))}
                 className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
               >
                 {Object.entries(INTERACTION_TYPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                  <option key={value} value={value}>{label[currentLocale]}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Kanal</label>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Kanal' : 'Channel'}
+              </label>
               <select
                 value={form.channel}
-                onChange={event => setForm(current => ({ ...current, channel: event.target.value }))}
+                onChange={(event) => setForm((current) => ({ ...current, channel: event.target.value }))}
                 className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
               >
-                <option value="phone">Telefon</option>
+                <option value="phone">{currentLocale === 'tr' ? 'Telefon' : 'Phone'}</option>
                 <option value="whatsapp">WhatsApp</option>
-                <option value="email">E-posta</option>
-                <option value="in_person">Yuz Yuze</option>
-                <option value="social_dm">DM</option>
-                <option value="video_call">Video</option>
-                <option value="manual">Diger</option>
+                <option value="email">{currentLocale === 'tr' ? 'E-posta' : 'Email'}</option>
+                <option value="in_person">{currentLocale === 'tr' ? 'Yüz Yüze' : 'In Person'}</option>
+                <option value="social_dm">{currentLocale === 'tr' ? 'DM' : 'DM'}</option>
+                <option value="video_call">{currentLocale === 'tr' ? 'Video' : 'Video'}</option>
+                <option value="manual">{currentLocale === 'tr' ? 'Diğer' : 'Other'}</option>
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Not *</label>
+            <label className="block text-xs font-medium text-text-secondary mb-1.5">
+              {currentLocale === 'tr' ? 'Not *' : 'Note *'}
+            </label>
             <textarea
               value={form.content}
-              onChange={event => setForm(current => ({ ...current, content: event.target.value }))}
-              placeholder="Gorusmenin ozeti, verilen tepki, itirazlar..."
+              onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))}
               rows={4}
-              className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 transition-all resize-none"
+              className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all resize-none"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Sonuc</label>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Sonuç' : 'Outcome'}
+              </label>
               <select
                 value={form.outcome}
-                onChange={event => setForm(current => ({ ...current, outcome: event.target.value as '' | NonNullable<InteractionRow['outcome']> }))}
+                onChange={(event) => setForm((current) => ({ ...current, outcome: event.target.value as '' | NonNullable<InteractionRow['outcome']> }))}
                 className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
               >
-                <option value="">Secilmedi</option>
+                <option value="">{currentLocale === 'tr' ? 'Seçilmedi' : 'Not selected'}</option>
                 {Object.entries(OUTCOME_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                  <option key={value} value={value}>{label[currentLocale]}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Tarih</label>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Tarih' : 'Date'}
+              </label>
               <input
                 type="date"
                 value={form.date}
-                onChange={event => setForm(current => ({ ...current, date: event.target.value }))}
+                onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
                 className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
               />
             </div>
@@ -289,42 +609,35 @@ function InteractionModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Sonraki Aksiyon</label>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Sonraki Aksiyon' : 'Next Action'}
+              </label>
               <input
                 value={form.next_action}
-                onChange={event => setForm(current => ({ ...current, next_action: event.target.value }))}
-                placeholder="Sunum gonder, tekrar ara..."
-                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Sonraki Takip Tarihi</label>
-              <input
-                type="date"
-                value={form.next_follow_up_date}
-                onChange={event => setForm(current => ({ ...current, next_follow_up_date: event.target.value }))}
+                onChange={(event) => setForm((current) => ({ ...current, next_action: event.target.value }))}
                 className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Sure (dk)</label>
-            <input
-              type="number"
-              min="0"
-              value={form.duration_minutes}
-              onChange={event => setForm(current => ({ ...current, duration_minutes: event.target.value }))}
-              placeholder="15"
-              className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 transition-all"
-            />
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Sonraki Takip' : 'Next Follow-up'}
+              </label>
+              <input
+                type="date"
+                value={form.next_follow_up_date}
+                onChange={(event) => setForm((current) => ({ ...current, next_follow_up_date: event.target.value }))}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+              />
+            </div>
           </div>
         </div>
 
         <div className="flex gap-3 p-5 border-t border-border">
-          <Button variant="outline" className="flex-1" onClick={onClose}>Iptal</Button>
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            {currentLocale === 'tr' ? 'İptal' : 'Cancel'}
+          </Button>
           <Button className="flex-1" loading={loading} disabled={!form.content.trim()} onClick={handleSubmit}>
-            Kaydi Ekle
+            {currentLocale === 'tr' ? 'Kaydı Ekle' : 'Save Log'}
           </Button>
         </div>
       </motion.div>
@@ -333,12 +646,14 @@ function InteractionModal({
 }
 
 function ContactTaskModal({
+  currentLocale,
   contactName,
   onClose,
   onSubmit,
   loading,
   error,
 }: {
+  currentLocale: 'tr' | 'en'
   contactName: string
   onClose: () => void
   onSubmit: (values: ContactTaskFormValues) => void
@@ -355,7 +670,6 @@ function ContactTaskModal({
 
   function handleSubmit() {
     if (!form.title.trim()) return
-
     onSubmit({
       title: form.title.trim(),
       type: form.type,
@@ -378,12 +692,14 @@ function ContactTaskModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="w-full max-w-lg bg-elevated border border-border rounded-2xl shadow-float overflow-hidden"
-        onClick={event => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
-            <h2 className="text-base font-semibold text-text-primary">Kisiye Gorev Ekle</h2>
-            <p className="text-xs text-text-tertiary mt-0.5">{contactName} icin yeni gorev</p>
+            <h2 className="text-base font-semibold text-text-primary">
+              {currentLocale === 'tr' ? 'Kontağa Görev Ekle' : 'Add Task for Contact'}
+            </h2>
+            <p className="text-xs text-text-tertiary mt-0.5">{contactName}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover">
             <X className="w-4 h-4" />
@@ -398,69 +714,78 @@ function ContactTaskModal({
           )}
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Baslik *</label>
+            <label className="block text-xs font-medium text-text-secondary mb-1.5">
+              {currentLocale === 'tr' ? 'Başlık *' : 'Title *'}
+            </label>
             <input
               value={form.title}
-              onChange={event => setForm(current => ({ ...current, title: event.target.value }))}
-              placeholder="Takip, arama, toplanti..."
-              className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 transition-all"
+              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+              className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Tur</label>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Tür' : 'Type'}
+              </label>
               <select
                 value={form.type}
-                onChange={event => setForm(current => ({ ...current, type: event.target.value as TaskRow['type'] }))}
+                onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as TaskRow['type'] }))}
                 className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
               >
                 {Object.entries(TASK_TYPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                  <option key={value} value={value}>{label[currentLocale]}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Oncelik</label>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Öncelik' : 'Priority'}
+              </label>
               <select
                 value={form.priority}
-                onChange={event => setForm(current => ({ ...current, priority: event.target.value as TaskRow['priority'] }))}
+                onChange={(event) => setForm((current) => ({ ...current, priority: event.target.value as TaskRow['priority'] }))}
                 className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
               >
-                <option value="low">Dusuk</option>
-                <option value="medium">Orta</option>
-                <option value="high">Yuksek</option>
-                <option value="urgent">Acil</option>
+                {Object.entries(TASK_PRIORITY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label[currentLocale]}</option>
+                ))}
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Son Tarih</label>
+            <label className="block text-xs font-medium text-text-secondary mb-1.5">
+              {currentLocale === 'tr' ? 'Son Tarih' : 'Due Date'}
+            </label>
             <input
               type="date"
               value={form.due_date}
-              onChange={event => setForm(current => ({ ...current, due_date: event.target.value }))}
+              onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))}
               className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Aciklama</label>
+            <label className="block text-xs font-medium text-text-secondary mb-1.5">
+              {currentLocale === 'tr' ? 'Açıklama' : 'Description'}
+            </label>
             <textarea
               value={form.description}
-              onChange={event => setForm(current => ({ ...current, description: event.target.value }))}
-              placeholder="Kisa baglam veya hazirlik notu..."
+              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
               rows={3}
-              className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 transition-all resize-none"
+              className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all resize-none"
             />
           </div>
         </div>
 
         <div className="flex gap-3 p-5 border-t border-border">
-          <Button variant="outline" className="flex-1" onClick={onClose}>Iptal</Button>
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            {currentLocale === 'tr' ? 'İptal' : 'Cancel'}
+          </Button>
           <Button className="flex-1" loading={loading} disabled={!form.title.trim()} onClick={handleSubmit}>
-            Gorevi Ekle
+            {currentLocale === 'tr' ? 'Görevi Ekle' : 'Add Task'}
           </Button>
         </div>
       </motion.div>
@@ -469,19 +794,32 @@ function ContactTaskModal({
 }
 
 export default function ContactsPage() {
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
+  const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const { currentUser } = useAppStore()
   const qc = useQueryClient()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const importInputRef = useRef<HTMLInputElement>(null)
+
   const selectedId = searchParams.get('contact')
+  const requestedSegment = searchParams.get('segment')
+  const activeSegment: SegmentKey = requestedSegment && validSegments.includes(requestedSegment as SegmentKey)
+    ? (requestedSegment as SegmentKey)
+    : 'all'
+  const routeModalOpen = searchParams.get('new') === '1'
 
   const [search, setSearch] = useState('')
+  const [selectedStage, setSelectedStage] = useState<string>('all')
+  const [selectedTemperature, setSelectedTemperature] = useState<'all' | ContactRow['temperature']>('all')
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [showAdd, setShowAdd] = useState(false)
   const [showInteractionModal, setShowInteractionModal] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
-  const [form, setForm] = useState<AddForm>(EMPTY_FORM)
+  const [form, setForm] = useState<AddForm>(() => createEmptyForm(activeSegment))
   const [formError, setFormError] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importMessage, setImportMessage] = useState('')
   const [interactionError, setInteractionError] = useState('')
   const [taskError, setTaskError] = useState('')
 
@@ -502,13 +840,26 @@ export default function ContactsPage() {
     enabled: !!selectedId,
   })
 
+  const interestLabel = (value: string) =>
+    t.interest?.[value as keyof typeof t.interest] ?? value
+
   const addMutation = useMutation({
-    mutationFn: (values: AddForm) => addContact(currentUser!.id, values),
+    mutationFn: (values: AddForm) =>
+      addContact(currentUser!.id, {
+        full_name: values.full_name,
+        phone: values.phone || undefined,
+        email: values.email || undefined,
+        location: values.location || undefined,
+        profession: values.profession || undefined,
+        temperature: values.temperature,
+        interest_type: values.interest_type,
+        source: values.source || undefined,
+        notes: values.notes || undefined,
+        pipeline_stage: values.pipeline_stage,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contacts'] })
-      setShowAdd(false)
-      setForm(EMPTY_FORM)
-      setFormError('')
+      closeAddModal()
     },
     onError: (error: Error) => setFormError(error.message),
   })
@@ -519,7 +870,7 @@ export default function ContactsPage() {
       qc.invalidateQueries({ queryKey: ['contacts'] })
       qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
       qc.invalidateQueries({ queryKey: ['contact-tasks', selectedId] })
-      router.push('/contacts')
+      router.push(buildContactsHref(activeSegment))
     },
   })
 
@@ -576,28 +927,212 @@ export default function ContactsPage() {
     },
   })
 
-  const filtered = contacts.filter(contact =>
-    !search || contact.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    contact.email?.toLowerCase().includes(search.toLowerCase()) ||
-    contact.phone?.includes(search)
-  )
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const monthKey = todayKey.slice(0, 7)
 
-  const selected = selectedId ? contacts.find(contact => contact.id === selectedId) ?? null : null
-  const openTasks = contactTasks.filter(task => task.status !== 'completed' && task.status !== 'skipped')
-  const completedTasks = contactTasks.filter(task => task.status === 'completed')
+  const contactStats = useMemo(() => ({
+    total: contacts.length,
+    prospects: contacts.filter((contact) => isProspectStage(contact.pipeline_stage)).length,
+    customers: contacts.filter((contact) => contact.pipeline_stage === 'became_customer').length,
+    team: contacts.filter((contact) => contact.pipeline_stage === 'became_member').length,
+    followUpDue: contacts.filter((contact) => isFollowUpDue(contact, todayKey)).length,
+    monthAdded: contacts.filter((contact) => contact.created_at.slice(0, 7) === monthKey).length,
+    hot: contacts.filter((contact) => contact.temperature === 'hot').length,
+    warm: contacts.filter((contact) => contact.temperature === 'warm').length,
+    cold: contacts.filter((contact) => contact.temperature === 'cold').length,
+  }), [contacts, monthKey, todayKey])
+
+  const filteredContacts = useMemo(() => {
+    return contacts.filter((contact) => {
+      const matchesSegment = (() => {
+        switch (activeSegment) {
+          case 'prospects':
+            return isProspectStage(contact.pipeline_stage)
+          case 'customers':
+            return contact.pipeline_stage === 'became_customer'
+          case 'team':
+            return contact.pipeline_stage === 'became_member'
+          case 'follow_up':
+            return isFollowUpDue(contact, todayKey)
+          case 'hot':
+            return contact.temperature === 'hot'
+          default:
+            return true
+        }
+      })()
+
+      const matchesSearch =
+        !search ||
+        contact.full_name.toLowerCase().includes(search.toLowerCase()) ||
+        contact.email?.toLowerCase().includes(search.toLowerCase()) ||
+        contact.phone?.includes(search) ||
+        contact.location?.toLowerCase().includes(search.toLowerCase()) ||
+        contact.profession?.toLowerCase().includes(search.toLowerCase())
+
+      const matchesStage = selectedStage === 'all' || contact.pipeline_stage === selectedStage
+      const matchesTemperature = selectedTemperature === 'all' || contact.temperature === selectedTemperature
+
+      return matchesSegment && matchesSearch && matchesStage && matchesTemperature
+    })
+  }, [activeSegment, contacts, search, selectedStage, selectedTemperature, todayKey])
+
+  const selected = selectedId ? contacts.find((contact) => contact.id === selectedId) ?? null : null
+  const openTasks = contactTasks.filter((task) => task.status !== 'completed' && task.status !== 'skipped')
+  const completedTasks = contactTasks.filter((task) => task.status === 'completed')
 
   function openContactDetail(contactId: string) {
-    router.push(`/contacts?contact=${contactId}`)
+    router.push(buildContactsHref(activeSegment, { contactId }))
   }
 
   function closeContactDetail() {
-    router.push('/contacts')
+    router.push(buildContactsHref(activeSegment))
   }
+
+  function closeAddModal() {
+    setShowAdd(false)
+    setFormError('')
+    setForm(createEmptyForm(activeSegment))
+    if (routeModalOpen) {
+      router.push(buildContactsHref(activeSegment))
+    }
+  }
+
+  function openAddModal() {
+    setForm(createEmptyForm(activeSegment))
+    setFormError('')
+    router.push(buildContactsHref(activeSegment, { newModal: true }))
+  }
+
+  function updateSegment(segment: SegmentKey) {
+    router.push(buildContactsHref(segment, selectedId ? { contactId: selectedId } : undefined))
+  }
+
+  function exportContacts() {
+    const headers = [
+      'full_name',
+      'phone',
+      'email',
+      'profession',
+      'location',
+      'temperature',
+      'interest_type',
+      'source',
+      'pipeline_stage',
+      'last_contact_date',
+      'next_follow_up_date',
+      'notes',
+    ]
+
+    const rows = filteredContacts.map((contact) => ([
+      contact.full_name,
+      contact.phone ?? '',
+      contact.email ?? '',
+      contact.profession ?? '',
+      contact.location ?? '',
+      contact.temperature,
+      contact.interest_type,
+      contact.source ?? '',
+      contact.pipeline_stage,
+      contact.last_contact_date ?? '',
+      contact.next_follow_up_date ?? '',
+      contact.goals_notes ?? '',
+    ]))
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `nmu-contacts-${todayKey}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file || !currentUser) return
+
+    setImporting(true)
+    setImportMessage('')
+
+    try {
+      const text = await file.text()
+      const [headerLine, ...lines] = text.split(/\r?\n/).filter(Boolean)
+      if (!headerLine) throw new Error(currentLocale === 'tr' ? 'CSV boş.' : 'CSV is empty.')
+
+      const headers = headerLine.split(',').map((header) => header.trim().replace(/^"|"$/g, ''))
+      const importedRows = lines
+        .map((line) => {
+          const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)|(?<=,)(?=,)/g) ?? []
+          const normalizedValues = values.map((value) => value.replace(/^"|"$/g, '').replace(/""/g, '"'))
+          return headers.reduce<Record<string, string>>((accumulator, header, index) => {
+            accumulator[header] = normalizedValues[index] ?? ''
+            return accumulator
+          }, {})
+        })
+        .filter((row) => row.full_name?.trim())
+
+      if (importedRows.length === 0) {
+        throw new Error(currentLocale === 'tr'
+          ? 'İçe aktarılacak geçerli kayıt bulunamadı.'
+          : 'No valid records found for import.')
+      }
+
+      for (const row of importedRows) {
+        await addContact(currentUser.id, {
+          full_name: row.full_name.trim(),
+          phone: row.phone || undefined,
+          email: row.email || undefined,
+          profession: row.profession || undefined,
+          location: row.location || undefined,
+          temperature: (row.temperature as AddForm['temperature']) || 'cold',
+          interest_type: (row.interest_type as AddForm['interest_type']) || 'unknown',
+          source: row.source || undefined,
+          notes: row.notes || undefined,
+          pipeline_stage: row.pipeline_stage || undefined,
+        })
+      }
+
+      await qc.invalidateQueries({ queryKey: ['contacts'] })
+      setImportMessage(currentLocale === 'tr'
+        ? `${importedRows.length} kontak içe aktarıldı.`
+        : `${importedRows.length} contacts imported.`)
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : (currentLocale === 'tr'
+        ? 'İçe aktarma sırasında hata oluştu.'
+        : 'Import failed.'))
+    } finally {
+      setImporting(false)
+      event.target.value = ''
+    }
+  }
+
+  async function handleAddContact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!currentUser) return
+    if (!form.full_name.trim()) {
+      setFormError(currentLocale === 'tr' ? 'Ad soyad zorunludur.' : 'Full name is required.')
+      return
+    }
+    addMutation.mutate(form)
+  }
+
+  const segmentButtons: Array<{ key: SegmentKey; label: string; count: number }> = [
+    { key: 'all', label: currentLocale === 'tr' ? 'Tümü' : 'All', count: contactStats.total },
+    { key: 'prospects', label: currentLocale === 'tr' ? 'Potansiyeller' : 'Prospects', count: contactStats.prospects },
+    { key: 'customers', label: currentLocale === 'tr' ? 'Müşteriler' : 'Customers', count: contactStats.customers },
+    { key: 'team', label: currentLocale === 'tr' ? 'Ekip' : 'Team', count: contactStats.team },
+    { key: 'follow_up', label: currentLocale === 'tr' ? 'Takip Gerekenler' : 'Follow-up Due', count: contactStats.followUpDue },
+    { key: 'hot', label: currentLocale === 'tr' ? 'Sıcak Kontaklar' : 'Hot Contacts', count: contactStats.hot },
+  ]
 
   if (selected) {
     return (
       <>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-[1320px] mx-auto">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-[1360px] mx-auto">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <Button variant="ghost" size="sm" onClick={closeContactDetail} icon={<ArrowLeft className="w-3.5 h-3.5" />}>
               {t.common.backToContacts}
@@ -611,7 +1146,7 @@ export default function ContactsPage() {
                 icon={<MessageSquareText className="w-3.5 h-3.5" />}
                 disabled={!currentUser}
               >
-                Iletisim Kaydi
+                {currentLocale === 'tr' ? 'İletişim Kaydı' : 'Log Interaction'}
               </Button>
               <Button
                 size="sm"
@@ -619,13 +1154,13 @@ export default function ContactsPage() {
                 icon={<Plus className="w-3.5 h-3.5" />}
                 disabled={!currentUser}
               >
-                Gorev Ekle
+                {currentLocale === 'tr' ? 'Görev Ekle' : 'Add Task'}
               </Button>
               <Button
                 variant="danger"
                 size="sm"
                 onClick={() => deleteMutation.mutate(selected.id)}
-                icon={<Trash2 className="w-3.5 h-3.5" />}
+                icon={<X className="w-3.5 h-3.5" />}
               >
                 {t.common.delete}
               </Button>
@@ -641,7 +1176,7 @@ export default function ContactsPage() {
                 <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
                   <TemperatureBadge temperature={selected.temperature} score={selected.temperature_score} />
                   <Badge variant="secondary" size="sm">
-                    {t.interest?.[selected.interest_type as keyof typeof t.interest] ?? selected.interest_type}
+                    {interestLabel(selected.interest_type)}
                   </Badge>
                 </div>
               </div>
@@ -665,58 +1200,53 @@ export default function ContactsPage() {
                     <span className="text-text-primary">{selected.location}</span>
                   </div>
                 )}
+                {selected.source && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <Contact className="w-4 h-4 text-text-tertiary shrink-0" />
+                    <span className="text-text-primary">{selected.source}</span>
+                  </div>
+                )}
               </div>
 
               <div className="mt-5 pt-4 border-t border-border space-y-4">
                 <div>
-                  <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">{t.common.pipelineStage}</p>
+                  <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">{currentLocale === 'tr' ? 'Aşama' : 'Stage'}</p>
                   <select
                     value={selected.pipeline_stage}
-                    onChange={event => stageMutation.mutate({ id: selected.id, stage: event.target.value })}
+                    onChange={(event) => stageMutation.mutate({ id: selected.id, stage: event.target.value })}
                     disabled={stageMutation.isPending}
                     className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
                   >
-                    {PIPELINE_STAGE_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
+                    {PIPELINE_STAGE_OPTIONS.map((stage) => (
+                      <option key={stage} value={stage}>{stageMeta(stage)[currentLocale]}</option>
                     ))}
                   </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-text-tertiary text-xs mb-0.5">Kaynak</p>
-                    <p className="text-text-primary">{selected.source || '—'}</p>
+                    <p className="text-text-tertiary text-xs mb-0.5">{currentLocale === 'tr' ? 'Eklenme' : 'Created'}</p>
+                    <p className="text-text-primary">{formatDate(selected.created_at, currentLocale)}</p>
                   </div>
                   <div>
-                    <p className="text-text-tertiary text-xs mb-0.5">Eklenme</p>
-                    <p className="text-text-primary">{formatDate(selected.created_at)}</p>
+                    <p className="text-text-tertiary text-xs mb-0.5">{currentLocale === 'tr' ? 'Son Temas' : 'Last Touch'}</p>
+                    <p className="text-text-primary">{formatDate(selected.last_contact_date, currentLocale)}</p>
                   </div>
                   <div>
-                    <p className="text-text-tertiary text-xs mb-0.5">Son Iletisim</p>
-                    <p className="text-text-primary">{formatDate(selected.last_contact_date)}</p>
+                    <p className="text-text-tertiary text-xs mb-0.5">{currentLocale === 'tr' ? 'Sonraki Takip' : 'Next Follow-up'}</p>
+                    <p className="text-text-primary">{formatDate(selected.next_follow_up_date, currentLocale)}</p>
                   </div>
                   <div>
-                    <p className="text-text-tertiary text-xs mb-0.5">Sonraki Takip</p>
-                    <p className="text-text-primary">{formatDate(selected.next_follow_up_date)}</p>
+                    <p className="text-text-tertiary text-xs mb-0.5">{currentLocale === 'tr' ? 'İlişki Gücü' : 'Relationship'}</p>
+                    <p className="text-text-primary">{selected.relationship_strength} / 100</p>
                   </div>
-                </div>
-
-                <div>
-                  <p className="text-text-tertiary text-xs mb-1">Iliski Gucu</p>
-                  <div className="w-full h-2 rounded-full bg-surface-hover overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-primary to-secondary"
-                      style={{ width: `${Math.max(0, Math.min(selected.relationship_strength, 100))}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-text-secondary mt-1">{selected.relationship_strength} / 100</p>
                 </div>
 
                 {selected.tags.length > 0 && (
                   <div>
                     <p className="text-text-tertiary text-xs mb-2">{t.common.tags}</p>
                     <div className="flex flex-wrap gap-2">
-                      {selected.tags.map(tag => (
+                      {selected.tags.map((tag) => (
                         <Badge key={tag} size="sm">{tag}</Badge>
                       ))}
                     </div>
@@ -728,19 +1258,22 @@ export default function ContactsPage() {
             <div className="xl:col-span-2 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Card padding="sm">
-                  <p className="text-[11px] uppercase tracking-wider text-text-tertiary font-semibold">Iletisim</p>
+                  <p className="text-[11px] uppercase tracking-wider text-text-tertiary font-semibold">
+                    {currentLocale === 'tr' ? 'İletişim' : 'Interactions'}
+                  </p>
                   <p className="text-2xl font-bold text-text-primary mt-2">{interactions.length}</p>
-                  <p className="text-xs text-text-secondary mt-1">Toplam kayit</p>
                 </Card>
                 <Card padding="sm">
-                  <p className="text-[11px] uppercase tracking-wider text-text-tertiary font-semibold">Acik Gorev</p>
+                  <p className="text-[11px] uppercase tracking-wider text-text-tertiary font-semibold">
+                    {currentLocale === 'tr' ? 'Açık Görev' : 'Open Tasks'}
+                  </p>
                   <p className="text-2xl font-bold text-text-primary mt-2">{openTasks.length}</p>
-                  <p className="text-xs text-text-secondary mt-1">Takip bekleyen is</p>
                 </Card>
                 <Card padding="sm">
-                  <p className="text-[11px] uppercase tracking-wider text-text-tertiary font-semibold">Tamamlanan</p>
+                  <p className="text-[11px] uppercase tracking-wider text-text-tertiary font-semibold">
+                    {currentLocale === 'tr' ? 'Tamamlanan' : 'Completed'}
+                  </p>
                   <p className="text-2xl font-bold text-text-primary mt-2">{completedTasks.length}</p>
-                  <p className="text-xs text-text-secondary mt-1">Kapanan gorev</p>
                 </Card>
               </div>
 
@@ -749,13 +1282,13 @@ export default function ContactsPage() {
                   {selected.goals_notes && (
                     <Card>
                       <CardHeader><CardTitle>{t.common.goals}</CardTitle></CardHeader>
-                      <p className="text-sm text-text-secondary">{selected.goals_notes}</p>
+                      <p className="text-sm text-text-secondary whitespace-pre-wrap">{selected.goals_notes}</p>
                     </Card>
                   )}
                   {selected.family_notes && (
                     <Card>
                       <CardHeader><CardTitle>{t.common.family}</CardTitle></CardHeader>
-                      <p className="text-sm text-text-secondary">{selected.family_notes}</p>
+                      <p className="text-sm text-text-secondary whitespace-pre-wrap">{selected.family_notes}</p>
                     </Card>
                   )}
                 </div>
@@ -764,8 +1297,7 @@ export default function ContactsPage() {
               <Card>
                 <CardHeader className="items-start gap-3 sm:flex-row sm:items-center">
                   <div>
-                    <CardTitle>{t.contacts.interactionHistory}</CardTitle>
-                    <p className="text-xs text-text-tertiary mt-1">Kisiyle yapilan temaslar ve sonraki aksiyonlar</p>
+                    <CardTitle>{t.common.interactionHistory}</CardTitle>
                   </div>
                   <Button
                     size="sm"
@@ -774,60 +1306,33 @@ export default function ContactsPage() {
                     icon={<MessageSquareText className="w-3.5 h-3.5" />}
                     disabled={!currentUser}
                   >
-                    Kayit Ekle
+                    {currentLocale === 'tr' ? 'Kayıt Ekle' : 'Add Log'}
                   </Button>
                 </CardHeader>
 
                 {interactionsLoading ? (
-                  <div className="py-10 text-center text-sm text-text-tertiary">Yukleniyor...</div>
+                  <div className="py-10 text-center text-sm text-text-tertiary">{t.common.loading}</div>
                 ) : interactions.length === 0 ? (
                   <div className="py-10 text-center">
                     <p className="text-sm text-text-tertiary">{t.contacts.noInteractions}</p>
-                    <Button
-                      size="sm"
-                      className="mt-3"
-                      onClick={() => { setInteractionError(''); setShowInteractionModal(true) }}
-                      icon={<Plus className="w-3.5 h-3.5" />}
-                      disabled={!currentUser}
-                    >
-                      {t.common.logFirstInteraction}
-                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {interactions.map(interaction => (
+                    {interactions.map((interaction) => (
                       <div key={interaction.id} className="rounded-xl border border-border-subtle bg-surface/40 p-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="primary" size="sm">{INTERACTION_TYPE_LABELS[interaction.type]}</Badge>
+                            <Badge variant="primary" size="sm">{INTERACTION_TYPE_LABELS[interaction.type][currentLocale]}</Badge>
                             {interaction.outcome && (
                               <Badge variant={OUTCOME_VARIANTS[interaction.outcome]} size="sm">
-                                {OUTCOME_LABELS[interaction.outcome]}
+                                {OUTCOME_LABELS[interaction.outcome][currentLocale]}
                               </Badge>
                             )}
-                            <Badge size="sm">{humanizeChannel(interaction.channel)}</Badge>
+                            <Badge size="sm">{interaction.channel.replace(/_/g, ' ')}</Badge>
                           </div>
-                          <div className="text-xs text-text-tertiary">{formatDateTime(interaction.date)}</div>
+                          <div className="text-xs text-text-tertiary">{formatDateTime(interaction.date, currentLocale)}</div>
                         </div>
-
                         <p className="text-sm text-text-primary mt-3 whitespace-pre-wrap">{interaction.content}</p>
-
-                        {(interaction.next_action || interaction.duration_minutes) && (
-                          <div className="mt-3 flex flex-wrap gap-3 text-xs text-text-secondary">
-                            {interaction.next_action && (
-                              <span className="inline-flex items-center gap-1.5">
-                                <CalendarDays className="w-3.5 h-3.5 text-text-tertiary" />
-                                Sonraki: {interaction.next_action}
-                              </span>
-                            )}
-                            {interaction.duration_minutes && (
-                              <span className="inline-flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5 text-text-tertiary" />
-                                {interaction.duration_minutes} dk
-                              </span>
-                            )}
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -838,7 +1343,6 @@ export default function ContactsPage() {
                 <CardHeader className="items-start gap-3 sm:flex-row sm:items-center">
                   <div>
                     <CardTitle>{t.common.tasksFor} {selected.full_name}</CardTitle>
-                    <p className="text-xs text-text-tertiary mt-1">Kisiye bagli takip ve aksiyon listesi</p>
                   </div>
                   <Button
                     size="sm"
@@ -846,87 +1350,68 @@ export default function ContactsPage() {
                     icon={<Plus className="w-3.5 h-3.5" />}
                     disabled={!currentUser}
                   >
-                    {t.common.createTask}
+                    {currentLocale === 'tr' ? 'Görev Ekle' : 'Add Task'}
                   </Button>
                 </CardHeader>
 
                 {contactTasksLoading ? (
-                  <div className="py-10 text-center text-sm text-text-tertiary">Yukleniyor...</div>
+                  <div className="py-10 text-center text-sm text-text-tertiary">{t.common.loading}</div>
                 ) : contactTasks.length === 0 ? (
                   <div className="py-10 text-center">
                     <p className="text-sm text-text-tertiary">{t.contacts.noTasks}</p>
-                    <Button
-                      size="sm"
-                      className="mt-3"
-                      onClick={() => { setTaskError(''); setShowTaskModal(true) }}
-                      icon={<Plus className="w-3.5 h-3.5" />}
-                      disabled={!currentUser}
-                    >
-                      {t.common.createTask}
-                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {contactTasks.map(task => {
+                    {contactTasks.map((task) => {
                       const isDone = task.status === 'completed'
                       return (
                         <div key={task.id} className="rounded-xl border border-border-subtle bg-surface/40 p-4">
                           <div className="flex flex-col lg:flex-row lg:items-start gap-3">
                             <button
                               onClick={() => !isDone && completeTaskMutation.mutate(task.id)}
-                              className={`w-8 h-8 rounded-xl border shrink-0 flex items-center justify-center transition-colors ${
+                              className={cn(
+                                'w-8 h-8 rounded-xl border shrink-0 flex items-center justify-center transition-colors',
                                 isDone
                                   ? 'bg-success/10 border-success/20 text-success'
-                                  : 'border-border text-text-muted hover:border-primary hover:text-primary'
-                              }`}
+                                  : 'border-border text-text-muted hover:border-primary hover:text-primary',
+                              )}
                             >
                               {isDone ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                             </button>
 
                             <div className="flex-1 min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
-                                <p className={`text-sm font-semibold ${isDone ? 'text-text-muted line-through' : 'text-text-primary'}`}>
+                                <p className={cn('text-sm font-semibold', isDone ? 'text-text-muted line-through' : 'text-text-primary')}>
                                   {task.title}
                                 </p>
                                 <Badge variant={TASK_PRIORITY_VARIANTS[task.priority]} size="sm">
-                                  {task.priority}
+                                  {TASK_PRIORITY_LABELS[task.priority][currentLocale]}
                                 </Badge>
-                                <Badge size="sm">{TASK_TYPE_LABELS[task.type]}</Badge>
+                                <Badge size="sm">{TASK_TYPE_LABELS[task.type][currentLocale]}</Badge>
                               </div>
-
                               {task.description && (
                                 <p className="text-sm text-text-secondary mt-2">{task.description}</p>
                               )}
-
                               <div className="flex flex-wrap gap-3 mt-3 text-xs text-text-tertiary">
                                 <span className="inline-flex items-center gap-1.5">
                                   <CalendarDays className="w-3.5 h-3.5" />
-                                  {t.common.due}: {formatDate(task.due_date)}
-                                </span>
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Clock className="w-3.5 h-3.5" />
-                                  Durum: {task.status}
+                                  {t.common.due}: {formatDate(task.due_date, currentLocale)}
                                 </span>
                               </div>
                             </div>
 
                             <div className="flex items-center gap-2">
                               {!isDone && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => completeTaskMutation.mutate(task.id)}
-                                >
-                                  Tamamla
+                                <Button size="sm" variant="ghost" onClick={() => completeTaskMutation.mutate(task.id)}>
+                                  {currentLocale === 'tr' ? 'Tamamla' : 'Complete'}
                                 </Button>
                               )}
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="text-error hover:bg-error/10"
                                 onClick={() => deleteTaskMutation.mutate(task.id)}
                               >
-                                Sil
+                                {t.common.delete}
                               </Button>
                             </div>
                           </div>
@@ -943,21 +1428,22 @@ export default function ContactsPage() {
         <AnimatePresence>
           {showInteractionModal && (
             <InteractionModal
+              currentLocale={currentLocale}
               contactName={selected.full_name}
               loading={interactionMutation.isPending}
               error={interactionError}
               onClose={() => setShowInteractionModal(false)}
-              onSubmit={values => interactionMutation.mutate({ ...values, contact_id: selected.id })}
+              onSubmit={(values) => interactionMutation.mutate({ ...values, contact_id: selected.id })}
             />
           )}
-
           {showTaskModal && (
             <ContactTaskModal
+              currentLocale={currentLocale}
               contactName={selected.full_name}
               loading={contactTaskMutation.isPending}
               error={taskError}
               onClose={() => setShowTaskModal(false)}
-              onSubmit={values => contactTaskMutation.mutate({ ...values, contact_id: selected.id })}
+              onSubmit={(values) => contactTaskMutation.mutate({ ...values, contact_id: selected.id })}
             />
           )}
         </AnimatePresence>
@@ -966,206 +1452,299 @@ export default function ContactsPage() {
   }
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
-      <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">{t.contacts.title}</h1>
-          <p className="text-sm text-text-secondary mt-0.5">{contacts.length} {t.contacts.subtitle}</p>
-        </div>
-        <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setShowAdd(true)}>
-          {t.contacts.addContact}
-        </Button>
-      </motion.div>
-
-      <motion.div variants={item} className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
-        <input
-          value={search}
-          onChange={event => setSearch(event.target.value)}
-          placeholder={t.contacts.searchPlaceholder}
-          className="w-full pl-9 pr-4 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
-        />
-      </motion.div>
-
-      <motion.div variants={item} className="space-y-2">
-        {isLoading ? (
-          <div className="py-12 text-center text-sm text-text-tertiary">Yukleniyor...</div>
-        ) : filtered.length === 0 ? (
-          <div className="py-12 text-center">
-            <div className="w-12 h-12 rounded-xl bg-surface flex items-center justify-center mx-auto mb-3">
-              <User className="w-6 h-6 text-text-muted" />
-            </div>
-            <p className="text-sm text-text-secondary font-medium">
-              {search ? 'Arama sonucu bulunamadi' : 'Henuz kisi eklenmemis'}
-            </p>
-            {!search && (
-              <button onClick={() => setShowAdd(true)} className="mt-3 text-xs text-primary hover:text-primary-dim font-medium">
-                Ilk kisini ekle →
-              </button>
-            )}
+    <>
+      <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
+        <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-text-primary">{t.contacts.title}</h1>
+            <p className="text-sm text-text-secondary mt-0.5">{contacts.length} {t.contacts.subtitle}</p>
           </div>
-        ) : (
-          filtered.map((contact, index) => (
-            <motion.div
-              key={contact.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.03 }}
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={handleImportFile}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Upload className="w-3.5 h-3.5" />}
+              onClick={() => importInputRef.current?.click()}
+              loading={importing}
             >
-              <Card hover padding="sm" className="cursor-pointer group" onClick={() => openContactDetail(contact.id)}>
-                <div className="flex items-center gap-4">
-                  <Avatar name={contact.full_name} size="md" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-text-primary truncate">{contact.full_name}</p>
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                      {contact.profession && <span className="text-xs text-text-tertiary flex items-center gap-1"><Briefcase className="w-3 h-3" />{contact.profession}</span>}
-                      {contact.location && <span className="text-xs text-text-tertiary flex items-center gap-1"><MapPin className="w-3 h-3" />{contact.location}</span>}
-                      {contact.phone && <span className="text-xs text-text-tertiary flex items-center gap-1"><Phone className="w-3 h-3" />{contact.phone}</span>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <TemperatureBadge temperature={contact.temperature} score={contact.temperature_score} />
-                    <Badge variant="default" size="sm">{PIPELINE_STAGE_LABELS[contact.pipeline_stage] ?? contact.pipeline_stage}</Badge>
-                    <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-text-secondary transition-colors" />
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))
+              {currentLocale === 'tr' ? 'İçe Aktar' : 'Import'}
+            </Button>
+            <Button variant="outline" size="sm" icon={<Download className="w-3.5 h-3.5" />} onClick={exportContacts}>
+              {currentLocale === 'tr' ? 'Dışa Aktar' : 'Export'}
+            </Button>
+            <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={openAddModal}>
+              {currentLocale === 'tr' ? 'Yeni Kontak' : 'New Contact'}
+            </Button>
+          </div>
+        </motion.div>
+
+        {importMessage && (
+          <motion.div variants={item}>
+            <div className="rounded-xl border border-border bg-surface/50 px-4 py-3 text-sm text-text-secondary">
+              {importMessage}
+            </div>
+          </motion.div>
         )}
+
+        <motion.div variants={item} className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          {[
+            { label: currentLocale === 'tr' ? 'Toplam Kontak' : 'Total Contacts', value: contactStats.total, icon: Users, glow: 'primary' as const, segment: 'all' as SegmentKey },
+            { label: currentLocale === 'tr' ? 'Potansiyeller' : 'Prospects', value: contactStats.prospects, icon: UserPlus, glow: 'warning' as const, segment: 'prospects' as SegmentKey },
+            { label: currentLocale === 'tr' ? 'Müşteriler' : 'Customers', value: contactStats.customers, icon: ShoppingBag, glow: 'success' as const, segment: 'customers' as SegmentKey },
+            { label: currentLocale === 'tr' ? 'Ekip' : 'Team', value: contactStats.team, icon: Contact, glow: 'primary' as const, segment: 'team' as SegmentKey },
+            { label: currentLocale === 'tr' ? 'Takip Gereken' : 'Follow-up Due', value: contactStats.followUpDue, icon: ListChecks, glow: 'error' as const, segment: 'follow_up' as SegmentKey },
+            { label: currentLocale === 'tr' ? 'Bu Ay Eklenen' : 'Added This Month', value: contactStats.monthAdded, icon: CalendarClock, glow: 'primary' as const, segment: 'all' as SegmentKey },
+          ].map((stat) => {
+            const Icon = stat.icon
+            const isActive = activeSegment === stat.segment
+            return (
+              <Card
+                key={stat.label}
+                hover
+                glow={stat.glow}
+                className={cn('min-h-[108px]', isActive && 'ring-1 ring-primary/25')}
+                onClick={() => updateSegment(stat.segment)}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-surface-hover flex items-center justify-center">
+                    <Icon className="w-4 h-4 text-primary" />
+                  </div>
+                  <p className="text-3xl font-bold text-text-primary kpi-number">{stat.value}</p>
+                </div>
+                <p className="mt-4 text-sm text-text-secondary font-medium">{stat.label}</p>
+              </Card>
+            )
+          })}
+        </motion.div>
+
+        <motion.div variants={item} className="grid grid-cols-3 gap-3">
+          {[
+            { key: 'hot', count: contactStats.hot, label: currentLocale === 'tr' ? 'Sıcak Kontaklar' : 'Hot Contacts', color: 'text-error', bg: 'bg-error/15' },
+            { key: 'warm', count: contactStats.warm, label: currentLocale === 'tr' ? 'Ilık Kontaklar' : 'Warm Contacts', color: 'text-warning', bg: 'bg-warning/15' },
+            { key: 'cold', count: contactStats.cold, label: currentLocale === 'tr' ? 'Soğuk Kontaklar' : 'Cold Contacts', color: 'text-slate-400', bg: 'bg-slate-500/15' },
+          ].map((card) => (
+            <div
+              key={card.key}
+              onClick={() => setSelectedTemperature((current) => (current === card.key ? 'all' : card.key as ContactRow['temperature']))}
+              className={cn(
+                'bg-card border rounded-xl p-4 flex items-center gap-3 cursor-pointer hover:bg-card-hover transition-colors',
+                selectedTemperature === card.key ? 'border-primary/40' : 'border-border',
+              )}
+            >
+              <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', card.bg)}>
+                <Flame className={cn('w-5 h-5', card.color)} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-text-primary">{card.count}</p>
+                <p className="text-xs text-text-tertiary">{card.label}</p>
+              </div>
+            </div>
+          ))}
+        </motion.div>
+
+        <motion.div variants={item} className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {segmentButtons.map((segment) => (
+              <button
+                key={segment.key}
+                type="button"
+                onClick={() => updateSegment(segment.key)}
+                className={cn(
+                  'px-4 py-2 rounded-xl text-sm font-medium transition-all border',
+                  activeSegment === segment.key
+                    ? 'bg-primary/15 text-primary border-primary/20'
+                    : 'bg-surface border-border text-text-secondary hover:text-text-primary',
+                )}
+              >
+                {segment.label} <span className="ml-1 text-xs opacity-75">{segment.count}</span>
+              </button>
+            ))}
+          </div>
+
+          <Card>
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+              <div className="relative flex-1">
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={currentLocale === 'tr' ? 'Ad, telefon, email, konum ara...' : 'Search name, phone, email, location...'}
+                  className="w-full h-11 rounded-xl border border-border bg-surface pl-4 pr-4 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-primary/30"
+                />
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  value={selectedStage}
+                  onChange={(event) => setSelectedStage(event.target.value)}
+                  className="h-11 px-3 bg-surface border border-border rounded-xl text-sm text-text-primary outline-none"
+                >
+                  <option value="all">{currentLocale === 'tr' ? 'Tüm Aşamalar' : 'All Stages'}</option>
+                  {PIPELINE_STAGE_OPTIONS.map((stage) => (
+                    <option key={stage} value={stage}>{stageMeta(stage)[currentLocale]}</option>
+                  ))}
+                </select>
+                <div className="flex items-center bg-surface border border-border rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('table')}
+                    className={cn('h-11 px-3 text-text-secondary', viewMode === 'table' && 'bg-primary/15 text-primary')}
+                  >
+                    <LayoutList className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('cards')}
+                    className={cn('h-11 px-3 text-text-secondary', viewMode === 'cards' && 'bg-primary/15 text-primary')}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+
+        <motion.div variants={item}>
+          {isLoading ? (
+            <Card>
+              <div className="py-12 text-center text-sm text-text-tertiary">{t.common.loading}</div>
+            </Card>
+          ) : filteredContacts.length === 0 ? (
+            <Card>
+              <div className="py-12 text-center">
+                <p className="text-base font-semibold text-text-primary">
+                  {currentLocale === 'tr' ? 'Bu görünümde kontak bulunamadı.' : 'No contacts matched this view.'}
+                </p>
+                <p className="text-sm text-text-tertiary mt-2">
+                  {currentLocale === 'tr'
+                    ? 'Filtreleri sadeleştir veya yeni bir kontak ekle.'
+                    : 'Broaden the filters or create a new contact.'}
+                </p>
+              </div>
+            </Card>
+          ) : viewMode === 'table' ? (
+            <Card padding="none" className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-surface/40">
+                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Kontak' : 'Contact'}</th>
+                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Kanallar' : 'Channels'}</th>
+                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Aşama' : 'Stage'}</th>
+                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Sıcaklık' : 'Warmth'}</th>
+                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'İlgi' : 'Interest'}</th>
+                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Son Temas' : 'Last Touch'}</th>
+                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Sonraki Takip' : 'Next Follow-up'}</th>
+                      <th className="px-4 py-3 text-right text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Detay' : 'Open'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredContacts.map((contact) => {
+                      const stage = stageMeta(contact.pipeline_stage)
+                      return (
+                        <tr
+                          key={contact.id}
+                          onClick={() => openContactDetail(contact.id)}
+                          className="border-b border-border last:border-0 hover:bg-surface/30 cursor-pointer transition-colors"
+                        >
+                          <td className="px-4 py-4 min-w-[260px]">
+                            <div className="flex items-center gap-3">
+                              <Avatar name={contact.full_name} size="sm" />
+                              <div>
+                                <p className="font-semibold text-text-primary">{contact.full_name}</p>
+                                <p className="text-xs text-text-tertiary">
+                                  {[contact.profession, contact.location].filter(Boolean).join(' · ') || (currentLocale === 'tr' ? 'Kontak kaydı' : 'Contact record')}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4"><ChannelButtons contact={contact} /></td>
+                          <td className="px-4 py-4">
+                            <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold', stage.className)}>
+                              {stage[currentLocale]}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 min-w-[170px]">
+                            <TemperatureBadge temperature={contact.temperature} score={contact.temperature_score} />
+                          </td>
+                          <td className="px-4 py-4 text-text-secondary">{interestLabel(contact.interest_type)}</td>
+                          <td className="px-4 py-4 text-text-secondary">{formatDate(contact.last_contact_date, currentLocale)}</td>
+                          <td className="px-4 py-4 text-text-secondary">{formatDate(contact.next_follow_up_date, currentLocale)}</td>
+                          <td className="px-4 py-4 text-right">
+                            <span className="inline-flex w-8 h-8 rounded-lg border border-border-subtle bg-surface/50 items-center justify-center text-text-secondary">
+                              <ChevronRight className="w-4 h-4" />
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {filteredContacts.map((contact) => {
+                const stage = stageMeta(contact.pipeline_stage)
+                return (
+                  <Card key={contact.id} hover onClick={() => openContactDetail(contact.id)}>
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={contact.full_name} size="md" />
+                        <div>
+                          <h3 className="text-sm font-semibold text-text-primary">{contact.full_name}</h3>
+                          <p className="text-xs text-text-tertiary">
+                            {[contact.profession, contact.location].filter(Boolean).join(' · ') || (currentLocale === 'tr' ? 'Kontak kaydı' : 'Contact record')}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={cn('inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold', stage.className)}>
+                        {stage[currentLocale]}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <ChannelButtons contact={contact} />
+                      <TemperatureBadge temperature={contact.temperature} score={contact.temperature_score} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <p className="text-text-tertiary">{currentLocale === 'tr' ? 'İlgi' : 'Interest'}</p>
+                        <p className="text-text-primary mt-1">{interestLabel(contact.interest_type)}</p>
+                      </div>
+                      <div>
+                        <p className="text-text-tertiary">{currentLocale === 'tr' ? 'Sonraki Takip' : 'Next Follow-up'}</p>
+                        <p className="text-text-primary mt-1">{formatDate(contact.next_follow_up_date, currentLocale)}</p>
+                      </div>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </motion.div>
       </motion.div>
 
       <AnimatePresence>
-        {showAdd && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setShowAdd(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-lg bg-elevated border border-border rounded-2xl shadow-float overflow-hidden"
-              onClick={event => event.stopPropagation()}
-            >
-              <div className="flex items-center justify-between p-5 border-b border-border">
-                <h2 className="text-base font-semibold text-text-primary">{t.contacts.addContact}</h2>
-                <button onClick={() => setShowAdd(false)} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-                {formError && (
-                  <div className="flex items-center gap-2 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-sm">
-                    <AlertCircle className="w-4 h-4 shrink-0" />{formError}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">Ad Soyad *</label>
-                    <input
-                      value={form.full_name}
-                      onChange={event => setForm(current => ({ ...current, full_name: event.target.value }))}
-                      placeholder="Adi Soyadi"
-                      required
-                      className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">Telefon</label>
-                    <input
-                      value={form.phone}
-                      onChange={event => setForm(current => ({ ...current, phone: event.target.value }))}
-                      placeholder="+90 5xx xxx xx xx"
-                      className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">E-posta</label>
-                    <input
-                      value={form.email}
-                      onChange={event => setForm(current => ({ ...current, email: event.target.value }))}
-                      placeholder="ad@ornek.com"
-                      type="email"
-                      className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">Sehir / Konum</label>
-                    <input
-                      value={form.location}
-                      onChange={event => setForm(current => ({ ...current, location: event.target.value }))}
-                      placeholder="Istanbul"
-                      className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">Meslek</label>
-                    <input
-                      value={form.profession}
-                      onChange={event => setForm(current => ({ ...current, profession: event.target.value }))}
-                      placeholder="Ogretmen, Girisimci..."
-                      className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">Sicaklik</label>
-                    <select
-                      value={form.temperature}
-                      onChange={event => setForm(current => ({ ...current, temperature: event.target.value as AddForm['temperature'] }))}
-                      className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                    >
-                      <option value="cold">Soguk</option>
-                      <option value="warm">Ilik</option>
-                      <option value="hot">Sicak</option>
-                      <option value="frozen">Donuk</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">Ilgi Alani</label>
-                    <select
-                      value={form.interest_type}
-                      onChange={event => setForm(current => ({ ...current, interest_type: event.target.value as AddForm['interest_type'] }))}
-                      className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                    >
-                      <option value="unknown">Bilinmiyor</option>
-                      <option value="product">Urun</option>
-                      <option value="business">Is Firsati</option>
-                      <option value="both">Her Ikisi</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">Kaynak</label>
-                    <input
-                      value={form.source}
-                      onChange={event => setForm(current => ({ ...current, source: event.target.value }))}
-                      placeholder="WhatsApp grubu, sosyal medya..."
-                      className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 transition-all"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3 p-5 border-t border-border">
-                <Button variant="outline" className="flex-1" onClick={() => setShowAdd(false)}>{t.common.cancel}</Button>
-                <Button
-                  className="flex-1"
-                  disabled={!form.full_name.trim() || addMutation.isPending}
-                  loading={addMutation.isPending}
-                  onClick={() => addMutation.mutate(form)}
-                >
-                  {t.common.save}
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
+        {(showAdd || routeModalOpen) && (
+          <ContactCreateModal
+            currentLocale={currentLocale}
+            form={form}
+            setForm={setForm}
+            error={formError}
+            loading={addMutation.isPending}
+            onClose={closeAddModal}
+            onSubmit={handleAddContact}
+          />
         )}
       </AnimatePresence>
-    </motion.div>
+    </>
   )
 }

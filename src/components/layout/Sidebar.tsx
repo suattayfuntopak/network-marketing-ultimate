@@ -15,7 +15,7 @@ import { syncAuthSessionCookie } from '@/lib/auth'
 import type { ContactRow, TaskRow } from '@/lib/queries'
 import { useState, useRef, useEffect } from 'react'
 import {
-  LayoutDashboard, Users, Contact, ShoppingBag, GitBranch, ListTodo,
+  LayoutDashboard, Users, ShoppingBag, GitBranch, ListTodo,
   GraduationCap, Calendar, BarChart3,
   Bot, Shield, ChevronLeft, ChevronRight, Zap,
   Target, Sparkles, X, LogOut, Settings, ChevronUp
@@ -37,7 +37,7 @@ export function Sidebar() {
   const { data: contacts = [] } = useQuery<ContactRow[]>({ queryKey: ['contacts'], queryFn: fetchContacts })
   const { data: tasks = [] } = useQuery<TaskRow[]>({ queryKey: ['tasks'], queryFn: fetchTasks })
 
-  const prospectsCount = contacts.length || undefined
+  const contactsCount = contacts.length || undefined
   const pendingTasksCount = tasks.filter(t => t.status === 'pending').length || undefined
 
   useEffect(() => {
@@ -59,8 +59,7 @@ export function Sidebar() {
 
   const navItems: NavItem[] = [
     { label: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
-    { label: t.nav.prospects, href: '/prospects', icon: Users, badge: prospectsCount?.toString() },
-    { label: t.nav.contacts, href: '/contacts', icon: Contact },
+    { label: t.nav.contacts, href: '/contacts', icon: Users, badge: contactsCount?.toString() },
     { label: t.nav.customers, href: '/customers', icon: ShoppingBag },
     { label: t.nav.pipeline, href: '/pipeline', icon: GitBranch },
     { label: t.nav.tasks, href: '/tasks', icon: ListTodo, badge: pendingTasksCount?.toString() },

@@ -221,7 +221,7 @@ export default function DashboardPage() {
         ].map((kpi, i) => {
           const Icon = kpi.icon
           const routeMap = [
-            '/prospects',
+            '/contacts?segment=prospects',
             '/tasks',
             '/pipeline',
             '/customers',
