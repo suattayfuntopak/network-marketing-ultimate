@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
 import { Avatar } from '@/components/ui/Avatar'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { consumeCoachPrompt, queueCoachPrompt } from '@/lib/clientStorage'
 import {
   fetchAllOrders,
   fetchContacts,
@@ -141,13 +142,30 @@ function getStageLabel(stage: string, locale: 'tr' | 'en') {
     : stage
 }
 
+async function readResponseError(response: Response, fallback: string) {
+  const body = await response.text()
+
+  if (!body) return fallback
+
+  try {
+    const parsed = JSON.parse(body) as { error?: string }
+    return parsed.error || fallback
+  } catch {
+    return body
+  }
+}
+
 export function AIPanel() {
   const { aiPanelOpen, toggleAIPanel, currentUser } = useAppStore()
   const { t, locale } = useLanguage()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const searchString = searchParams.toString()
   const [message, setMessage] = useState('')
   const [streaming, setStreaming] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['ai-panel', 'contacts'],
@@ -191,6 +209,23 @@ export function AIPanel() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages])
 
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!aiPanelOpen) return
+
+    const prompt = consumeCoachPrompt()
+    if (prompt) {
+      void handleSend(prompt)
+    }
+  // A queued prompt should only be consumed when the panel is visible on the latest route.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiPanelOpen, pathname, searchString])
+
   async function handleSend(text?: string) {
     const userText = (text ?? message).trim()
     if (!userText || streaming) return
@@ -208,11 +243,25 @@ export function AIPanel() {
     setChatMessages((prev) => [...prev, { role: 'ai', content: '' }])
 
     try {
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: apiMessages }),
+        signal: controller.signal,
       })
+
+      if (!res.ok) {
+        throw new Error(
+          await readResponseError(
+            res,
+            locale === 'tr' ? 'AI yaniti alinamadi.' : 'Failed to get an AI response.'
+          )
+        )
+      }
 
       const reader = res.body?.getReader()
       if (!reader) {
@@ -226,6 +275,7 @@ export function AIPanel() {
         const { value, done: completed } = await reader.read()
         done = completed
         if (!value) continue
+        if (controller.signal.aborted) return
 
         const chunk = decoder.decode(value)
         setChatMessages((prev) => {
@@ -237,18 +287,28 @@ export function AIPanel() {
           return next
         })
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return
+      }
+
       setChatMessages((prev) => {
         const next = [...prev]
         next[next.length - 1] = {
           role: 'ai',
-          content: locale === 'tr' ? 'Bir hata olustu. Lutfen tekrar dene.' : 'Something went wrong. Please try again.',
+          content:
+            error instanceof Error && error.message
+              ? error.message
+              : locale === 'tr'
+                ? 'Bir hata olustu. Lutfen tekrar dene.'
+                : 'Something went wrong. Please try again.',
         }
         return next
       })
+    } finally {
+      abortRef.current = null
+      setStreaming(false)
     }
-
-    setStreaming(false)
   }
 
   const contactsById = new Map(contacts.map((contact) => [contact.id, contact]))
@@ -437,8 +497,15 @@ export function AIPanel() {
   }
 
   async function handleInsightAction(insight: InsightCard) {
+    const currentRoute = `${pathname}${searchString ? `?${searchString}` : ''}`
+
+    if (insight.route === currentRoute) {
+      await handleSend(insight.prompt)
+      return
+    }
+
+    queueCoachPrompt(insight.prompt)
     router.push(insight.route)
-    await handleSend(insight.prompt)
   }
 
   return (

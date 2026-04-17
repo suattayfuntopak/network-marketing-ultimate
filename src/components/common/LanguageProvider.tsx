@@ -1,7 +1,8 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { translations, type Locale } from '@/lib/i18n'
+import { syncLocaleCookie } from '@/lib/auth'
 
 type Translations = typeof translations.en
 
@@ -17,22 +18,33 @@ const LanguageContext = createContext<LanguageContextType>({
   t: translations.en as Translations,
 })
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('nmu-locale') as Locale | null
-      if (saved === 'tr' || saved === 'en') return saved
+export function LanguageProvider({
+  children,
+  initialLocale,
+}: {
+  children: ReactNode
+  initialLocale: Locale
+}) {
+  const [locale, setLocaleState] = useState<Locale>(initialLocale)
+
+  useEffect(() => {
+    const saved = localStorage.getItem('nmu-locale') as Locale | null
+    if ((saved === 'tr' || saved === 'en') && saved !== locale) {
+      setLocaleState(saved)
     }
-    return 'tr'
-  })
+  // Align client preference after hydration without causing a mismatched first render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('nmu-locale', l)
-      document.documentElement.lang = l
-    }
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem('nmu-locale', locale)
+    document.documentElement.lang = locale
+    syncLocaleCookie(locale)
+  }, [locale])
 
   const t = translations[locale] as Translations
 

@@ -38,7 +38,7 @@ const PIPELINE_COLORS: Record<string, string> = {
 }
 
 export default function DashboardPage() {
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const { currentUser, toggleAIPanel } = useAppStore()
   const router = useRouter()
   const qc = useQueryClient()
@@ -235,7 +235,7 @@ export default function DashboardPage() {
               </CardHeader>
               {urgentTasks.length === 0 ? (
                 <div className="py-8 text-center text-sm text-text-tertiary">
-                  Bugün acil görev yok 🎉
+                  {locale === 'tr' ? 'Bugün acil görev yok.' : 'No urgent tasks for today.'}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -285,11 +285,15 @@ export default function DashboardPage() {
                   <BarChart3 className="w-4 h-4 text-secondary" />
                   {t.dashboard.pipelineOverview}
                 </CardTitle>
-                <Badge variant="default">{contacts.length} kişi</Badge>
+                <Badge variant="default">
+                  {contacts.length} {locale === 'tr' ? 'kişi' : 'people'}
+                </Badge>
               </CardHeader>
               {pipelineDistribution.length === 0 ? (
                 <div className="py-8 text-center text-sm text-text-tertiary">
-                  Henüz huni verisi yok — kişi eklemeye başla
+                  {locale === 'tr'
+                    ? 'Henüz huni verisi yok. Kişi ekleyerek başlayabilirsin.'
+                    : 'There is no pipeline data yet. Start by adding a few contacts.'}
                 </div>
               ) : (
                 <div className="flex gap-2 overflow-x-auto pb-2">

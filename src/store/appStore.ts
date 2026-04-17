@@ -23,6 +23,7 @@ interface AppState {
   // AI Panel
   aiPanelOpen: boolean
   toggleAIPanel: () => void
+  setAIPanelOpen: (open: boolean) => void
 
   // Search
   searchOpen: boolean
@@ -79,6 +80,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   aiPanelOpen: false,
   toggleAIPanel: () => set((s) => ({ aiPanelOpen: !s.aiPanelOpen })),
+  setAIPanelOpen: (open) => set({ aiPanelOpen: open }),
 
   searchOpen: false,
   searchQuery: '',

@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { fetchContacts, fetchTasks } from '@/lib/queries'
+import { syncAuthSessionCookie } from '@/lib/auth'
 import type { ContactRow, TaskRow } from '@/lib/queries'
 import { useState, useRef, useEffect } from 'react'
 import {
@@ -51,6 +52,7 @@ export function Sidebar() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
+    syncAuthSessionCookie(false)
     setCurrentUser(null)
     router.replace('/auth/login')
   }

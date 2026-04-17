@@ -10,6 +10,24 @@ export type InteractionRow = Database['public']['Tables']['nmu_interactions']['R
 export type ProductRow = Database['public']['Tables']['nmu_products']['Row']
 export type OrderRow = Database['public']['Tables']['nmu_orders']['Row']
 
+async function requireSessionUserId() {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession()
+
+  if (error) {
+    throw error
+  }
+
+  const userId = session?.user?.id
+  if (!userId) {
+    throw new Error('User session not found.')
+  }
+
+  return userId
+}
+
 function normalizeTaskStatus(task: TaskRow): TaskRow {
   if (task.status === 'completed' || task.status === 'skipped') {
     return task
@@ -31,9 +49,11 @@ function normalizeTaskStatus(task: TaskRow): TaskRow {
 // ─── PRODUCT ──────────────────────────────────────────────────
 
 export async function fetchProducts(): Promise<ProductRow[]> {
+  const userId = await requireSessionUserId()
   const { data, error } = await supabase
     .from('nmu_products')
     .select('*')
+    .eq('user_id', userId)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -79,27 +99,33 @@ export async function updateProduct(
     reorder_cycle_days: number | null
   }>
 ): Promise<void> {
+  const userId = await requireSessionUserId()
   const { error } = await supabase
     .from('nmu_products')
     .update(input)
     .eq('id', id)
+    .eq('user_id', userId)
   if (error) throw error
 }
 
 export async function deleteProduct(id: string): Promise<void> {
+  const userId = await requireSessionUserId()
   const { error } = await supabase
     .from('nmu_products')
     .update({ is_active: false })
     .eq('id', id)
+    .eq('user_id', userId)
   if (error) throw error
 }
 
 // ─── CONTACTS ────────────────────────────────────────────────
 
 export async function fetchContacts(): Promise<ContactRow[]> {
+  const userId = await requireSessionUserId()
   const { data, error } = await supabase
     .from('nmu_contacts')
     .select('*')
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as ContactRow[]
@@ -142,22 +168,31 @@ export async function addContact(
 }
 
 export async function deleteContact(id: string): Promise<void> {
-  const { error } = await supabase.from('nmu_contacts').delete().eq('id', id)
+  const userId = await requireSessionUserId()
+  const { error } = await supabase
+    .from('nmu_contacts')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId)
   if (error) throw error
 }
 
 export async function updateContactStage(id: string, stage: string): Promise<void> {
+  const userId = await requireSessionUserId()
   const { error } = await supabase
     .from('nmu_contacts')
     .update({ pipeline_stage: stage })
     .eq('id', id)
+    .eq('user_id', userId)
   if (error) throw error
 }
 
 export async function fetchInteractionsByContact(contactId: string): Promise<InteractionRow[]> {
+  const userId = await requireSessionUserId()
   const { data, error } = await supabase
     .from('nmu_interactions')
     .select('*')
+    .eq('user_id', userId)
     .eq('contact_id', contactId)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
@@ -211,6 +246,7 @@ export async function addInteraction(
     .from('nmu_contacts')
     .update(contactUpdate)
     .eq('id', input.contact_id)
+    .eq('user_id', userId)
 
   if (contactError) throw contactError
 
@@ -220,18 +256,22 @@ export async function addInteraction(
 // ─── TASKS ───────────────────────────────────────────────────
 
 export async function fetchTasks(): Promise<TaskRow[]> {
+  const userId = await requireSessionUserId()
   const { data, error } = await supabase
     .from('nmu_tasks')
     .select('*')
+    .eq('user_id', userId)
     .order('due_date', { ascending: true })
   if (error) throw error
   return ((data ?? []) as TaskRow[]).map(normalizeTaskStatus)
 }
 
 export async function fetchTasksByContact(contactId: string): Promise<TaskRow[]> {
+  const userId = await requireSessionUserId()
   const { data, error } = await supabase
     .from('nmu_tasks')
     .select('*')
+    .eq('user_id', userId)
     .eq('contact_id', contactId)
     .order('due_date', { ascending: true })
   if (error) throw error
@@ -268,15 +308,22 @@ export async function addTask(
 }
 
 export async function completeTask(id: string): Promise<void> {
+  const userId = await requireSessionUserId()
   const { error } = await supabase
     .from('nmu_tasks')
     .update({ status: 'completed', completed_at: new Date().toISOString() })
     .eq('id', id)
+    .eq('user_id', userId)
   if (error) throw error
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  const { error } = await supabase.from('nmu_tasks').delete().eq('id', id)
+  const userId = await requireSessionUserId()
+  const { error } = await supabase
+    .from('nmu_tasks')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId)
   if (error) throw error
 }
 
@@ -290,9 +337,11 @@ export interface OrderItem {
 }
 
 export async function fetchOrdersByContact(contactId: string): Promise<OrderRow[]> {
+  const userId = await requireSessionUserId()
   const { data, error } = await supabase
     .from('nmu_orders')
     .select('*')
+    .eq('user_id', userId)
     .eq('contact_id', contactId)
     .order('order_date', { ascending: false })
   if (error) throw error
@@ -300,9 +349,11 @@ export async function fetchOrdersByContact(contactId: string): Promise<OrderRow[
 }
 
 export async function fetchAllOrders(): Promise<OrderRow[]> {
+  const userId = await requireSessionUserId()
   const { data, error } = await supabase
     .from('nmu_orders')
     .select('*')
+    .eq('user_id', userId)
     .order('order_date', { ascending: false })
   if (error) throw error
   return (data ?? []) as OrderRow[]
@@ -339,17 +390,21 @@ export async function addOrder(
 }
 
 export async function updateOrderStatus(id: string, status: OrderRow['status']): Promise<void> {
+  const userId = await requireSessionUserId()
   const { error } = await supabase
     .from('nmu_orders')
     .update({ status })
     .eq('id', id)
+    .eq('user_id', userId)
   if (error) throw error
 }
 
 export async function deleteOrder(id: string): Promise<void> {
+  const userId = await requireSessionUserId()
   const { error } = await supabase
     .from('nmu_orders')
     .delete()
     .eq('id', id)
+    .eq('user_id', userId)
   if (error) throw error
 }

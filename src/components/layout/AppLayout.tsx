@@ -12,6 +12,7 @@ import { useAppStore } from '@/store/appStore'
 import type { User, UserSettings } from '@/types'
 import type { Database } from '@/lib/database.types'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { syncAuthSessionCookie } from '@/lib/auth'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { AIPanel } from './AIPanel'
@@ -62,21 +63,28 @@ export function AppLayout({ children }: { children: ReactNode }) {
     type ProfileRow = Database['public']['Tables']['nmu_user_profiles']['Row']
 
     async function fetchProfile(userId: string, email: string) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('nmu_user_profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle()
 
+      if (error) {
+        throw error
+      }
+
       let profile = data as ProfileRow | null
 
       // Trigger henüz çalışmadıysa profili kendimiz oluştur
       if (!profile) {
-        const { data: upserted } = await supabase
+        const { data: upserted, error: upsertError } = await supabase
           .from('nmu_user_profiles')
           .upsert({ id: userId, email, name: email.split('@')[0] }, { onConflict: 'id' })
           .select()
           .single()
+        if (upsertError) {
+          throw upsertError
+        }
         profile = upserted as ProfileRow | null
       }
 
@@ -101,20 +109,37 @@ export function AppLayout({ children }: { children: ReactNode }) {
     }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      syncAuthSessionCookie(Boolean(session?.user))
+
       if (session?.user) {
-        fetchProfile(session.user.id, session.user.email ?? '').finally(() => setAuthReady(true))
+        fetchProfile(session.user.id, session.user.email ?? '')
+          .catch(() => {
+            setCurrentUser(null)
+            syncAuthSessionCookie(false)
+          })
+          .finally(() => setAuthReady(true))
       } else {
         setCurrentUser(null)
+        syncAuthSessionCookie(false)
         setAuthReady(true)
       }
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      syncAuthSessionCookie(Boolean(session?.user))
+
       if (session?.user) {
-        fetchProfile(session.user.id, session.user.email ?? '')
+        void fetchProfile(session.user.id, session.user.email ?? '')
+          .catch(() => {
+            setCurrentUser(null)
+            syncAuthSessionCookie(false)
+          })
       } else {
         setCurrentUser(null)
+        syncAuthSessionCookie(false)
       }
+
+      setAuthReady(true)
     })
 
     return () => subscription.unsubscribe()

@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { syncThemeCookie } from '@/lib/auth'
 
 export type Theme = 'dark' | 'light'
 
@@ -11,20 +12,29 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType>({ theme: 'dark', setTheme: () => {} })
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === 'undefined') {
-      return 'dark'
-    }
+export function ThemeProvider({
+  children,
+  initialTheme,
+}: {
+  children: ReactNode
+  initialTheme: Theme
+}) {
+  const [theme, setThemeState] = useState<Theme>(initialTheme)
 
+  useEffect(() => {
     const saved = localStorage.getItem('nmu-theme') as Theme | null
-    return saved === 'light' || saved === 'dark' ? saved : 'dark'
-  })
+    if ((saved === 'light' || saved === 'dark') && saved !== theme) {
+      setThemeState(saved)
+    }
+  // Align the hydrated client state with persisted preference after the initial paint.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Tema değişince uygula
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('nmu-theme', theme)
+    syncThemeCookie(theme)
   }, [theme])
 
   const setTheme = useCallback((t: Theme) => setThemeState(t), [])

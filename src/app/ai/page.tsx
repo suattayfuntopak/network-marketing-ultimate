@@ -10,7 +10,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
 import { deriveCoachInsights } from '@/lib/coach'
-import { consumeCoachPrompt } from '@/lib/clientStorage'
+import { consumeCoachPrompt, queueCoachPrompt } from '@/lib/clientStorage'
 import { fetchAllOrders, fetchContacts, fetchTasks, type ContactRow, type OrderRow, type TaskRow } from '@/lib/queries'
 import { Bot, Sparkles, Send, Target, TrendingUp, ShoppingBag, GraduationCap, Lightbulb, MessageSquare, Zap, ArrowRight } from 'lucide-react'
 
@@ -19,10 +19,23 @@ const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
 type ChatMsg = { role: 'user' | 'ai'; content: string }
 
+async function readResponseError(response: Response, fallback: string) {
+  const body = await response.text()
+
+  if (!body) return fallback
+
+  try {
+    const parsed = JSON.parse(body) as { error?: string }
+    return parsed.error || fallback
+  } catch {
+    return body
+  }
+}
+
 export default function AIPage() {
   const router = useRouter()
   const { t, locale } = useLanguage()
-  const { currentUser } = useAppStore()
+  const { currentUser, setAIPanelOpen } = useAppStore()
   const [message, setMessage] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([
@@ -35,6 +48,7 @@ export default function AIPage() {
     },
   ])
   const bottomRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -70,6 +84,12 @@ export default function AIPage() {
   }, [chatMessages])
 
   useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
+
+  useEffect(() => {
     const prompt = consumeCoachPrompt()
     if (prompt) {
       void handleSend(prompt)
@@ -89,6 +109,10 @@ export default function AIPage() {
     setChatMessages((current) => [...current, { role: 'ai', content: '' }])
 
     try {
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -98,7 +122,17 @@ export default function AIPage() {
             content: entry.content,
           })),
         }),
+        signal: controller.signal,
       })
+
+      if (!response.ok) {
+        throw new Error(
+          await readResponseError(
+            response,
+            locale === 'tr' ? 'AI yaniti alinamadi.' : 'Failed to get an AI response.'
+          )
+        )
+      }
 
       const reader = response.body?.getReader()
       if (!reader) {
@@ -112,6 +146,7 @@ export default function AIPage() {
         const { value, done: completed } = await reader.read()
         done = completed
         if (!value) continue
+        if (controller.signal.aborted) return
 
         const chunk = decoder.decode(value)
         setChatMessages((current) => {
@@ -123,23 +158,34 @@ export default function AIPage() {
           return next
         })
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return
+      }
+
       setChatMessages((current) => {
         const next = [...current]
         next[next.length - 1] = {
           role: 'ai',
-          content: locale === 'tr' ? 'Bir hata oldu. Lutfen tekrar dene.' : 'Something went wrong. Please try again.',
+          content:
+            error instanceof Error && error.message
+              ? error.message
+              : locale === 'tr'
+                ? 'Bir hata oldu. Lutfen tekrar dene.'
+                : 'Something went wrong. Please try again.',
         }
         return next
       })
+    } finally {
+      abortRef.current = null
+      setStreaming(false)
     }
-
-    setStreaming(false)
   }
 
-  async function openInsight(route: string, prompt: string) {
+  function openInsight(route: string, prompt: string) {
+    queueCoachPrompt(prompt)
+    setAIPanelOpen(true)
     router.push(route)
-    await handleSend(prompt)
   }
 
   return (

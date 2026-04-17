@@ -1,16 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { getSafeRedirectTarget, syncAuthSessionCookie } from '@/lib/auth'
 import { Sparkles, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { t } = useLanguage()
+  const searchParams = useSearchParams()
+  const { t, locale } = useLanguage()
   const a = t.auth
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -30,7 +32,8 @@ export default function LoginPage() {
       return
     }
 
-    router.replace('/dashboard')
+    syncAuthSessionCookie(true)
+    router.replace(getSafeRedirectTarget(searchParams.get('next')))
   }
 
   return (
@@ -53,7 +56,11 @@ export default function LoginPage() {
         {/* Card */}
         <div className="bg-card border border-border rounded-2xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
           <h2 className="text-xl font-semibold text-text-primary mb-1">{a.login}</h2>
-          <p className="text-text-tertiary text-sm mb-6">Hesabına giriş yap ve işini yönet.</p>
+          <p className="text-text-tertiary text-sm mb-6">
+            {locale === 'tr'
+              ? 'Hesabına giriş yap ve işini yönet.'
+              : 'Sign in to your workspace and keep the business moving.'}
+          </p>
 
           {error && (
             <div className="flex items-center gap-2 p-3 mb-5 rounded-xl bg-error/10 border border-error/20 text-error text-sm">

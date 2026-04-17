@@ -1,16 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { getSafeRedirectTarget, syncAuthSessionCookie } from '@/lib/auth'
 import { Sparkles, Mail, Lock, User, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export default function SignupPage() {
   const router = useRouter()
-  const { t } = useLanguage()
+  const searchParams = useSearchParams()
+  const { t, locale } = useLanguage()
   const a = t.auth
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -41,7 +43,8 @@ export default function SignupPage() {
     // E-posta onayı gerekmeyebilir — önce session kontrol et
     const { data: { session } } = await supabase.auth.getSession()
     if (session) {
-      router.replace('/dashboard')
+      syncAuthSessionCookie(true)
+      router.replace(getSafeRedirectTarget(searchParams.get('next')))
     } else {
       setSuccess(true)
       setLoading(false)
@@ -59,15 +62,19 @@ export default function SignupPage() {
           <div className="w-16 h-16 rounded-2xl bg-success/15 border border-success/20 flex items-center justify-center mx-auto mb-5">
             <CheckCircle2 className="w-8 h-8 text-success" />
           </div>
-          <h2 className="text-xl font-semibold text-text-primary mb-2">Hesabın oluşturuldu!</h2>
+          <h2 className="text-xl font-semibold text-text-primary mb-2">
+            {locale === 'tr' ? 'Hesabın oluşturuldu!' : 'Your account is ready!'}
+          </h2>
           <p className="text-text-tertiary text-sm mb-6">
-            E-posta adresine bir onay bağlantısı gönderdik. Onayladıktan sonra giriş yapabilirsin.
+            {locale === 'tr'
+              ? 'E-posta adresine bir onay bağlantısı gönderdik. Onayladıktan sonra giriş yapabilirsin.'
+              : 'We sent a verification link to your email. Once you confirm it, you can sign in.'}
           </p>
           <Link
             href="/auth/login"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-surface border border-border text-sm font-medium text-text-primary hover:bg-surface-hover transition-colors"
           >
-            Giriş sayfasına git
+            {locale === 'tr' ? 'Giriş sayfasına git' : 'Go to sign in'}
           </Link>
         </motion.div>
       </div>
@@ -94,7 +101,11 @@ export default function SignupPage() {
         {/* Card */}
         <div className="bg-card border border-border rounded-2xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
           <h2 className="text-xl font-semibold text-text-primary mb-1">{a.signup}</h2>
-          <p className="text-text-tertiary text-sm mb-6">Ücretsiz hesabını oluştur ve başla.</p>
+          <p className="text-text-tertiary text-sm mb-6">
+            {locale === 'tr'
+              ? 'Ücretsiz hesabını oluştur ve başla.'
+              : 'Create your account and get started in minutes.'}
+          </p>
 
           {error && (
             <div className="flex items-center gap-2 p-3 mb-5 rounded-xl bg-error/10 border border-error/20 text-error text-sm">
@@ -113,7 +124,7 @@ export default function SignupPage() {
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
                   required
-                  placeholder="Adın Soyadın"
+                  placeholder={locale === 'tr' ? 'Adın Soyadın' : 'Your full name'}
                   className="w-full pl-9 pr-4 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
                 />
               </div>
@@ -148,7 +159,9 @@ export default function SignupPage() {
                   className="w-full pl-9 pr-4 py-2.5 bg-surface border border-border rounded-xl text-text-primary placeholder:text-text-muted text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
                 />
               </div>
-              <p className="text-[11px] text-text-muted mt-1.5">En az 6 karakter</p>
+              <p className="text-[11px] text-text-muted mt-1.5">
+                {locale === 'tr' ? 'En az 6 karakter' : 'At least 6 characters'}
+              </p>
             </div>
 
             <button
