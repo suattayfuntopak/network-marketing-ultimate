@@ -398,7 +398,7 @@ export const ranks: Rank[] = [
 export const notifications: Notification[] = [
   { id: 'n1', userId: 'u1', type: 'follow_up_due', title: 'Takip Zamanı', message: 'Elena Rodriguez bugün takip edilmeli. Serumunun azaldığını belirtmişti.', actionUrl: '/contacts/c2', isRead: false, priority: 'high', createdAt: '2026-04-14T08:00:00' },
   { id: 'n2', userId: 'u1', type: 'team_alert', title: 'Yeni Üyenin Sana İhtiyacı Var', message: 'Michael Foster oryantasyonun 1. Gününü tamamladı. İlerlemesini gözden geçir ve kontrol planla.', actionUrl: '/team/c11', isRead: false, priority: 'high', createdAt: '2026-04-14T07:30:00' },
-  { id: 'n3', userId: 'u1', type: 'achievement', title: 'Başarı Kilidi Açıldı! 🔥', message: '30 Günlük Seri rozetini kazandın! İvmeyi sürdür.', actionUrl: '/rank', isRead: false, priority: 'medium', createdAt: '2026-04-14T07:00:00' },
+  { id: 'n3', userId: 'u1', type: 'achievement', title: 'Başarı Kilidi Açıldı! 🔥', message: '30 Günlük Seri rozetini kazandın! İvmeyi sürdür.', actionUrl: '/analytics', isRead: false, priority: 'medium', createdAt: '2026-04-14T07:00:00' },
   { id: 'n4', userId: 'u1', type: 'ai_suggestion', title: 'AI İçgörüsü', message: 'Marcus Johnson\'ın ilgi puanı 15 puan arttı. Takibini hızlandırmayı düşün.', actionUrl: '/contacts/c1', isRead: true, priority: 'medium', createdAt: '2026-04-13T18:00:00' },
   { id: 'n5', userId: 'u1', type: 'event_reminder', title: 'Yarın Etkinlik', message: 'Haftalık Ekip Strateji Çağrısı yarın saat 19:00\'da. 2 üye onayladı.', actionUrl: '/events/e2', isRead: true, priority: 'medium', createdAt: '2026-04-13T09:00:00' },
 ]

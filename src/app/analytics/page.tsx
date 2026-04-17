@@ -275,8 +275,8 @@ export default function AnalyticsPage() {
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
                   <Tooltip content={CustomTooltip} />
                   <Bar dataKey="contacts" fill="#00d4ff" radius={[4, 4, 0, 0]} name={t.analytics.contacted} />
-                  <Bar dataKey="followUps" fill="#8b5cf6" radius={[4, 4, 0, 0]} name={t.rank.followUps} />
-                  <Bar dataKey="newLeads" fill="#10b981" radius={[4, 4, 0, 0]} name={t.rank.newLeads} />
+                  <Bar dataKey="followUps" fill="#8b5cf6" radius={[4, 4, 0, 0]} name={t.common.followUps} />
+                  <Bar dataKey="newLeads" fill="#10b981" radius={[4, 4, 0, 0]} name={t.common.newLeads} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

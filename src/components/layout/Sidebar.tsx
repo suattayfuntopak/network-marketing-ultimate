@@ -16,7 +16,7 @@ import type { ContactRow, TaskRow } from '@/lib/queries'
 import { useState, useRef, useEffect } from 'react'
 import {
   LayoutDashboard, Users, Contact, ShoppingBag, GitBranch, ListTodo,
-  GraduationCap, FileText, Calendar, Megaphone, Trophy, BarChart3,
+  GraduationCap, FileText, Calendar, Megaphone, BarChart3,
   Bot, Shield, ChevronLeft, ChevronRight, Zap,
   Target, Sparkles, X, LogOut, Settings, ChevronUp
 } from 'lucide-react'
@@ -71,7 +71,6 @@ export function Sidebar() {
     { label: t.nav.campaigns, href: '/campaigns', icon: Megaphone },
     { divider: true },
     { label: t.nav.team, href: '/team', icon: Target },
-    { label: t.nav.rank, href: '/rank', icon: Trophy },
     { label: t.nav.analytics, href: '/analytics', icon: BarChart3 },
     { label: t.nav.aiCoach, href: '/ai', icon: Bot, highlight: true },
     { divider: true },
@@ -238,7 +237,7 @@ export function Sidebar() {
                 className="overflow-hidden whitespace-nowrap flex-1 min-w-0 text-left"
               >
                 <p className="text-sm font-medium text-text-primary truncate">{currentUser?.name ?? '—'}</p>
-                <p className="text-[10px] text-text-tertiary truncate">{currentUser?.rank ?? currentUser?.role ?? t.sidebar.goldDirector}</p>
+                <p className="text-[10px] text-text-tertiary truncate">{currentUser?.role ?? t.sidebar.goldDirector}</p>
               </motion.div>
             )}
           </AnimatePresence>

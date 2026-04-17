@@ -14,7 +14,7 @@ import type { ContactRow, TaskRow } from '@/lib/queries'
 import {
   Flame, TrendingUp, Users, ShoppingBag,
   UserPlus, GraduationCap, Target, ArrowRight, Clock,
-  Zap, Bot, Calendar, ChevronRight, Sparkles, Award, BarChart3,
+  Zap, Bot, Calendar, ChevronRight, Sparkles, BarChart3,
   CheckCircle2, Presentation
 } from 'lucide-react'
 import {
@@ -208,7 +208,7 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* KPI Strip */}
-      <motion.div variants={item} className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      <motion.div variants={item} className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
         {[
           { label: t.dashboard.kpi.newLeads, value: contacts.length, icon: Users, color: 'text-primary' },
           { label: t.dashboard.kpi.followUps, value: pendingTasks.length, icon: Clock, color: 'text-warning' },
@@ -217,7 +217,7 @@ export default function DashboardPage() {
           { label: t.dashboard.kpi.customers, value: contacts.filter(c => c.pipeline_stage === 'became_customer' || c.pipeline_stage === 'became_member').length, icon: ShoppingBag, color: 'text-emerald-400' },
           { label: t.dashboard.kpi.team, value: contacts.filter(c => c.pipeline_stage === 'became_member').length, icon: UserPlus, color: 'text-violet-400' },
           { label: t.dashboard.kpi.training, value: 0, icon: GraduationCap, color: 'text-accent' },
-          { label: t.dashboard.kpi.rankProgress, value: currentUser?.xp ?? 0, icon: Award, color: 'text-amber-400' },
+          { label: t.nav.events, value: 0, icon: Calendar, color: 'text-accent' },
         ].map((kpi, i) => {
           const Icon = kpi.icon
           const routeMap = [
@@ -228,18 +228,18 @@ export default function DashboardPage() {
             '/customers',
             '/team',
             '/academy',
-            '/rank',
+            '/events',
           ]
           return (
             <motion.div key={i} whileHover={{ y: -2 }}
-              className="bg-card border border-border rounded-xl p-3 cursor-pointer hover:bg-card-hover hover:border-border-strong transition-all"
+              className="bg-card border border-border rounded-xl p-4 min-h-[96px] cursor-pointer hover:bg-card-hover hover:border-border-strong transition-all"
               onClick={() => router.push(routeMap[i])}
             >
-              <div className="flex items-center gap-1.5 mb-2">
+              <div className="flex items-center gap-2 mb-3">
                 <Icon className={`w-3.5 h-3.5 ${kpi.color}`} />
-                <span className="text-[10px] text-text-tertiary font-medium truncate">{kpi.label}</span>
+                <span className="text-xs sm:text-sm text-text-tertiary font-medium leading-snug">{kpi.label}</span>
               </div>
-              <p className="text-xl font-bold text-text-primary">{kpi.value}</p>
+              <p className="text-2xl font-bold text-text-primary leading-none">{kpi.value}</p>
             </motion.div>
           )
         })}
@@ -483,26 +483,6 @@ export default function DashboardPage() {
               </div>
             </Card>
           </motion.div>
-
-          {/* Recent Wins */}
-          <motion.div variants={item}>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="w-4 h-4 text-amber-400" />
-                  {t.dashboard.recentWins}
-                </CardTitle>
-              </CardHeader>
-              <div className="py-6 text-center">
-                <div className="w-10 h-10 rounded-xl bg-amber-400/10 flex items-center justify-center mx-auto mb-3">
-                  <Award className="w-5 h-5 text-amber-400" />
-                </div>
-                <p className="text-sm text-text-secondary font-medium">Henüz kazanım yok</p>
-                <p className="text-xs text-text-tertiary mt-1">İlk işlemini tamamla ve XP kazan</p>
-              </div>
-            </Card>
-          </motion.div>
-
         </div>
       </div>
     </motion.div>

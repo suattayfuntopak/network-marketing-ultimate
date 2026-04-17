@@ -23,7 +23,6 @@ const campaignTypeColors: Record<string, string> = {
   recruit_activation: 'bg-secondary/15 text-secondary',
   retention: 'bg-warning/15 text-warning',
   event_push: 'bg-accent/15 text-accent',
-  rank_sprint: 'bg-amber-500/15 text-amber-400',
   social_challenge: 'bg-rose-500/15 text-rose-400',
   duplication_sprint: 'bg-emerald-500/15 text-emerald-400',
 }
@@ -34,7 +33,6 @@ const campaignTypeLabels: Record<string, { tr: string; en: string }> = {
   recruit_activation: { tr: 'Üye Aktivasyonu', en: 'Recruit Activation' },
   retention: { tr: 'Sadakat Kampanyası', en: 'Retention' },
   event_push: { tr: 'Etkinlik İtişi', en: 'Event Push' },
-  rank_sprint: { tr: 'Rütbe Sprinti', en: 'Rank Sprint' },
   social_challenge: { tr: 'Sosyal Meydan Okuma', en: 'Social Challenge' },
   duplication_sprint: { tr: 'Duplikasyon Sprinti', en: 'Duplication Sprint' },
 }
@@ -42,7 +40,6 @@ const campaignTypeLabels: Record<string, { tr: string; en: string }> = {
 const templateMap = [
   { type: 'launch', icon: '🚀' as const, nameKey: 'launch', descKey: 'launchDesc' },
   { type: 'product_promo', icon: '🎯' as const, nameKey: 'productPush', descKey: 'productPushDesc' },
-  { type: 'rank_sprint', icon: '🏆' as const, nameKey: 'rankSprint', descKey: 'rankSprintDesc' },
   { type: 'social_challenge', icon: '⚡' as const, nameKey: 'teamChallenge', descKey: 'teamChallengeDesc' },
 ]
 
@@ -59,7 +56,6 @@ function campaignDestination(type: Campaign['type']) {
   if (type === 'launch' || type === 'recruit_activation' || type === 'duplication_sprint') return '/team'
   if (type === 'product_promo' || type === 'retention') return '/customers'
   if (type === 'event_push') return '/events'
-  if (type === 'rank_sprint') return '/rank'
   return '/scripts'
 }
 
@@ -71,6 +67,7 @@ export default function CampaignsPage() {
   const [createForm, setCreateForm] = useState(blankCampaign)
   const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null)
   const [editForm, setEditForm] = useState(blankCampaign)
+  const visibleCampaignItems = campaignItems.filter((campaign) => campaign.type !== 'rank_sprint')
 
   function campaignTypeLabel(type: string) {
     return campaignTypeLabels[type]?.[locale] ?? type.replace(/_/g, ' ')
@@ -181,7 +178,7 @@ export default function CampaignsPage() {
       </motion.div>
 
       <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {campaignItems.map((campaign) => (
+        {visibleCampaignItems.map((campaign) => (
           <Card key={campaign.id} hover onClick={() => openCampaign(campaign)}>
             <div className="flex items-start justify-between mb-3">
               <Badge className={campaignTypeColors[campaign.type] || 'bg-surface-hover text-text-secondary'} size="md">

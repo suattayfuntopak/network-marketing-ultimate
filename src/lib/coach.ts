@@ -412,20 +412,5 @@ export function deriveNotifications(
     })
   }
 
-  notifications.push({
-    id: `rank-${currentUser.id}`,
-    userId: currentUser.id,
-    type: 'achievement',
-    title: locale === 'tr' ? 'Günlük ivme güncellendi' : 'Momentum updated',
-    message:
-      locale === 'tr'
-        ? `${currentUser.streak} günlük seri ve ${currentUser.xp} XP ile rütbe ekraninda ilerlemeyi kontrol et.`
-        : `Check your rank progress with a ${currentUser.streak}-day streak and ${currentUser.xp} XP.`,
-    actionUrl: '/rank',
-    isRead: false,
-    priority: 'low',
-    createdAt: new Date().toISOString(),
-  })
-
   return notifications.slice(0, 5)
 }
