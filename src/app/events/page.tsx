@@ -58,10 +58,14 @@ function toInputDateTime(value: string) {
   return value.slice(0, 16)
 }
 
+const EVENT_STORAGE_VERSION = 2
+
 export default function EventsPage() {
   const router = useRouter()
   const { t, locale } = useLanguage()
-  const [eventItems, setEventItems] = usePersistentState<Event[]>('nmu-events', events)
+  const [eventItems, setEventItems] = usePersistentState<Event[]>('nmu-events', events, {
+    version: EVENT_STORAGE_VERSION,
+  })
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState(blankEvent)
   const [activeEvent, setActiveEvent] = useState<Event | null>(null)

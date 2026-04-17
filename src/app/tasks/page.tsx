@@ -47,6 +47,8 @@ const EMPTY_FORM: AddForm = {
   description: '', contact_id: '',
 }
 
+const EVENT_STORAGE_VERSION = 2
+
 export default function TasksPage() {
   const { t, locale } = useLanguage()
   const { currentUser } = useAppStore()
@@ -58,7 +60,9 @@ export default function TasksPage() {
   const [form, setForm] = useState<AddForm>(EMPTY_FORM)
   const [formError, setFormError] = useState('')
   const [editingTask, setEditingTask] = useState<TaskRow | null>(null)
-  const [eventItems] = usePersistentState<Event[]>('nmu-events', defaultEvents)
+  const [eventItems] = usePersistentState<Event[]>('nmu-events', defaultEvents, {
+    version: EVENT_STORAGE_VERSION,
+  })
 
   const { data: tasks = [], isLoading } = useQuery<TaskRow[]>({
     queryKey: ['tasks'],
