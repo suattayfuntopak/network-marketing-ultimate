@@ -1,23 +1,31 @@
 'use client'
 
-import { startTransition, useDeferredValue, useMemo, useState } from 'react'
+import { type FormEvent, startTransition, useDeferredValue, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { usePersistentState } from '@/hooks/usePersistentState'
-import { objections, scripts } from '@/data/mockData'
 import {
+  academyLibraryCategories,
+  academyLibraryItemTypes,
   academyLibraryItems,
+  academyLibraryLevels,
+  academyObjectionCategories,
   academyObjectionGuides,
+  type AcademyLibraryCategory,
   type AcademyLibraryItem,
+  type AcademyLibraryItemType,
+  type AcademyLibraryLevel,
+  type AcademyObjectionCategory,
   type AcademyObjectionGuide,
 } from '@/data/academyLibrary'
 import { queueCoachPrompt } from '@/lib/clientStorage'
-import { cn } from '@/lib/utils'
+import { cn, generateId } from '@/lib/utils'
 import {
   Clock,
   Copy,
@@ -25,6 +33,7 @@ import {
   Heart,
   Library,
   MessageSquareQuote,
+  Plus,
   Search,
   ShieldAlert,
   Sparkles,
@@ -39,14 +48,62 @@ const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 const validTabs = ['library', 'objections', 'favorites'] as const
 type AcademyTab = (typeof validTabs)[number]
 
+const libraryCategoryLabels: Record<AcademyLibraryCategory, { tr: string; en: string }> = {
+  mindset: { tr: 'Zihniyet', en: 'Mindset' },
+  prospecting: { tr: 'Aday Bulma', en: 'Prospecting' },
+  inviting: { tr: 'Davet', en: 'Inviting' },
+  presenting: { tr: 'Sunum', en: 'Presenting' },
+  closing: { tr: 'Karar Aşaması', en: 'Closing' },
+  follow_up: { tr: 'Takip', en: 'Follow-up' },
+  team_building: { tr: 'Ekip Kurma', en: 'Team Building' },
+  leadership: { tr: 'Liderlik', en: 'Leadership' },
+  social_media: { tr: 'Sosyal Medya', en: 'Social Media' },
+  product_knowledge: { tr: 'Ürün Bilgisi', en: 'Product Knowledge' },
+  company_info: { tr: 'Şirket Bilgisi', en: 'Company Info' },
+  compliance: { tr: 'Etik ve Uyum', en: 'Compliance' },
+}
+
+const libraryTypeLabels: Record<AcademyLibraryItemType, { tr: string; en: string }> = {
+  lesson: { tr: 'Ders Notu', en: 'Lesson Note' },
+  article: { tr: 'Makale', en: 'Article' },
+  script: { tr: 'Senaryo', en: 'Script' },
+  cheat_sheet: { tr: 'Hızlı Rehber', en: 'Cheat Sheet' },
+  role_play: { tr: 'Rol Canlandırma', en: 'Role Play' },
+  success_story: { tr: 'Başarı Hikayesi', en: 'Success Story' },
+}
+
+const libraryLevelLabels: Record<AcademyLibraryLevel, { tr: string; en: string }> = {
+  beginner: { tr: 'Başlangıç', en: 'Beginner' },
+  intermediate: { tr: 'Orta Seviye', en: 'Intermediate' },
+  advanced: { tr: 'İleri Seviye', en: 'Advanced' },
+}
+
+const objectionCategoryLabels: Record<AcademyObjectionCategory, { tr: string; en: string }> = {
+  money: { tr: 'Para', en: 'Money' },
+  time: { tr: 'Zaman', en: 'Time' },
+  trust: { tr: 'Güven', en: 'Trust' },
+  family: { tr: 'Aile / Çevre', en: 'Family / Circle' },
+  fear: { tr: 'Korku', en: 'Fear' },
+  experience: { tr: 'Deneyim', en: 'Experience' },
+  product: { tr: 'Ürün', en: 'Product' },
+  company: { tr: 'Şirket', en: 'Company' },
+  pyramid: { tr: 'Model Şüphesi', en: 'Model Skepticism' },
+  no_network: { tr: 'Çevrem Yok', en: 'No Network' },
+  introvert: { tr: 'İçe Dönüklük', en: 'Introvert' },
+  employed: { tr: 'Çalışıyorum', en: 'Employed' },
+  wait: { tr: 'Erteleme', en: 'Delay' },
+  other: { tr: 'Diğer', en: 'Other' },
+}
+
 type LibraryResource = {
   id: string
-  source: 'academy' | 'script'
+  source: 'academy' | 'custom'
   title: string
   summary: string
   content: string
-  categoryKey: string
+  categoryKey: AcademyLibraryCategory
   categoryLabel: string
+  typeKey: AcademyLibraryItemType
   typeLabel: string
   levelLabel: string
   readingMinutes: number
@@ -56,9 +113,9 @@ type LibraryResource = {
 
 type ObjectionResource = {
   id: string
-  source: 'academy' | 'legacy'
+  source: 'academy' | 'custom'
   title: string
-  categoryKey: string
+  categoryKey: AcademyObjectionCategory
   categoryLabel: string
   shortResponse: string
   fullResponse: string
@@ -73,76 +130,72 @@ type ActivePanel =
   | { type: 'objection'; resource: ObjectionResource }
   | null
 
-function scriptCategoryLabel(category: string, locale: 'tr' | 'en') {
-  const labels: Record<string, { tr: string; en: string }> = {
-    Davet: { tr: 'Davet', en: 'Invitation' },
-    Takip: { tr: 'Takip', en: 'Follow-up' },
-    'Müşteri İlişkileri': { tr: 'Müşteri İlişkileri', en: 'Customer Care' },
-    'Sosyal Medya': { tr: 'Sosyal Medya', en: 'Social Media' },
-    Oryantasyon: { tr: 'Oryantasyon', en: 'Onboarding' },
-    İtirazlar: { tr: 'İtirazlar', en: 'Objections' },
-    'Potansiyel Müşteri': { tr: 'Potansiyel', en: 'Prospecting' },
+type LibraryFormState = {
+  title: string
+  summary: string
+  content: string
+  category: AcademyLibraryCategory
+  type: AcademyLibraryItemType
+  level: AcademyLibraryLevel
+  tags: string
+}
+
+type ObjectionFormState = {
+  objection: string
+  shortResponse: string
+  fullResponse: string
+  approach: string
+  exampleDialog: string
+  category: AcademyObjectionCategory
+  tags: string
+}
+
+function createLibraryFormState(): LibraryFormState {
+  return {
+    title: '',
+    summary: '',
+    content: '',
+    category: 'mindset',
+    type: 'lesson',
+    level: 'beginner',
+    tags: '',
   }
-
-  return labels[category]?.[locale] ?? category
 }
 
-function academyCategoryLabel(category: AcademyLibraryItem['category'], locale: 'tr' | 'en') {
-  const labels = {
-    mindset: { tr: 'Zihniyet', en: 'Mindset' },
-    prospecting: { tr: 'Potansiyel', en: 'Prospecting' },
-    inviting: { tr: 'Davet', en: 'Inviting' },
-    presenting: { tr: 'Sunum', en: 'Presenting' },
-    follow_up: { tr: 'Takip', en: 'Follow-up' },
-    team_building: { tr: 'Ekip Kurulumu', en: 'Team Building' },
-    social_media: { tr: 'Sosyal Medya', en: 'Social Media' },
-    product_knowledge: { tr: 'Ürün Bilgisi', en: 'Product Knowledge' },
-  } as const
-
-  return labels[category][locale]
+function createObjectionFormState(): ObjectionFormState {
+  return {
+    objection: '',
+    shortResponse: '',
+    fullResponse: '',
+    approach: '',
+    exampleDialog: '',
+    category: 'trust',
+    tags: '',
+  }
 }
 
-function academyTypeLabel(type: AcademyLibraryItem['type'], locale: 'tr' | 'en') {
-  const labels = {
-    lesson: { tr: 'Ders Notu', en: 'Lesson Note' },
-    article: { tr: 'Makale', en: 'Article' },
-    script: { tr: 'Senaryo', en: 'Script' },
-    cheat_sheet: { tr: 'Hızlı Rehber', en: 'Cheat Sheet' },
-    role_play: { tr: 'Rol Canlandırma', en: 'Role Play' },
-  } as const
-
-  return labels[type][locale]
+function makeLocalizedText(value: string) {
+  return {
+    tr: value,
+    en: value,
+  }
 }
 
-function academyLevelLabel(level: AcademyLibraryItem['level'], locale: 'tr' | 'en') {
-  const labels = {
-    beginner: { tr: 'Başlangıç', en: 'Beginner' },
-    intermediate: { tr: 'Orta Seviye', en: 'Intermediate' },
-    advanced: { tr: 'İleri Seviye', en: 'Advanced' },
-  } as const
-
-  return labels[level][locale]
+function parseTags(raw: string) {
+  return raw
+    .split(/[,\n;]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean)
 }
 
-function objectionCategoryLabel(category: AcademyObjectionGuide['category'], locale: 'tr' | 'en') {
-  const labels = {
-    money: { tr: 'Para', en: 'Money' },
-    time: { tr: 'Zaman', en: 'Time' },
-    trust: { tr: 'Güven', en: 'Trust' },
-    family: { tr: 'Aile / Çevre', en: 'Family / Circle' },
-    fear: { tr: 'Korku', en: 'Fear' },
-    experience: { tr: 'Deneyim', en: 'Experience' },
-    pyramid: { tr: 'Model Şüphesi', en: 'Model Skepticism' },
-    wait: { tr: 'Erteleme', en: 'Delay' },
-  } as const
-
-  return labels[category][locale]
+function getReadingMinutes(content: string) {
+  return Math.max(2, Math.ceil(content.split(/\s+/).filter(Boolean).length / 180))
 }
 
-function typeIconForResource(typeLabel: string): LucideIcon {
-  if (typeLabel.toLowerCase().includes('makale') || typeLabel.toLowerCase().includes('article')) return Library
-  if (typeLabel.toLowerCase().includes('rehber') || typeLabel.toLowerCase().includes('cheat')) return Zap
-  if (typeLabel.toLowerCase().includes('rol') || typeLabel.toLowerCase().includes('role')) return Sparkles
+function typeIconForResource(type: AcademyLibraryItemType): LucideIcon {
+  if (type === 'article' || type === 'success_story') return Library
+  if (type === 'cheat_sheet') return Zap
+  if (type === 'role_play') return Sparkles
   return MessageSquareQuote
 }
 
@@ -151,8 +204,9 @@ export default function AcademyPage() {
   const searchParams = useSearchParams()
   const { t, locale } = useLanguage()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
-  const activeTab = validTabs.includes((searchParams.get('tab') ?? 'library') as AcademyTab)
-    ? ((searchParams.get('tab') ?? 'library') as AcademyTab)
+  const requestedTab = searchParams.get('tab')
+  const activeTab: AcademyTab = requestedTab && validTabs.includes(requestedTab as AcademyTab)
+    ? (requestedTab as AcademyTab)
     : 'library'
 
   const [activePanel, setActivePanel] = useState<ActivePanel>(null)
@@ -160,6 +214,18 @@ export default function AcademyPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedLibraryCategory, setSelectedLibraryCategory] = useState('all')
   const [selectedObjectionCategory, setSelectedObjectionCategory] = useState('all')
+  const [showLibraryForm, setShowLibraryForm] = useState(false)
+  const [showObjectionForm, setShowObjectionForm] = useState(false)
+  const [libraryForm, setLibraryForm] = useState<LibraryFormState>(createLibraryFormState)
+  const [objectionForm, setObjectionForm] = useState<ObjectionFormState>(createObjectionFormState)
+  const [customLibraryItems, setCustomLibraryItems] = usePersistentState<AcademyLibraryItem[]>(
+    'nmu-academy-custom-library-v1',
+    [],
+  )
+  const [customObjectionGuides, setCustomObjectionGuides] = usePersistentState<AcademyObjectionGuide[]>(
+    'nmu-academy-custom-objections-v1',
+    [],
+  )
   const [favoriteLibraryIds, setFavoriteLibraryIds] = usePersistentState<string[]>(
     'nmu-academy-library-favorites-v2',
     [],
@@ -179,49 +245,67 @@ export default function AcademyPage() {
 
   const deferredSearchTerm = useDeferredValue(searchTerm.trim().toLocaleLowerCase(currentLocale))
 
+  const libraryCategoryOptions = useMemo(
+    () =>
+      academyLibraryCategories.map((category) => ({
+        value: category,
+        label: libraryCategoryLabels[category][currentLocale],
+      })),
+    [currentLocale],
+  )
+
+  const libraryTypeOptions = useMemo(
+    () =>
+      academyLibraryItemTypes.map((type) => ({
+        value: type,
+        label: libraryTypeLabels[type][currentLocale],
+      })),
+    [currentLocale],
+  )
+
+  const libraryLevelOptions = useMemo(
+    () =>
+      academyLibraryLevels.map((level) => ({
+        value: level,
+        label: libraryLevelLabels[level][currentLocale],
+      })),
+    [currentLocale],
+  )
+
+  const objectionCategoryOptions = useMemo(
+    () =>
+      academyObjectionCategories.map((category) => ({
+        value: category,
+        label: objectionCategoryLabels[category][currentLocale],
+      })),
+    [currentLocale],
+  )
+
   const libraryResources = useMemo<LibraryResource[]>(() => {
-    const academyResources = academyLibraryItems.map((resource) => ({
+    return [...academyLibraryItems, ...customLibraryItems].map((resource) => ({
       id: resource.id,
-      source: 'academy' as const,
+      source: resource.id.startsWith('custom-library-') ? 'custom' : 'academy',
       title: resource.title[currentLocale],
       summary: resource.summary[currentLocale],
       content: resource.content[currentLocale],
       categoryKey: resource.category,
-      categoryLabel: academyCategoryLabel(resource.category, currentLocale),
-      typeLabel: academyTypeLabel(resource.type, currentLocale),
-      levelLabel: academyLevelLabel(resource.level, currentLocale),
+      categoryLabel: libraryCategoryLabels[resource.category][currentLocale],
+      typeKey: resource.type,
+      typeLabel: libraryTypeLabels[resource.type][currentLocale],
+      levelLabel: libraryLevelLabels[resource.level][currentLocale],
       readingMinutes: resource.readingMinutes,
       tags: resource.tags,
       coachPrompt: resource.coachPrompt[currentLocale],
     }))
-
-    const legacyScripts = scripts.map((script) => ({
-      id: script.id,
-      source: 'script' as const,
-      title: script.title,
-      summary: script.subcategory,
-      content: script.content,
-      categoryKey: script.category,
-      categoryLabel: scriptCategoryLabel(script.category, currentLocale),
-      typeLabel: currentLocale === 'tr' ? 'Saha Senaryosu' : 'Field Script',
-      levelLabel: currentLocale === 'tr' ? 'Uygulamaya Hazır' : 'Field Ready',
-      readingMinutes: Math.max(1, Math.ceil(script.content.split(/\s+/).length / 45)),
-      tags: script.tags,
-      coachPrompt: currentLocale === 'tr'
-        ? `${script.title} içeriğini bana kişiselleştir ve 2 farklı tonla yeniden yaz.`
-        : `Personalize ${script.title} for me and rewrite it in 2 different tones.`,
-    }))
-
-    return [...academyResources, ...legacyScripts]
-  }, [currentLocale])
+  }, [currentLocale, customLibraryItems])
 
   const objectionResources = useMemo<ObjectionResource[]>(() => {
-    const academyGuides = academyObjectionGuides.map((guide) => ({
+    return [...academyObjectionGuides, ...customObjectionGuides].map((guide) => ({
       id: guide.id,
-      source: 'academy' as const,
+      source: guide.id.startsWith('custom-objection-') ? 'custom' : 'academy',
       title: guide.objection[currentLocale],
       categoryKey: guide.category,
-      categoryLabel: objectionCategoryLabel(guide.category, currentLocale),
+      categoryLabel: objectionCategoryLabels[guide.category][currentLocale],
       shortResponse: guide.shortResponse[currentLocale],
       fullResponse: guide.fullResponse[currentLocale],
       approach: guide.approach[currentLocale],
@@ -229,27 +313,7 @@ export default function AcademyPage() {
       tags: guide.tags,
       coachPrompt: guide.coachPrompt[currentLocale],
     }))
-
-    const legacyGuides = objections.map((objection) => ({
-      id: objection.id,
-      source: 'legacy' as const,
-      title: objection.objection,
-      categoryKey: objection.category,
-      categoryLabel: objection.category,
-      shortResponse: objection.responses[0]?.script ?? '',
-      fullResponse: objection.responses.map((response) => response.script).join('\n\n'),
-      approach: currentLocale === 'tr'
-        ? 'Farklı tonlarla hazırlanmış hızlı saha cevapları.'
-        : 'Quick field-ready responses prepared in multiple tones.',
-      exampleDialog: objection.responses.map((response) => response.script).join('\n\n'),
-      tags: objection.tags,
-      coachPrompt: currentLocale === 'tr'
-        ? `"${objection.objection}" itirazına daha doğal bir cevap yaz.`
-        : `Write a more natural response to the objection "${objection.objection}".`,
-    }))
-
-    return [...academyGuides, ...legacyGuides]
-  }, [currentLocale])
+  }, [currentLocale, customObjectionGuides])
 
   const libraryCategories = useMemo(
     () => ['all', ...new Set(libraryResources.map((resource) => resource.categoryKey))],
@@ -282,6 +346,9 @@ export default function AcademyPage() {
   const totalAvailable = libraryResources.length + objectionResources.length
 
   function updateTab(tab: AcademyTab) {
+    setSearchTerm('')
+    setSelectedLibraryCategory('all')
+    setSelectedObjectionCategory('all')
     startTransition(() => {
       router.replace(tab === 'library' ? '/academy' : `/academy?tab=${tab}`)
     })
@@ -306,19 +373,19 @@ export default function AcademyPage() {
   }
 
   function toggleLibraryFavorite(id: string) {
-    setFavoriteLibraryIds((current) =>
+    setFavoriteLibraryIds((current) => (
       current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [id, ...current],
-    )
+        ? current.filter((itemId) => itemId !== id)
+        : [id, ...current]
+    ))
   }
 
   function toggleObjectionFavorite(id: string) {
-    setFavoriteObjectionIds((current) =>
+    setFavoriteObjectionIds((current) => (
       current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [id, ...current],
-    )
+        ? current.filter((itemId) => itemId !== id)
+        : [id, ...current]
+    ))
   }
 
   async function copyText(id: string, value: string) {
@@ -330,6 +397,65 @@ export default function AcademyPage() {
   function openCoach(prompt: string) {
     queueCoachPrompt(prompt)
     router.push('/ai')
+  }
+
+  function submitLibraryForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const title = libraryForm.title.trim()
+    const summary = libraryForm.summary.trim()
+    const content = libraryForm.content.trim()
+    if (!title || !summary || !content) return
+
+    const itemToCreate: AcademyLibraryItem = {
+      id: `custom-library-${generateId()}`,
+      category: libraryForm.category,
+      type: libraryForm.type,
+      level: libraryForm.level,
+      readingMinutes: getReadingMinutes(content),
+      tags: parseTags(libraryForm.tags),
+      title: makeLocalizedText(title),
+      summary: makeLocalizedText(summary),
+      content: makeLocalizedText(content),
+      coachPrompt: makeLocalizedText(
+        currentLocale === 'tr'
+          ? `${title} içeriğini bana göre kişiselleştir ve sahada uygulama planı çıkar.`
+          : `Personalize ${title} for me and turn it into a field plan.`,
+      ),
+    }
+
+    setCustomLibraryItems((current) => [itemToCreate, ...current])
+    setLibraryForm(createLibraryFormState())
+    setShowLibraryForm(false)
+  }
+
+  function submitObjectionForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const objection = objectionForm.objection.trim()
+    const shortResponse = objectionForm.shortResponse.trim()
+    const fullResponse = objectionForm.fullResponse.trim()
+    const approach = objectionForm.approach.trim()
+    const exampleDialog = objectionForm.exampleDialog.trim()
+    if (!objection || !shortResponse || !fullResponse || !approach || !exampleDialog) return
+
+    const guideToCreate: AcademyObjectionGuide = {
+      id: `custom-objection-${generateId()}`,
+      category: objectionForm.category,
+      tags: parseTags(objectionForm.tags),
+      objection: makeLocalizedText(objection),
+      shortResponse: makeLocalizedText(shortResponse),
+      fullResponse: makeLocalizedText(fullResponse),
+      approach: makeLocalizedText(approach),
+      exampleDialog: makeLocalizedText(exampleDialog),
+      coachPrompt: makeLocalizedText(
+        currentLocale === 'tr'
+          ? `${objection} itirazına daha sıcak, daha doğal ve ikna edici bir cevap yaz.`
+          : `Write a warmer and more persuasive response to the objection "${objection}".`,
+      ),
+    }
+
+    setCustomObjectionGuides((current) => [guideToCreate, ...current])
+    setObjectionForm(createObjectionFormState())
+    setShowObjectionForm(false)
   }
 
   const tabLabels: Record<AcademyTab, string> = {
@@ -347,13 +473,13 @@ export default function AcademyPage() {
     },
     {
       label: currentLocale === 'tr' ? 'Kütüphane İçeriği' : 'Library Content',
-      value: viewedLibraryIds.length.toString(),
+      value: libraryResources.length.toString(),
       icon: Library,
       color: 'text-secondary',
     },
     {
       label: currentLocale === 'tr' ? 'İtiraz Rehberi' : 'Objection Guides',
-      value: viewedObjectionIds.length.toString(),
+      value: objectionResources.length.toString(),
       icon: ShieldAlert,
       color: 'text-warning',
     },
@@ -375,8 +501,8 @@ export default function AcademyPage() {
           <h1 className="text-2xl font-bold text-text-primary">{t.academy.title}</h1>
           <p className="text-sm text-text-secondary mt-0.5">
             {currentLocale === 'tr'
-              ? 'Senaryolar, içerikler ve itiraz cevapları tek merkezde.'
-              : 'Scripts, content, and objection answers live in one center.'}
+              ? 'Master projedeki zengin kütüphane artık burada: içerikler, itirazlar ve kendi eklemelerin tek merkezde.'
+              : 'The richer master library now lives here: content, objections, and your own additions in one place.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -416,7 +542,7 @@ export default function AcademyPage() {
       </motion.div>
 
       {(activeTab === 'library' || activeTab === 'objections') && (
-        <motion.div variants={item}>
+        <motion.div variants={item} className="space-y-4">
           <Card>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="relative flex-1">
@@ -426,8 +552,8 @@ export default function AcademyPage() {
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder={
                     activeTab === 'library'
-                      ? (currentLocale === 'tr' ? 'İçerik, senaryo veya etiket ara...' : 'Search content, scripts, or tags...')
-                      : (currentLocale === 'tr' ? 'İtiraz, kategori veya etiket ara...' : 'Search objections, categories, or tags...')
+                      ? (currentLocale === 'tr' ? 'İçerik, etiket veya kategori ara...' : 'Search content, tags, or category...')
+                      : (currentLocale === 'tr' ? 'İtiraz, yaklaşım veya etiket ara...' : 'Search objections, approaches, or tags...')
                   }
                   className="w-full h-11 rounded-xl border border-border bg-surface pl-11 pr-4 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-primary/30"
                 />
@@ -441,8 +567,8 @@ export default function AcademyPage() {
                   const label = category === 'all'
                     ? (currentLocale === 'tr' ? 'Tümü' : 'All')
                     : activeTab === 'library'
-                      ? libraryResources.find((resource) => resource.categoryKey === category)?.categoryLabel ?? category
-                      : objectionResources.find((resource) => resource.categoryKey === category)?.categoryLabel ?? category
+                      ? libraryCategoryLabels[category as AcademyLibraryCategory][currentLocale]
+                      : objectionCategoryLabels[category as AcademyObjectionCategory][currentLocale]
                   const isSelected = activeTab === 'library'
                     ? selectedLibraryCategory === category
                     : selectedObjectionCategory === category
@@ -469,13 +595,208 @@ export default function AcademyPage() {
               </div>
             </div>
           </Card>
+
+          {activeTab === 'library' && (
+            <Card>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-text-primary">
+                      {currentLocale === 'tr' ? 'Kendi İçeriğini Ekle' : 'Add Your Own Content'}
+                    </h2>
+                    <p className="text-xs text-text-tertiary mt-1">
+                      {currentLocale === 'tr'
+                        ? 'Master kütüphanenin üstüne kendi script, ders notu veya rehberini ekleyebilirsin.'
+                        : 'Layer your own scripts, lesson notes, or guides on top of the master library.'}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant={showLibraryForm ? 'ghost' : 'secondary'}
+                    size="sm"
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                    onClick={() => setShowLibraryForm((current) => !current)}
+                  >
+                    {showLibraryForm
+                      ? (currentLocale === 'tr' ? 'Formu Kapat' : 'Close Form')
+                      : (currentLocale === 'tr' ? 'İçerik Ekle' : 'Add Content')}
+                  </Button>
+                </div>
+
+                {showLibraryForm && (
+                  <form onSubmit={submitLibraryForm} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <Input
+                      label={currentLocale === 'tr' ? 'Başlık' : 'Title'}
+                      value={libraryForm.title}
+                      onChange={(event) => setLibraryForm((current) => ({ ...current, title: event.target.value }))}
+                      placeholder={currentLocale === 'tr' ? 'Örn. İlk sunum sonrası mini takip planı' : 'Ex. Mini follow-up plan after the first presentation'}
+                    />
+                    <Input
+                      label={currentLocale === 'tr' ? 'Özet' : 'Summary'}
+                      value={libraryForm.summary}
+                      onChange={(event) => setLibraryForm((current) => ({ ...current, summary: event.target.value }))}
+                      placeholder={currentLocale === 'tr' ? 'İçeriğin ne iş gördüğünü kısa anlat.' : 'Describe what this content helps with.'}
+                    />
+                    <Select
+                      label={currentLocale === 'tr' ? 'Kategori' : 'Category'}
+                      value={libraryForm.category}
+                      options={libraryCategoryOptions}
+                      onChange={(event) => setLibraryForm((current) => ({ ...current, category: event.target.value as AcademyLibraryCategory }))}
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Select
+                        label={currentLocale === 'tr' ? 'Tür' : 'Type'}
+                        value={libraryForm.type}
+                        options={libraryTypeOptions}
+                        onChange={(event) => setLibraryForm((current) => ({ ...current, type: event.target.value as AcademyLibraryItemType }))}
+                      />
+                      <Select
+                        label={currentLocale === 'tr' ? 'Seviye' : 'Level'}
+                        value={libraryForm.level}
+                        options={libraryLevelOptions}
+                        onChange={(event) => setLibraryForm((current) => ({ ...current, level: event.target.value as AcademyLibraryLevel }))}
+                      />
+                    </div>
+                    <div className="xl:col-span-2">
+                      <Textarea
+                        label={currentLocale === 'tr' ? 'İçerik' : 'Content'}
+                        value={libraryForm.content}
+                        onChange={(event) => setLibraryForm((current) => ({ ...current, content: event.target.value }))}
+                        rows={8}
+                        placeholder={currentLocale === 'tr' ? 'Tam içerik metnini buraya yaz...' : 'Write the full content here...'}
+                      />
+                    </div>
+                    <div className="xl:col-span-2">
+                      <Input
+                        label={currentLocale === 'tr' ? 'Etiketler' : 'Tags'}
+                        value={libraryForm.tags}
+                        onChange={(event) => setLibraryForm((current) => ({ ...current, tags: event.target.value }))}
+                        placeholder={currentLocale === 'tr' ? 'örn. takip, whatsapp, kapanış' : 'ex. follow-up, whatsapp, closing'}
+                        hint={currentLocale === 'tr' ? 'Virgül ile ayır.' : 'Separate with commas.'}
+                      />
+                    </div>
+                    <div className="xl:col-span-2 flex justify-end gap-2">
+                      <Button type="button" variant="ghost" onClick={() => {
+                        setLibraryForm(createLibraryFormState())
+                        setShowLibraryForm(false)
+                      }}>
+                        {t.common.cancel}
+                      </Button>
+                      <Button type="submit" variant="secondary" icon={<Plus className="w-3.5 h-3.5" />}>
+                        {currentLocale === 'tr' ? 'Kütüphaneye Ekle' : 'Save to Library'}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {activeTab === 'objections' && (
+            <Card>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-text-primary">
+                      {currentLocale === 'tr' ? 'Kendi İtirazını Ekle' : 'Add Your Own Objection'}
+                    </h2>
+                    <p className="text-xs text-text-tertiary mt-1">
+                      {currentLocale === 'tr'
+                        ? 'Sahada duyduğun yeni itirazları kısa ve detaylı cevaplarıyla birlikte bankaya ekleyebilirsin.'
+                        : 'Capture new field objections with short and detailed responses.'}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant={showObjectionForm ? 'ghost' : 'secondary'}
+                    size="sm"
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                    onClick={() => setShowObjectionForm((current) => !current)}
+                  >
+                    {showObjectionForm
+                      ? (currentLocale === 'tr' ? 'Formu Kapat' : 'Close Form')
+                      : (currentLocale === 'tr' ? 'İtiraz Ekle' : 'Add Objection')}
+                  </Button>
+                </div>
+
+                {showObjectionForm && (
+                  <form onSubmit={submitObjectionForm} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <Input
+                      label={currentLocale === 'tr' ? 'İtiraz' : 'Objection'}
+                      value={objectionForm.objection}
+                      onChange={(event) => setObjectionForm((current) => ({ ...current, objection: event.target.value }))}
+                      placeholder={currentLocale === 'tr' ? 'Örn. Bu iş uzun vadede yorucu gelmiyor mu?' : 'Ex. Does not this feel exhausting over time?'}
+                    />
+                    <Select
+                      label={currentLocale === 'tr' ? 'Kategori' : 'Category'}
+                      value={objectionForm.category}
+                      options={objectionCategoryOptions}
+                      onChange={(event) => setObjectionForm((current) => ({ ...current, category: event.target.value as AcademyObjectionCategory }))}
+                    />
+                    <div className="xl:col-span-2">
+                      <Textarea
+                        label={currentLocale === 'tr' ? 'Kısa Cevap' : 'Short Response'}
+                        value={objectionForm.shortResponse}
+                        onChange={(event) => setObjectionForm((current) => ({ ...current, shortResponse: event.target.value }))}
+                        rows={3}
+                        placeholder={currentLocale === 'tr' ? 'Kısa ve hızlı saha cevabı...' : 'Short field-ready response...'}
+                      />
+                    </div>
+                    <div className="xl:col-span-2">
+                      <Textarea
+                        label={currentLocale === 'tr' ? 'Detaylı Cevap' : 'Detailed Response'}
+                        value={objectionForm.fullResponse}
+                        onChange={(event) => setObjectionForm((current) => ({ ...current, fullResponse: event.target.value }))}
+                        rows={5}
+                        placeholder={currentLocale === 'tr' ? 'Detaylı cevap metni...' : 'Detailed response...'}
+                      />
+                    </div>
+                    <Textarea
+                      label={currentLocale === 'tr' ? 'Yaklaşım' : 'Approach'}
+                      value={objectionForm.approach}
+                      onChange={(event) => setObjectionForm((current) => ({ ...current, approach: event.target.value }))}
+                      rows={4}
+                      placeholder={currentLocale === 'tr' ? 'Bu itirazı nasıl ele almak gerektiğini yaz...' : 'Explain how this objection should be handled...'}
+                    />
+                    <Textarea
+                      label={currentLocale === 'tr' ? 'Örnek Diyalog' : 'Example Dialogue'}
+                      value={objectionForm.exampleDialog}
+                      onChange={(event) => setObjectionForm((current) => ({ ...current, exampleDialog: event.target.value }))}
+                      rows={4}
+                      placeholder={currentLocale === 'tr' ? 'Kısa örnek konuşma...' : 'Short example dialogue...'}
+                    />
+                    <div className="xl:col-span-2">
+                      <Input
+                        label={currentLocale === 'tr' ? 'Etiketler' : 'Tags'}
+                        value={objectionForm.tags}
+                        onChange={(event) => setObjectionForm((current) => ({ ...current, tags: event.target.value }))}
+                        placeholder={currentLocale === 'tr' ? 'örn. güven, fiyat, zamanlama' : 'ex. trust, price, timing'}
+                        hint={currentLocale === 'tr' ? 'Virgül ile ayır.' : 'Separate with commas.'}
+                      />
+                    </div>
+                    <div className="xl:col-span-2 flex justify-end gap-2">
+                      <Button type="button" variant="ghost" onClick={() => {
+                        setObjectionForm(createObjectionFormState())
+                        setShowObjectionForm(false)
+                      }}>
+                        {t.common.cancel}
+                      </Button>
+                      <Button type="submit" variant="secondary" icon={<Plus className="w-3.5 h-3.5" />}>
+                        {currentLocale === 'tr' ? 'Bankaya Ekle' : 'Save to Bank'}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </Card>
+          )}
         </motion.div>
       )}
 
       {activeTab === 'library' && (
         <motion.div variants={item} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {filteredLibrary.map((resource) => {
-            const Icon = typeIconForResource(resource.typeLabel)
+            const Icon = typeIconForResource(resource.typeKey)
             const isFavorite = favoriteLibraryIds.includes(resource.id)
             const isViewed = viewedLibraryIds.includes(resource.id)
             return (
@@ -487,7 +808,14 @@ export default function AcademyPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap gap-2 mb-2">
                       <Badge variant="default" size="sm">{resource.categoryLabel}</Badge>
-                      <Badge variant={resource.source === 'academy' ? 'secondary' : 'success'} size="sm">{resource.typeLabel}</Badge>
+                      <Badge variant={resource.source === 'custom' ? 'success' : 'secondary'} size="sm">
+                        {resource.source === 'custom'
+                          ? (currentLocale === 'tr' ? 'Özel İçerik' : 'Custom')
+                          : resource.typeLabel}
+                      </Badge>
+                      {resource.source === 'custom' && (
+                        <Badge variant="secondary" size="sm">{resource.typeLabel}</Badge>
+                      )}
                       <span className="text-[10px] text-text-tertiary">{resource.levelLabel}</span>
                       {isViewed && (
                         <Badge variant="success" size="sm">
@@ -536,7 +864,7 @@ export default function AcademyPage() {
                   {currentLocale === 'tr' ? 'Bu filtrede içerik bulunamadı.' : 'No content matched this filter.'}
                 </p>
                 <p className="text-xs text-text-tertiary mt-1">
-                  {currentLocale === 'tr' ? 'Aramayı sadeleştir veya başka bir kategori seç.' : 'Try a broader search or another category.'}
+                  {currentLocale === 'tr' ? 'Aramayı sadeleştir veya yeni bir içerik ekle.' : 'Try a broader search or add a new content entry.'}
                 </p>
               </div>
             </Card>
@@ -558,10 +886,10 @@ export default function AcademyPage() {
                   <div className="flex-1">
                     <div className="flex flex-wrap gap-2 mb-2">
                       <Badge variant="default" size="sm">{resource.categoryLabel}</Badge>
-                      <Badge variant={resource.source === 'academy' ? 'secondary' : 'warning'} size="sm">
-                        {resource.source === 'academy'
-                          ? (currentLocale === 'tr' ? 'Derin Rehber' : 'Deep Guide')
-                          : (currentLocale === 'tr' ? 'Hızlı Paket' : 'Quick Pack')}
+                      <Badge variant={resource.source === 'custom' ? 'success' : 'secondary'} size="sm">
+                        {resource.source === 'custom'
+                          ? (currentLocale === 'tr' ? 'Özel Rehber' : 'Custom Guide')
+                          : (currentLocale === 'tr' ? 'Master Rehber' : 'Master Guide')}
                       </Badge>
                       {isViewed && (
                         <Badge variant="success" size="sm">
@@ -606,6 +934,9 @@ export default function AcademyPage() {
                 <ShieldAlert className="w-10 h-10 text-text-muted mx-auto mb-3" />
                 <p className="text-sm font-medium text-text-primary">
                   {currentLocale === 'tr' ? 'Bu filtrede itiraz rehberi bulunamadı.' : 'No objection guide matched this filter.'}
+                </p>
+                <p className="text-xs text-text-tertiary mt-1">
+                  {currentLocale === 'tr' ? 'Filtreyi gevşet veya yeni bir itiraz rehberi ekle.' : 'Broaden the filter or add a new objection guide.'}
                 </p>
               </div>
             </Card>
@@ -697,7 +1028,14 @@ export default function AcademyPage() {
           <div className="p-5 space-y-4">
             <div className="flex flex-wrap gap-2">
               <Badge variant="default">{selectedLibraryResource.categoryLabel}</Badge>
-              <Badge variant={selectedLibraryResource.source === 'academy' ? 'secondary' : 'success'}>{selectedLibraryResource.typeLabel}</Badge>
+              <Badge variant={selectedLibraryResource.source === 'custom' ? 'success' : 'secondary'}>
+                {selectedLibraryResource.source === 'custom'
+                  ? (currentLocale === 'tr' ? 'Özel İçerik' : 'Custom')
+                  : selectedLibraryResource.typeLabel}
+              </Badge>
+              {selectedLibraryResource.source === 'custom' && (
+                <Badge variant="secondary">{selectedLibraryResource.typeLabel}</Badge>
+              )}
               <Badge variant="default">{selectedLibraryResource.levelLabel}</Badge>
             </div>
             <div className="rounded-xl border border-border-subtle bg-surface/50 p-4">
@@ -748,10 +1086,10 @@ export default function AcademyPage() {
           <div className="p-5 space-y-4">
             <div className="flex flex-wrap gap-2">
               <Badge variant="default">{selectedObjectionResource.categoryLabel}</Badge>
-              <Badge variant={selectedObjectionResource.source === 'academy' ? 'secondary' : 'warning'}>
-                {selectedObjectionResource.source === 'academy'
-                  ? (currentLocale === 'tr' ? 'Derin Rehber' : 'Deep Guide')
-                  : (currentLocale === 'tr' ? 'Hızlı Paket' : 'Quick Pack')}
+              <Badge variant={selectedObjectionResource.source === 'custom' ? 'success' : 'secondary'}>
+                {selectedObjectionResource.source === 'custom'
+                  ? (currentLocale === 'tr' ? 'Özel Rehber' : 'Custom Guide')
+                  : (currentLocale === 'tr' ? 'Master Rehber' : 'Master Guide')}
               </Badge>
             </div>
             <div className="grid gap-3">

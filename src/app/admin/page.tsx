@@ -68,7 +68,7 @@ export default function AdminPage() {
       desc: t.admin.sections.contentManagementDesc,
       icon: FileText,
       items: [
-        { title: t.admin.items.academyCourses, description: locale === 'tr' ? 'Öğrenme yolu ve kurs akışlarını tek merkezden yönet.' : 'Manage the learning path and course flows from one center.', route: '/academy', cta: locale === 'tr' ? 'Öğrenme yolunu aç' : 'Open learning path' },
+        { title: t.admin.items.academyCourses, description: locale === 'tr' ? 'Birleşik Akademi içinde içerik kütüphanesini, itiraz bankasını ve favorileri yönet.' : 'Manage the unified Academy, objection bank, and favorites from one center.', route: '/academy', cta: locale === 'tr' ? 'Akademiyi aç' : 'Open Academy' },
         { title: t.admin.items.scriptLibrary, description: locale === 'tr' ? 'Saha senaryoları ve içerik kütüphanesini birleşik Akademi içinde düzenle.' : 'Maintain field scripts and the content library inside the unified Academy.', route: '/academy?tab=library', cta: locale === 'tr' ? 'Kütüphaneyi aç' : 'Open library' },
         { title: t.admin.items.emailTemplates, description: locale === 'tr' ? 'İtiraz bankası ve cevap akışlarını Akademi içinde yönet.' : 'Manage the objection bank and response flows inside Academy.', route: '/academy?tab=objections', cta: locale === 'tr' ? 'İtiraz bankasını aç' : 'Open objection bank' },
         { title: t.admin.items.campaignAssets, description: locale === 'tr' ? 'Etkinlik akislari, davetler ve paylasim varliklarini etkinliklerde incele.' : 'Review event flows, invites, and shareable assets in events.', route: '/events', cta: locale === 'tr' ? 'Etkinlikleri aç' : 'Open events' },
