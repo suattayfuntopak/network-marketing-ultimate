@@ -9,11 +9,11 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
-import { fetchTasks, addTask, completeTask, deleteTask, fetchContacts } from '@/lib/queries'
+import { fetchTasks, addTask, deleteTask, fetchContacts, setTaskStatus, updateTask } from '@/lib/queries'
 import type { TaskRow, ContactRow } from '@/lib/queries'
 import {
   Plus, X, CheckCircle2, Circle, Clock, Phone, Users,
-  MessageCircle, GraduationCap, ListTodo, AlertCircle, Trash2,
+  MessageCircle, GraduationCap, ListTodo, AlertCircle, Pencil, Trash2,
 } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
@@ -53,6 +53,7 @@ export default function TasksPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState<AddForm>(EMPTY_FORM)
   const [formError, setFormError] = useState('')
+  const [editingTask, setEditingTask] = useState<TaskRow | null>(null)
 
   const { data: tasks = [], isLoading } = useQuery<TaskRow[]>({
     queryKey: ['tasks'],
@@ -75,15 +76,30 @@ export default function TasksPage() {
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
-      setShowAdd(false)
-      setForm(EMPTY_FORM)
-      setFormError('')
+      closeTaskModal()
     },
     onError: (e: Error) => setFormError(e.message),
   })
 
-  const completeMutation = useMutation({
-    mutationFn: completeTask,
+  const updateMutation = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: AddForm }) =>
+      updateTask(id, {
+        title: values.title,
+        type: values.type,
+        priority: values.priority,
+        due_date: values.due_date,
+        description: values.description || null,
+        contact_id: values.contact_id || null,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      closeTaskModal()
+    },
+    onError: (e: Error) => setFormError(e.message),
+  })
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: TaskRow['status'] }) => setTaskStatus(id, status),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
   })
 
@@ -92,14 +108,42 @@ export default function TasksPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
   })
 
+  function openCreateModal() {
+    setEditingTask(null)
+    setForm(EMPTY_FORM)
+    setFormError('')
+    setShowAdd(true)
+  }
+
+  function openEditModal(task: TaskRow) {
+    setEditingTask(task)
+    setForm({
+      title: task.title,
+      type: task.type,
+      priority: task.priority,
+      due_date: task.due_date,
+      description: task.description ?? '',
+      contact_id: task.contact_id ?? '',
+    })
+    setFormError('')
+    setShowAdd(true)
+  }
+
+  function closeTaskModal() {
+    setShowAdd(false)
+    setEditingTask(null)
+    setForm(EMPTY_FORM)
+    setFormError('')
+  }
+
   const filtered = tasks.filter(t => {
-    if (filter === 'pending') return t.status === 'pending'
+    if (filter === 'pending') return !['completed', 'skipped'].includes(t.status)
     if (filter === 'completed') return t.status === 'completed'
     if (filter === 'overdue') return t.status === 'overdue'
     return true
   })
 
-  const pending = tasks.filter(t => t.status === 'pending').length
+  const pending = tasks.filter(t => !['completed', 'skipped'].includes(t.status)).length
   const completed = tasks.filter(t => t.status === 'completed').length
   const overdue = tasks.filter(t => t.status === 'overdue').length
 
@@ -114,7 +158,7 @@ export default function TasksPage() {
           <h1 className="text-2xl font-bold text-text-primary">{t.tasks.title}</h1>
           <p className="text-sm text-text-secondary mt-0.5">{pending} {t.tasks.subtitle}</p>
         </div>
-        <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setShowAdd(true)}>
+        <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreateModal}>
           {t.tasks.createTask}
         </Button>
       </motion.div>
@@ -152,7 +196,7 @@ export default function TasksPage() {
               {filter === 'all' ? 'Henüz görev yok' : 'Bu filtrede görev yok'}
             </p>
             {filter === 'all' && (
-              <button onClick={() => setShowAdd(true)} className="mt-3 text-xs text-primary hover:text-primary-dim font-medium">
+              <button onClick={openCreateModal} className="mt-3 text-xs text-primary hover:text-primary-dim font-medium">
                 İlk görevi oluştur →
               </button>
             )}
@@ -169,7 +213,7 @@ export default function TasksPage() {
                 <Card hover padding="sm" className="group">
                   <div className="flex items-center gap-4">
                     <button
-                      onClick={() => !isDone && completeMutation.mutate(task.id)}
+                      onClick={() => statusMutation.mutate({ id: task.id, status: isDone ? 'pending' : 'completed' })}
                       className="w-6 h-6 rounded-lg border-2 border-border-strong hover:border-primary hover:bg-primary/10 transition-colors shrink-0 flex items-center justify-center"
                     >
                       {isDone
@@ -210,6 +254,13 @@ export default function TasksPage() {
                       <p className="text-[10px] text-text-tertiary capitalize">{task.type.replace(/_/g, ' ')}</p>
                     </div>
                     <button
+                      onClick={() => openEditModal(task)}
+                      className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
+                      aria-label="Edit task"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={() => deleteMutation.mutate(task.id)}
                       className="p-1.5 rounded-lg text-text-muted hover:text-error hover:bg-error/10 opacity-0 group-hover:opacity-100 transition-all"
                     >
@@ -229,7 +280,7 @@ export default function TasksPage() {
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setShowAdd(false)}
+            onClick={closeTaskModal}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -239,8 +290,17 @@ export default function TasksPage() {
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between p-5 border-b border-border">
-                <h2 className="text-base font-semibold text-text-primary">{t.tasks.createTask}</h2>
-                <button onClick={() => setShowAdd(false)} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover">
+                <div>
+                  <h2 className="text-base font-semibold text-text-primary">
+                    {editingTask ? 'Görevi Düzenle' : t.tasks.createTask}
+                  </h2>
+                  <p className="text-xs text-text-tertiary mt-0.5">
+                    {editingTask
+                      ? 'Kaydı güncelleyip yeniden aktif plana alabilirsin.'
+                      : 'Yeni bir görev veya takip planla.'}
+                  </p>
+                </div>
+                <button onClick={closeTaskModal} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -293,10 +353,10 @@ export default function TasksPage() {
 
                 {contacts.length > 0 && (
                   <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">İlgili Kişi (isteğe bağlı)</label>
+                    <label className="block text-xs font-medium text-text-secondary mb-1.5">İlgili Kontak (isteğe bağlı)</label>
                     <select value={form.contact_id} onChange={e => setForm(f => ({ ...f, contact_id: e.target.value }))}
                       className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all">
-                      <option value="">— Kişi seç —</option>
+                      <option value="">— Kontak seç —</option>
                       {contacts.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
                     </select>
                   </div>
@@ -311,13 +371,21 @@ export default function TasksPage() {
               </div>
 
               <div className="flex gap-3 p-5 border-t border-border">
-                <Button variant="outline" className="flex-1" onClick={() => setShowAdd(false)}>{t.common.cancel}</Button>
+                <Button variant="outline" className="flex-1" onClick={closeTaskModal}>{t.common.cancel}</Button>
                 <Button
                   className="flex-1"
-                  disabled={!form.title.trim() || !form.due_date || addMutation.isPending}
-                  onClick={() => addMutation.mutate(form)}
+                  disabled={!form.title.trim() || !form.due_date || addMutation.isPending || updateMutation.isPending}
+                  onClick={() => (
+                    editingTask
+                      ? updateMutation.mutate({ id: editingTask.id, values: form })
+                      : addMutation.mutate(form)
+                  )}
                 >
-                  {addMutation.isPending ? 'Kaydediliyor...' : t.common.save}
+                  {addMutation.isPending || updateMutation.isPending
+                    ? 'Kaydediliyor...'
+                    : editingTask
+                      ? 'Değişiklikleri Kaydet'
+                      : t.common.save}
                 </Button>
               </div>
             </motion.div>

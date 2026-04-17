@@ -12,6 +12,7 @@ export type PipelineStage =
   | 'interested'
   | 'invited'
   | 'presentation_sent'
+  | 'presentation_done'
   | 'followup_pending'
   | 'objection_handling'
   | 'ready_to_buy'

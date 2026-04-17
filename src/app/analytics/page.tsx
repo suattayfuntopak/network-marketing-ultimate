@@ -39,6 +39,7 @@ const stageColors: Record<string, string> = {
   interested: '#14b8a6',
   invited: '#3b82f6',
   presentation_sent: '#22c55e',
+  presentation_done: '#f97316',
   followup_pending: '#f59e0b',
   objection_handling: '#f97316',
   ready_to_buy: '#10b981',
@@ -57,9 +58,10 @@ const stageLabels: Record<string, { tr: string; en: string }> = {
   interested: { tr: 'İlgili', en: 'Interested' },
   invited: { tr: 'Davetli', en: 'Invited' },
   presentation_sent: { tr: 'Sunum', en: 'Presentation' },
-  followup_pending: { tr: 'Takip', en: 'Follow-up' },
+  presentation_done: { tr: 'Sunum Yapıldı', en: 'Presentation Done' },
+  followup_pending: { tr: 'Takipte', en: 'Follow-up' },
   objection_handling: { tr: 'İtiraz', en: 'Objection' },
-  ready_to_buy: { tr: 'Hazır', en: 'Ready' },
+  ready_to_buy: { tr: 'Karar', en: 'Decision' },
   became_customer: { tr: 'Müşteri', en: 'Customer' },
   ready_to_join: { tr: 'Katılıma Hazır', en: 'Ready to Join' },
   became_member: { tr: 'Üye', en: 'Member' },
@@ -139,7 +141,7 @@ export default function AnalyticsPage() {
 
   const totalContacts = contacts.length || 1
   const contactedCount = contacts.filter((contact) => Boolean(contact.last_contact_date)).length
-  const presentationCount = contacts.filter((contact) => ['presentation_sent', 'followup_pending', 'objection_handling', 'ready_to_buy', 'became_customer', 'ready_to_join', 'became_member'].includes(contact.pipeline_stage)).length
+  const presentationCount = contacts.filter((contact) => ['presentation_sent', 'presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy', 'became_customer', 'ready_to_join', 'became_member'].includes(contact.pipeline_stage)).length
   const customerCount = contacts.filter((contact) => contact.pipeline_stage === 'became_customer').length
   const recruitCount = contacts.filter((contact) => contact.pipeline_stage === 'became_member').length
   const reorderReadyCount = orders.filter((order) => order.status !== 'cancelled' && Boolean(order.next_reorder_date)).length
@@ -223,7 +225,7 @@ export default function AnalyticsPage() {
   const funnelSteps = [
     { stage: t.analytics.totalLeads, value: contacts.length },
     { stage: t.analytics.contacted, value: contactedCount },
-    { stage: t.analytics.interested, value: contacts.filter((contact) => ['interested', 'invited', 'presentation_sent', 'followup_pending', 'objection_handling', 'ready_to_buy', 'ready_to_join', 'became_customer', 'became_member'].includes(contact.pipeline_stage)).length },
+    { stage: t.analytics.interested, value: contacts.filter((contact) => ['interested', 'invited', 'presentation_sent', 'presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy', 'ready_to_join', 'became_customer', 'became_member'].includes(contact.pipeline_stage)).length },
     { stage: t.analytics.presented, value: presentationCount },
     { stage: t.analytics.converted, value: customerCount + recruitCount },
   ].map((step) => ({

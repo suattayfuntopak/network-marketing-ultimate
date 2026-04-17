@@ -317,6 +317,43 @@ export async function completeTask(id: string): Promise<void> {
   if (error) throw error
 }
 
+export async function setTaskStatus(
+  id: string,
+  status: TaskRow['status']
+): Promise<void> {
+  const userId = await requireSessionUserId()
+  const { error } = await supabase
+    .from('nmu_tasks')
+    .update({
+      status,
+      completed_at: status === 'completed' ? new Date().toISOString() : null,
+    })
+    .eq('id', id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function updateTask(
+  id: string,
+  input: Partial<{
+    title: string
+    type: TaskRow['type']
+    priority: TaskRow['priority']
+    due_date: string
+    description: string | null
+    contact_id: string | null
+    status: TaskRow['status']
+  }>
+): Promise<void> {
+  const userId = await requireSessionUserId()
+  const { error } = await supabase
+    .from('nmu_tasks')
+    .update(input)
+    .eq('id', id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
 export async function deleteTask(id: string): Promise<void> {
   const userId = await requireSessionUserId()
   const { error } = await supabase
