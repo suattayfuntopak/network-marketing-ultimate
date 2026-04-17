@@ -38,6 +38,10 @@ const PIPELINE_STAGES: Record<string, { label: string; color: string }> = {
   lost:               { label: 'Kaybedildi',           color: '#334155' },
 }
 
+const PROSPECT_STAGE_KEYS = Object.keys(PIPELINE_STAGES).filter(
+  (stage) => !['became_customer', 'became_member'].includes(stage)
+)
+
 const INTEREST_KEY: Record<string, 'product' | 'business' | 'both' | 'unknown'> = {
   product: 'product', business: 'business', both: 'both', unknown: 'unknown',
 }
@@ -95,7 +99,7 @@ export default function ProspectsPage() {
       'notes',
     ]
 
-    const rows = contacts.map(contact => ([
+    const rows = prospectContacts.map(contact => ([
       contact.full_name,
       contact.phone ?? '',
       contact.email ?? '',
@@ -184,6 +188,10 @@ export default function ProspectsPage() {
     queryFn: fetchContacts,
   })
 
+  const prospectContacts = contacts.filter(contact =>
+    !['became_customer', 'became_member'].includes(contact.pipeline_stage)
+  )
+
   async function handleAddContact(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!currentUser) return
@@ -211,16 +219,16 @@ export default function ProspectsPage() {
     setSaving(false)
   }
 
-  const filtered = contacts.filter(c => {
+  const filtered = prospectContacts.filter(c => {
     if (searchQuery && !c.full_name.toLowerCase().includes(searchQuery.toLowerCase())) return false
     if (filterTemp !== 'all' && c.temperature !== filterTemp) return false
     if (filterStage !== 'all' && c.pipeline_stage !== filterStage) return false
     return true
   })
 
-  const hotCount  = contacts.filter(c => c.temperature === 'hot').length
-  const warmCount = contacts.filter(c => c.temperature === 'warm').length
-  const coldCount = contacts.filter(c => c.temperature === 'cold').length
+  const hotCount  = prospectContacts.filter(c => c.temperature === 'hot').length
+  const warmCount = prospectContacts.filter(c => c.temperature === 'warm').length
+  const coldCount = prospectContacts.filter(c => c.temperature === 'cold').length
 
   return (
     <>
@@ -230,7 +238,7 @@ export default function ProspectsPage() {
       <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">{t.prospects.title}</h1>
-          <p className="text-sm text-text-secondary mt-0.5">{contacts.length} {t.prospects.subtitle}</p>
+          <p className="text-sm text-text-secondary mt-0.5">{prospectContacts.length} {t.prospects.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -305,8 +313,8 @@ export default function ProspectsPage() {
             className="h-10 px-3 bg-surface border border-border rounded-xl text-sm text-text-primary outline-none"
           >
             <option value="all">{t.prospects.allStages}</option>
-            {Object.entries(PIPELINE_STAGES).map(([key, { label }]) => (
-              <option key={key} value={key}>{label}</option>
+            {PROSPECT_STAGE_KEYS.map((key) => (
+              <option key={key} value={key}>{PIPELINE_STAGES[key].label}</option>
             ))}
           </select>
           <div className="flex items-center bg-surface border border-border rounded-xl overflow-hidden">

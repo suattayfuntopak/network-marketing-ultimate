@@ -26,8 +26,47 @@ import {
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
 
-const WEEK_DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
-const EMPTY_WEEK = WEEK_DAYS.map(day => ({ day, contacts: 0, presentations: 0 }))
+const WEEK_DAYS = {
+  tr: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'],
+  en: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+} as const
+
+const PIPELINE_LABELS = {
+  tr: {
+    new: 'Yeni Potansiyel',
+    contact_planned: 'Iletisim Planlandi',
+    first_contact: 'Ilk Iletisim',
+    interested: 'Ilgileniyor',
+    invited: 'Davet Edildi',
+    presentation_sent: 'Sunum Gonderildi',
+    followup_pending: 'Takip Bekleniyor',
+    objection_handling: 'Itiraz Yonetimi',
+    ready_to_buy: 'Satin Almaya Hazir',
+    became_customer: 'Musteri Oldu',
+    ready_to_join: 'Katilmaya Hazir',
+    became_member: 'Ekip Uyesi',
+    nurture_later: 'Sonra Ilgilen',
+    dormant: 'Pasif',
+    lost: 'Kaybedildi',
+  },
+  en: {
+    new: 'New Lead',
+    contact_planned: 'Contact Planned',
+    first_contact: 'First Contact',
+    interested: 'Interested',
+    invited: 'Invited',
+    presentation_sent: 'Presentation Sent',
+    followup_pending: 'Follow-up Pending',
+    objection_handling: 'Objection Handling',
+    ready_to_buy: 'Ready to Buy',
+    became_customer: 'Became Customer',
+    ready_to_join: 'Ready to Join',
+    became_member: 'Became Member',
+    nurture_later: 'Nurture Later',
+    dormant: 'Dormant',
+    lost: 'Lost',
+  },
+} as const
 
 const PIPELINE_COLORS: Record<string, string> = {
   new: '#00d4ff', contact_planned: '#3b82f6', first_contact: '#8b5cf6',
@@ -42,6 +81,11 @@ export default function DashboardPage() {
   const { currentUser, toggleAIPanel } = useAppStore()
   const router = useRouter()
   const qc = useQueryClient()
+  const weekDays = WEEK_DAYS[locale]
+  const emptyWeek = weekDays.map(day => ({ day, contacts: 0, presentations: 0 }))
+  const pipelineLabels = PIPELINE_LABELS[locale]
+  const chartContactsLabel = t.common.contactsMade
+  const chartPresentationsLabel = t.dashboard.kpi.presentations
 
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -73,7 +117,7 @@ export default function DashboardPage() {
     return acc
   }, {})
   const pipelineDistribution = Object.entries(pipelineCounts).map(([stage, count]) => ({
-    stage: stage.replace(/_/g, ' '),
+    stage: pipelineLabels[stage as keyof typeof pipelineLabels] ?? stage.replace(/_/g, ' '),
     count,
     color: PIPELINE_COLORS[stage] ?? '#64748b',
   }))
@@ -84,7 +128,7 @@ export default function DashboardPage() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const weeklyBuckets = EMPTY_WEEK.map((entry, index) => {
+  const weeklyBuckets = emptyWeek.map((entry, index) => {
     const date = new Date(today)
     date.setDate(today.getDate() - (6 - index))
     return {
@@ -347,9 +391,27 @@ export default function DashboardPage() {
                     </defs>
                     <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', fontSize: '12px', color: '#f1f5f9' }} />
-                    <Area type="monotone" dataKey="contacts" stroke="#00d4ff" fill="url(#cC)" strokeWidth={2} />
-                    <Area type="monotone" dataKey="presentations" stroke="#8b5cf6" fill="url(#cP)" strokeWidth={2} />
+                    <Tooltip
+                      contentStyle={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', fontSize: '12px', color: '#f1f5f9' }}
+                      formatter={(value, name) => [value, name]}
+                      labelFormatter={(label) => label}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="contacts"
+                      name={chartContactsLabel}
+                      stroke="#00d4ff"
+                      fill="url(#cC)"
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="presentations"
+                      name={chartPresentationsLabel}
+                      stroke="#8b5cf6"
+                      fill="url(#cP)"
+                      strokeWidth={2}
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
