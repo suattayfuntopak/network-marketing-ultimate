@@ -16,7 +16,7 @@ import type { ContactRow, TaskRow } from '@/lib/queries'
 import { useState, useRef, useEffect } from 'react'
 import {
   LayoutDashboard, Users, ShoppingBag, GitBranch, ListTodo,
-  GraduationCap, Calendar, BarChart3,
+  CalendarDays, GraduationCap, Calendar, BarChart3,
   Bot, Shield, ChevronLeft, ChevronRight, Zap,
   Target, Sparkles, X, LogOut, Settings, ChevronUp
 } from 'lucide-react'
@@ -63,6 +63,7 @@ export function Sidebar() {
     { label: t.nav.customers, href: '/customers', icon: ShoppingBag },
     { label: t.nav.pipeline, href: '/pipeline', icon: GitBranch },
     { label: t.nav.tasks, href: '/tasks', icon: ListTodo, badge: pendingTasksCount?.toString() },
+    { label: t.nav.calendar, href: '/calendar', icon: CalendarDays },
     { divider: true },
     { label: t.nav.academy, href: '/academy', icon: GraduationCap },
     { label: t.nav.events, href: '/events', icon: Calendar },
