@@ -16,37 +16,47 @@ import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { AIPanel } from './AIPanel'
 
+const EMPTY_CONTACTS = [] as Awaited<ReturnType<typeof fetchContacts>>
+const EMPTY_TASKS = [] as Awaited<ReturnType<typeof fetchTasks>>
+const EMPTY_ORDERS = [] as Awaited<ReturnType<typeof fetchAllOrders>>
+
 export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const { locale } = useLanguage()
-  const { currentUser, setCurrentUser, setNotifications } = useAppStore()
+  const currentUser = useAppStore((state) => state.currentUser)
+  const setCurrentUser = useAppStore((state) => state.setCurrentUser)
+  const setNotifications = useAppStore((state) => state.setNotifications)
   const [authReady, setAuthReady] = useState(false)
 
   const isAuthRoute = pathname?.startsWith('/auth')
 
   const notificationsEnabled = authReady && Boolean(currentUser) && !isAuthRoute
 
-  const { data: contacts = [] } = useQuery({
+  const { data: contactsData } = useQuery({
     queryKey: ['contacts'],
     queryFn: fetchContacts,
     enabled: notificationsEnabled,
     staleTime: 30_000,
   })
 
-  const { data: tasks = [] } = useQuery({
+  const { data: tasksData } = useQuery({
     queryKey: ['tasks'],
     queryFn: fetchTasks,
     enabled: notificationsEnabled,
     staleTime: 30_000,
   })
 
-  const { data: orders = [] } = useQuery({
+  const { data: ordersData } = useQuery({
     queryKey: ['orders-all'],
     queryFn: fetchAllOrders,
     enabled: notificationsEnabled,
     staleTime: 30_000,
   })
+
+  const contacts = contactsData ?? EMPTY_CONTACTS
+  const tasks = tasksData ?? EMPTY_TASKS
+  const orders = ordersData ?? EMPTY_ORDERS
 
   useEffect(() => {
     type ProfileRow = Database['public']['Tables']['nmu_user_profiles']['Row']
