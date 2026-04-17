@@ -16,7 +16,7 @@ import type { ContactRow, TaskRow } from '@/lib/queries'
 import { useState, useRef, useEffect } from 'react'
 import {
   LayoutDashboard, Users, Contact, ShoppingBag, GitBranch, ListTodo,
-  GraduationCap, FileText, Calendar, Megaphone, BarChart3,
+  GraduationCap, FileText, Calendar, BarChart3,
   Bot, Shield, ChevronLeft, ChevronRight, Zap,
   Target, Sparkles, X, LogOut, Settings, ChevronUp
 } from 'lucide-react'
@@ -68,7 +68,6 @@ export function Sidebar() {
     { label: t.nav.academy, href: '/academy', icon: GraduationCap },
     { label: t.nav.scripts, href: '/scripts', icon: FileText },
     { label: t.nav.events, href: '/events', icon: Calendar },
-    { label: t.nav.campaigns, href: '/campaigns', icon: Megaphone },
     { divider: true },
     { label: t.nav.team, href: '/team', icon: Target },
     { label: t.nav.analytics, href: '/analytics', icon: BarChart3 },

@@ -69,8 +69,8 @@ export default function AdminPage() {
       items: [
         { title: t.admin.items.academyCourses, description: locale === 'tr' ? 'Akademi icerigini ve ogrenci akislarini yonet.' : 'Manage academy content and learner flows.', route: '/academy', cta: locale === 'tr' ? 'Akademiyi aç' : 'Open academy' },
         { title: t.admin.items.scriptLibrary, description: locale === 'tr' ? 'Senaryo kutuphanesini duzenle ve kullan.' : 'Maintain and use the script library.', route: '/scripts', cta: locale === 'tr' ? 'Havuzu aç' : 'Open library' },
-        { title: t.admin.items.emailTemplates, description: locale === 'tr' ? 'Kampanya ve takip mesajlarina giden hizli yol.' : 'Fast route to campaign and follow-up messaging.', route: '/campaigns', cta: locale === 'tr' ? 'Kampanyalara git' : 'Open campaigns' },
-        { title: t.admin.items.campaignAssets, description: locale === 'tr' ? 'Kampanya varliklari ve calisan akislari incele.' : 'Inspect campaign assets and active flows.', route: '/campaigns', cta: locale === 'tr' ? 'Varliklari aç' : 'Open assets' },
+        { title: t.admin.items.emailTemplates, description: locale === 'tr' ? 'Takip ve iletisim mesajlarini senaryo havuzunda yonet.' : 'Manage follow-up and communication messages in the script library.', route: '/scripts', cta: locale === 'tr' ? 'Mesajlari aç' : 'Open messages' },
+        { title: t.admin.items.campaignAssets, description: locale === 'tr' ? 'Etkinlik akislari, davetler ve paylasim varliklarini etkinliklerde incele.' : 'Review event flows, invites, and shareable assets in events.', route: '/events', cta: locale === 'tr' ? 'Etkinlikleri aç' : 'Open events' },
       ],
     },
     {

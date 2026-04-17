@@ -12,7 +12,7 @@ import { useLanguage } from '@/components/common/LanguageProvider'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { events } from '@/data/mockData'
 import type { Event } from '@/types'
-import { Calendar, MapPin, Video, Clock, Plus, Users, ExternalLink } from 'lucide-react'
+import { Calendar, MapPin, Video, Clock, Plus, Users } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -326,9 +326,6 @@ export default function EventsPage() {
               )}
               <Button type="button" variant="ghost" size="sm" onClick={() => router.push('/contacts')}>
                 <Users className="w-3.5 h-3.5" /> {locale === 'tr' ? 'Kisileri gor' : 'View contacts'}
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => router.push('/campaigns')}>
-                <ExternalLink className="w-3.5 h-3.5" /> {locale === 'tr' ? 'Kampanyalara git' : 'Go to campaigns'}
               </Button>
             </div>
 

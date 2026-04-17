@@ -301,33 +301,6 @@ export interface EventAttendee {
   followUpStatus: 'pending' | 'sent' | 'converted' | 'lost'
 }
 
-export interface Campaign {
-  id: string
-  userId: string
-  name: string
-  type: 'launch' | 'product_promo' | 'recruit_activation' | 'retention' | 'event_push' | 'rank_sprint' | 'social_challenge' | 'duplication_sprint'
-  description: string
-  startDate: string
-  endDate: string
-  status: 'draft' | 'active' | 'paused' | 'completed'
-  enrollments: CampaignEnrollment[]
-  metrics: CampaignMetrics
-}
-
-export interface CampaignEnrollment {
-  contactId: string
-  enrolledAt: string
-  status: 'active' | 'completed' | 'dropped'
-  progress: number
-}
-
-export interface CampaignMetrics {
-  totalEnrolled: number
-  totalCompleted: number
-  conversionRate: number
-  revenue?: number
-}
-
 export interface Achievement {
   id: string
   userId: string
@@ -420,7 +393,7 @@ export interface AutomationCondition {
 }
 
 export interface AutomationAction {
-  type: 'send_notification' | 'create_task' | 'update_stage' | 'send_message' | 'add_tag' | 'enroll_campaign' | 'assign_training' | 'ai_suggest'
+  type: 'send_notification' | 'create_task' | 'update_stage' | 'send_message' | 'add_tag' | 'assign_training' | 'ai_suggest'
   config: Record<string, unknown>
 }
 

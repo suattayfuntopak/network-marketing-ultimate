@@ -1,6 +1,6 @@
 import type {
   User, Contact, Task, Interaction, PipelineStageConfig, Product, CustomerOrder,
-  AcademyCourse, Script, Objection, Event, Campaign, Achievement, Rank,
+  AcademyCourse, Script, Objection, Event, Achievement, Rank,
   Notification, AIRecommendation, Automation, TeamMember
 } from '@/types'
 
@@ -359,14 +359,6 @@ export const events: Event[] = [
     ],
     status: 'published'
   },
-]
-
-// ============================================================
-// CAMPAIGNS
-// ============================================================
-export const campaigns: Campaign[] = [
-  { id: 'camp1', userId: 'u1', name: '7 Günlük Yeni Üye Başlangıcı', type: 'launch', description: 'İlk haftalarında yeni ekip üyeleri için yapılandırılmış başlangıç planı.', startDate: '2026-04-01', endDate: '2026-04-30', status: 'active', enrollments: [{ contactId: 'c6', enrolledAt: '2026-04-01', status: 'active', progress: 60 }, { contactId: 'c11', enrolledAt: '2026-04-05', status: 'active', progress: 20 }], metrics: { totalEnrolled: 2, totalCompleted: 0, conversionRate: 0 } },
-  { id: 'camp2', userId: 'u1', name: 'Bahar Cilt Bakımı Kampanyası', type: 'product_promo', description: 'Özel paketlerle cilt bakım serisi için sezonluk promosyon.', startDate: '2026-04-10', endDate: '2026-04-25', status: 'active', enrollments: [{ contactId: 'c2', enrolledAt: '2026-04-10', status: 'active', progress: 30 }, { contactId: 'c5', enrolledAt: '2026-04-10', status: 'active', progress: 50 }], metrics: { totalEnrolled: 2, totalCompleted: 0, conversionRate: 0 } },
 ]
 
 // ============================================================
