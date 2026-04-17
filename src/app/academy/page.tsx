@@ -44,6 +44,7 @@ import type { LucideIcon } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
+const ITEMS_PER_PAGE = 10
 
 const validTabs = ['library', 'objections', 'favorites'] as const
 type AcademyTab = (typeof validTabs)[number]
@@ -214,6 +215,8 @@ export default function AcademyPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedLibraryCategory, setSelectedLibraryCategory] = useState('all')
   const [selectedObjectionCategory, setSelectedObjectionCategory] = useState('all')
+  const [currentLibraryPage, setCurrentLibraryPage] = useState(1)
+  const [currentObjectionPage, setCurrentObjectionPage] = useState(1)
   const [showLibraryForm, setShowLibraryForm] = useState(false)
   const [showObjectionForm, setShowObjectionForm] = useState(false)
   const [libraryForm, setLibraryForm] = useState<LibraryFormState>(createLibraryFormState)
@@ -339,6 +342,17 @@ export default function AcademyPage() {
     return matchesCategory && matchesSearch
   })
 
+  const totalLibraryPages = Math.max(1, Math.ceil(filteredLibrary.length / ITEMS_PER_PAGE))
+  const totalObjectionPages = Math.max(1, Math.ceil(filteredObjections.length / ITEMS_PER_PAGE))
+  const paginatedLibrary = filteredLibrary.slice(
+    (currentLibraryPage - 1) * ITEMS_PER_PAGE,
+    currentLibraryPage * ITEMS_PER_PAGE,
+  )
+  const paginatedObjections = filteredObjections.slice(
+    (currentObjectionPage - 1) * ITEMS_PER_PAGE,
+    currentObjectionPage * ITEMS_PER_PAGE,
+  )
+
   const favoriteLibrary = libraryResources.filter((resource) => favoriteLibraryIds.includes(resource.id))
   const favoriteObjections = objectionResources.filter((resource) => favoriteObjectionIds.includes(resource.id))
   const totalFavorites = favoriteLibrary.length + favoriteObjections.length
@@ -349,6 +363,8 @@ export default function AcademyPage() {
     setSearchTerm('')
     setSelectedLibraryCategory('all')
     setSelectedObjectionCategory('all')
+    setCurrentLibraryPage(1)
+    setCurrentObjectionPage(1)
     startTransition(() => {
       router.replace(tab === 'library' ? '/academy' : `/academy?tab=${tab}`)
     })
@@ -426,6 +442,7 @@ export default function AcademyPage() {
     setCustomLibraryItems((current) => [itemToCreate, ...current])
     setLibraryForm(createLibraryFormState())
     setShowLibraryForm(false)
+    setCurrentLibraryPage(1)
   }
 
   function submitObjectionForm(event: FormEvent<HTMLFormElement>) {
@@ -456,6 +473,7 @@ export default function AcademyPage() {
     setCustomObjectionGuides((current) => [guideToCreate, ...current])
     setObjectionForm(createObjectionFormState())
     setShowObjectionForm(false)
+    setCurrentObjectionPage(1)
   }
 
   const tabLabels: Record<AcademyTab, string> = {
@@ -493,6 +511,33 @@ export default function AcademyPage() {
 
   const selectedLibraryResource = activePanel?.type === 'library' ? activePanel.resource : null
   const selectedObjectionResource = activePanel?.type === 'objection' ? activePanel.resource : null
+
+  function renderPagination(currentPage: number, totalPages: number, onChange: (page: number) => void) {
+    if (totalPages <= 1) return null
+
+    return (
+      <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+        {Array.from({ length: totalPages }, (_, index) => {
+          const page = index + 1
+          return (
+            <button
+              key={page}
+              type="button"
+              onClick={() => onChange(page)}
+              className={cn(
+                'min-w-9 h-9 px-3 rounded-xl text-sm font-medium transition-all border',
+                currentPage === page
+                  ? 'bg-primary/15 text-primary border-primary/20'
+                  : 'bg-surface border-border text-text-secondary hover:text-text-primary',
+              )}
+            >
+              {page}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
@@ -549,7 +594,11 @@ export default function AcademyPage() {
                 <Search className="w-4 h-4 text-text-tertiary absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value)
+                    if (activeTab === 'library') setCurrentLibraryPage(1)
+                    else setCurrentObjectionPage(1)
+                  }}
                   placeholder={
                     activeTab === 'library'
                       ? (currentLocale === 'tr' ? 'İçerik, etiket veya kategori ara...' : 'Search content, tags, or category...')
@@ -578,8 +627,13 @@ export default function AcademyPage() {
                       key={category}
                       type="button"
                       onClick={() => {
-                        if (activeTab === 'library') setSelectedLibraryCategory(category)
-                        else setSelectedObjectionCategory(category)
+                        if (activeTab === 'library') {
+                          setSelectedLibraryCategory(category)
+                          setCurrentLibraryPage(1)
+                        } else {
+                          setSelectedObjectionCategory(category)
+                          setCurrentObjectionPage(1)
+                        }
                       }}
                       className={cn(
                         'px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all border',
@@ -794,8 +848,9 @@ export default function AcademyPage() {
       )}
 
       {activeTab === 'library' && (
-        <motion.div variants={item} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {filteredLibrary.map((resource) => {
+        <motion.div variants={item} className="space-y-4">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {paginatedLibrary.map((resource) => {
             const Icon = typeIconForResource(resource.typeKey)
             const isFavorite = favoriteLibraryIds.includes(resource.id)
             const isViewed = viewedLibraryIds.includes(resource.id)
@@ -869,12 +924,15 @@ export default function AcademyPage() {
               </div>
             </Card>
           )}
+          </div>
+          {renderPagination(currentLibraryPage, totalLibraryPages, setCurrentLibraryPage)}
         </motion.div>
       )}
 
       {activeTab === 'objections' && (
-        <motion.div variants={item} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {filteredObjections.map((resource) => {
+        <motion.div variants={item} className="space-y-4">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {paginatedObjections.map((resource) => {
             const isFavorite = favoriteObjectionIds.includes(resource.id)
             const isViewed = viewedObjectionIds.includes(resource.id)
             return (
@@ -941,6 +999,8 @@ export default function AcademyPage() {
               </div>
             </Card>
           )}
+          </div>
+          {renderPagination(currentObjectionPage, totalObjectionPages, setCurrentObjectionPage)}
         </motion.div>
       )}
 
