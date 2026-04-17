@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
 import { readStoredValue, writeStoredValue } from '@/lib/clientStorage'
 
 type PersistentStateOptions<T> = {
@@ -22,10 +22,19 @@ function readVersionedValue<T>(storageKey: string, initialValue: T, options?: Pe
 export function usePersistentState<T>(key: string, initialValue: T, options?: PersistentStateOptions<T>) {
   const storageKey = useMemo(() => storageKeyFor(key, options?.version), [key, options?.version])
   const [value, setValue] = useState<T>(() => readVersionedValue(storageKey, initialValue, options))
+  const previousStorageKeyRef = useRef(storageKey)
 
   useEffect(() => {
+    if (previousStorageKeyRef.current !== storageKey) {
+      previousStorageKeyRef.current = storageKey
+      startTransition(() => {
+        setValue(readVersionedValue(storageKey, initialValue, options))
+      })
+      return
+    }
+
     writeStoredValue(storageKey, value)
-  }, [storageKey, value])
+  }, [initialValue, options, storageKey, value])
 
   return [value, setValue] as const
 }

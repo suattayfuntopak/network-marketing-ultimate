@@ -47,7 +47,7 @@ const EMPTY_FORM: AddForm = {
   description: '', contact_id: '',
 }
 
-const EVENT_STORAGE_VERSION = 2
+const EVENT_STORAGE_VERSION = 3
 
 export default function TasksPage() {
   const { t, locale } = useLanguage()

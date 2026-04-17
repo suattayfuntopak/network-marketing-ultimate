@@ -58,7 +58,7 @@ function toInputDateTime(value: string) {
   return value.slice(0, 16)
 }
 
-const EVENT_STORAGE_VERSION = 2
+const EVENT_STORAGE_VERSION = 3
 
 export default function EventsPage() {
   const router = useRouter()
