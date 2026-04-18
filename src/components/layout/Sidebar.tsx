@@ -145,11 +145,8 @@ export function Sidebar() {
           )}
         >
           <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-text-muted">
-            {sidebarCollapsed ? 'NMU' : 'Network Marketing Ultimate'}
+            {sidebarCollapsed ? 'NMU' : versionLabel}
           </p>
-          {!sidebarCollapsed && (
-            <p className="mt-1 text-xs text-text-tertiary">{versionLabel}</p>
-          )}
         </div>
       </div>
 
