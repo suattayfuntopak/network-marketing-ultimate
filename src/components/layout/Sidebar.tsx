@@ -33,7 +33,7 @@ export function Sidebar() {
   const contactsCount = contacts.length || undefined
   const pendingTasksCount = tasks.filter(t => t.status === 'pending').length || undefined
   const versionLabel = useMemo(
-    () => (locale === 'tr' ? 'NMU v1.0' : 'NMU v1.0'),
+    () => (locale === 'tr' ? 'NMU v 1.0' : 'NMU v 1.0'),
     [locale]
   )
 
