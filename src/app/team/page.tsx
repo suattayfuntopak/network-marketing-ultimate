@@ -1,75 +1,155 @@
 'use client'
 
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
-import { Progress } from '@/components/ui/Progress'
+import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
 import { fetchContacts, fetchTasks } from '@/lib/queries'
 import type { ContactRow, TaskRow } from '@/lib/queries'
 import {
-  Users, UserPlus, AlertTriangle, Shield, Target,
-  Activity, BarChart3, CheckCircle2, Clock,
+  Activity,
+  AlertTriangle,
+  ArrowRight,
+  Crown,
+  ShoppingBag,
+  Target,
+  UserPlus,
+  Users,
 } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
-type TeamCard = {
+type DirectoryCard = {
   id: string
   name: string
-  roleLabel: string
-  joinDate: string
-  activityScore: number
-  streak: number
-  momentumScore: number
-  onboardingStatus: 'not_started' | 'in_progress' | 'complete'
-  onboardingProgress: number
-  pipelineHealth: 'strong' | 'moderate' | 'weak' | 'critical'
-  riskLevel: 'low' | 'medium' | 'high'
+  headline: string
+  role: 'leader' | 'distributor' | 'customer'
   lastActive: string
-  status: 'online' | 'away' | 'offline'
+  temperature?: ContactRow['temperature']
+  temperatureScore?: number
+  relationshipStrength: number
+  openTasks: number
+  overdueTasks: number
+  route: string
 }
 
-function clamp(value: number, min = 0, max = 100) {
-  return Math.min(max, Math.max(min, value))
-}
-
-function formatMonthYear(value: string) {
-  return new Date(value).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })
+function formatDate(value: string, locale: 'tr' | 'en') {
+  return new Date(value).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 function daysSince(value: string) {
-  const diff = Date.now() - new Date(value).getTime()
+  const today = Date.now()
+  const diff = today - new Date(value).getTime()
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)))
 }
 
-function derivePipelineHealth(score: number): TeamCard['pipelineHealth'] {
-  if (score >= 80) return 'strong'
-  if (score >= 55) return 'moderate'
-  if (score >= 30) return 'weak'
-  return 'critical'
+function buildContactDirectoryCard(contact: ContactRow, tasks: TaskRow[]): DirectoryCard {
+  const relatedTasks = tasks.filter((task) => task.contact_id === contact.id && task.status !== 'completed' && task.status !== 'skipped')
+
+  return {
+    id: contact.id,
+    name: contact.full_name,
+    headline: [contact.profession, contact.location].filter(Boolean).join(' · ') || contact.source || 'NMU',
+    role: contact.pipeline_stage === 'became_customer' ? 'customer' : 'distributor',
+    lastActive: contact.last_contact_date ?? contact.updated_at,
+    temperature: contact.temperature,
+    temperatureScore: contact.temperature_score,
+    relationshipStrength: contact.relationship_strength,
+    openTasks: relatedTasks.length,
+    overdueTasks: relatedTasks.filter((task) => task.status === 'overdue').length,
+    route: `/contacts?contact=${contact.id}`,
+  }
 }
 
-function deriveRiskLevel(score: number): TeamCard['riskLevel'] {
-  if (score >= 70) return 'low'
-  if (score >= 40) return 'medium'
-  return 'high'
-}
+function CategorySection({
+  title,
+  description,
+  count,
+  cards,
+  locale,
+  emptyLabel,
+}: {
+  title: string
+  description: string
+  count: number
+  cards: DirectoryCard[]
+  locale: 'tr' | 'en'
+  emptyLabel: string
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-surface/30 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">{title}</p>
+          <p className="mt-1 text-xs text-text-tertiary">{description}</p>
+        </div>
+        <Badge variant="secondary">{count}</Badge>
+      </div>
 
-function deriveStatus(activityScore: number): TeamCard['status'] {
-  if (activityScore >= 75) return 'online'
-  if (activityScore >= 40) return 'away'
-  return 'offline'
+      <div className="mt-4 space-y-3">
+        {cards.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border-subtle px-4 py-6 text-center text-sm text-text-tertiary">
+            {emptyLabel}
+          </div>
+        ) : (
+          cards.map((card) => (
+            <Link
+              key={card.id}
+              href={card.route}
+              className="block rounded-xl border border-border-subtle bg-card px-4 py-3 transition-colors hover:border-border hover:bg-card-hover"
+            >
+              <div className="flex items-start gap-3">
+                <Avatar name={card.name} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-semibold text-text-primary">{card.name}</p>
+                    <ArrowRight className="w-3.5 h-3.5 text-text-tertiary" />
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-text-tertiary">{card.headline}</p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {card.temperature && (
+                      <TemperatureBadge temperature={card.temperature} score={card.temperatureScore} />
+                    )}
+                    {card.overdueTasks > 0 && (
+                      <Badge variant="warning">{card.overdueTasks} {locale === 'tr' ? 'gecikmiş' : 'overdue'}</Badge>
+                    )}
+                    {card.openTasks > 0 && (
+                      <Badge>{card.openTasks} {locale === 'tr' ? 'açık görev' : 'open tasks'}</Badge>
+                    )}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-[11px] text-text-tertiary">
+                    <span>
+                      {locale === 'tr' ? 'İlişki gücü' : 'Relationship'}: <strong className="text-text-secondary">{card.relationshipStrength}</strong>
+                    </span>
+                    <span>
+                      {locale === 'tr' ? 'Son temas' : 'Last touch'}: <strong className="text-text-secondary">{formatDate(card.lastActive, locale)}</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
+    </div>
+  )
 }
 
 export default function TeamPage() {
-  const { t } = useLanguage()
+  const { locale, t } = useLanguage()
+  const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const { currentUser } = useAppStore()
   const router = useRouter()
 
@@ -83,192 +163,227 @@ export default function TeamPage() {
     queryFn: fetchTasks,
   })
 
-  const memberContacts = contacts.filter(contact => contact.pipeline_stage === 'became_member')
+  const distributorCards = contacts
+    .filter((contact) => contact.pipeline_stage === 'became_member')
+    .map((contact) => buildContactDirectoryCard(contact, tasks))
+    .sort((a, b) => (b.relationshipStrength + b.openTasks * 4) - (a.relationshipStrength + a.openTasks * 4))
 
-  const currentUserCard: TeamCard | null = currentUser ? {
-    id: currentUser.id,
-    name: currentUser.name,
-    roleLabel: currentUser.rank ?? 'Lider',
-    joinDate: currentUser.joinDate,
-    activityScore: clamp(Math.round((currentUser.momentumScore + currentUser.streak * 4) / 2)),
-    streak: currentUser.streak,
-    momentumScore: currentUser.momentumScore,
-    onboardingStatus: 'complete',
-    onboardingProgress: 100,
-    pipelineHealth: derivePipelineHealth(currentUser.momentumScore),
-    riskLevel: deriveRiskLevel(currentUser.momentumScore),
-    lastActive: new Date().toISOString(),
-    status: deriveStatus(currentUser.momentumScore),
-  } : null
+  const customerCards = contacts
+    .filter((contact) => contact.pipeline_stage === 'became_customer')
+    .map((contact) => buildContactDirectoryCard(contact, tasks))
+    .sort((a, b) => (b.relationshipStrength + b.openTasks * 4) - (a.relationshipStrength + a.openTasks * 4))
 
-  const teamCardsFromContacts: TeamCard[] = memberContacts.map(contact => {
-    const memberTasks = tasks.filter(task => task.contact_id === contact.id)
-    const completedTasks = memberTasks.filter(task => task.status === 'completed').length
-    const activeTaskWeight = memberTasks.filter(task => task.status === 'pending' || task.status === 'overdue').length
-    const relationship = contact.relationship_strength
-    const temperature = contact.temperature_score
-    const momentumScore = clamp(Math.round((relationship * 0.6) + (temperature * 0.4)))
-    const activityScore = clamp(Math.round((relationship * 0.5) + (temperature * 0.3) + (completedTasks * 8) - (activeTaskWeight * 3)))
-    const accountAgeInDays = daysSince(contact.created_at)
-    const onboardingProgress = clamp(accountAgeInDays >= 30 ? 100 : Math.round((accountAgeInDays / 30) * 100))
-    const onboardingStatus = onboardingProgress >= 100 ? 'complete' : onboardingProgress > 0 ? 'in_progress' : 'not_started'
+  const leaderCards: DirectoryCard[] = currentUser
+    ? [{
+        id: currentUser.id,
+        name: currentUser.name,
+        headline: currentUser.rank ?? (currentLocale === 'tr' ? 'Organizasyon Lideri' : 'Organization Leader'),
+        role: 'leader',
+        lastActive: new Date().toISOString(),
+        relationshipStrength: currentUser.momentumScore,
+        openTasks: tasks.filter((task) => !task.contact_id && task.status !== 'completed' && task.status !== 'skipped').length,
+        overdueTasks: tasks.filter((task) => !task.contact_id && task.status === 'overdue').length,
+        route: '/settings',
+      }]
+    : []
 
-    return {
-      id: contact.id,
-      name: contact.full_name,
-      roleLabel: contact.profession || 'Ekip Uyesi',
-      joinDate: contact.created_at,
-      activityScore,
-      streak: completedTasks,
-      momentumScore,
-      onboardingStatus,
-      onboardingProgress,
-      pipelineHealth: derivePipelineHealth(momentumScore),
-      riskLevel: deriveRiskLevel(activityScore),
-      lastActive: contact.last_contact_date ?? contact.updated_at,
-      status: deriveStatus(activityScore),
-    }
-  })
+  const attentionList = [...distributorCards, ...customerCards]
+    .filter((card) => card.overdueTasks > 0 || daysSince(card.lastActive) > 14 || card.relationshipStrength < 45)
+    .sort((a, b) => {
+      const scoreA = a.overdueTasks * 10 + daysSince(a.lastActive) + (100 - a.relationshipStrength)
+      const scoreB = b.overdueTasks * 10 + daysSince(b.lastActive) + (100 - b.relationshipStrength)
+      return scoreB - scoreA
+    })
+    .slice(0, 5)
 
-  const teamCards = currentUserCard ? [currentUserCard, ...teamCardsFromContacts] : teamCardsFromContacts
-  const activeCount = teamCards.filter(member => member.riskLevel === 'low').length
-  const atRiskCount = teamCards.filter(member => member.riskLevel === 'high' || member.riskLevel === 'medium').length
-  const avgActivity = teamCards.length > 0
-    ? Math.round(teamCards.reduce((total, member) => total + member.activityScore, 0) / teamCards.length)
-    : 0
+  const totalOrg = leaderCards.length + distributorCards.length + customerCards.length
+  const openFollowUps = tasks.filter((task) => task.status === 'pending' || task.status === 'overdue').length
+  const riskWatch = attentionList.length
+
+  const stats = [
+    {
+      label: currentLocale === 'tr' ? 'Toplam Organizasyon' : 'Total Organization',
+      value: totalOrg,
+      icon: Users,
+      color: 'text-primary',
+    },
+    {
+      label: currentLocale === 'tr' ? 'Lider' : 'Leaders',
+      value: leaderCards.length,
+      icon: Crown,
+      color: 'text-secondary',
+    },
+    {
+      label: currentLocale === 'tr' ? 'Distribütör' : 'Distributors',
+      value: distributorCards.length,
+      icon: Target,
+      color: 'text-success',
+    },
+    {
+      label: currentLocale === 'tr' ? 'Müşteri' : 'Customers',
+      value: customerCards.length,
+      icon: ShoppingBag,
+      color: 'text-accent',
+    },
+    {
+      label: currentLocale === 'tr' ? 'Takip Gerektirenler' : 'Needs Attention',
+      value: riskWatch,
+      icon: AlertTriangle,
+      color: 'text-warning',
+    },
+  ]
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
-      <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1500px] mx-auto">
+      <motion.div variants={item} className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">{t.team.title}</h1>
-          <p className="text-sm text-text-secondary mt-0.5">{teamCards.length} {t.team.subtitle}</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            {currentLocale === 'tr'
+              ? 'Tek ekranda lider, distribütör ve müşteri görünümü ile organizasyon fotoğrafı.'
+              : 'A single-screen organization view for leaders, distributors, and customers.'}
+          </p>
         </div>
-        <Button size="sm" icon={<UserPlus className="w-3.5 h-3.5" />} onClick={() => router.push('/pipeline')}>
+        <Button
+          size="sm"
+          icon={<UserPlus className="w-3.5 h-3.5" />}
+          onClick={() => router.push('/pipeline')}
+        >
           {t.team.inviteMember}
         </Button>
       </motion.div>
 
-      <motion.div variants={item} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: t.team.totalMembers, value: teamCards.length, icon: Users, color: 'text-primary' },
-          { label: t.team.activeMembers, value: activeCount, icon: Activity, color: 'text-success' },
-          { label: t.team.atRisk, value: atRiskCount, icon: AlertTriangle, color: 'text-warning' },
-          { label: t.team.avgActivity, value: `${avgActivity}%`, icon: BarChart3, color: 'text-secondary' },
-        ].map((stat, index) => {
+      <motion.div variants={item} className="grid grid-cols-2 xl:grid-cols-5 gap-3">
+        {stats.map((stat) => {
           const Icon = stat.icon
           return (
-            <div key={index} className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-surface-hover flex items-center justify-center">
-                <Icon className={`w-5 h-5 ${stat.color}`} />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-text-primary kpi-number">{stat.value}</p>
-                <p className="text-xs text-text-tertiary">{stat.label}</p>
+            <div key={stat.label} className="rounded-2xl border border-border bg-card px-4 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-hover">
+                  <Icon className={`w-5 h-5 ${stat.color}`} />
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-text-primary">{stat.value}</p>
+                  <p className="text-xs text-text-tertiary">{stat.label}</p>
+                </div>
               </div>
             </div>
           )
         })}
       </motion.div>
 
-      <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {teamCards.length === 0 ? (
-          <Card className="lg:col-span-2">
-            <div className="py-12 text-center">
-              <Users className="w-10 h-10 text-text-muted opacity-40 mx-auto mb-3" />
-              <p className="text-sm text-text-secondary font-medium">Henuz ekip uyesi yok</p>
-              <p className="text-xs text-text-tertiary mt-1">Bir kisiyi “Ekip Uyesi” asamasina tasidiginda burada gorunecek.</p>
-            </div>
-          </Card>
-        ) : (
-          teamCards.map(member => (
-            <motion.div key={member.id} variants={item}>
-              <Card hover glow={member.riskLevel === 'high' ? 'error' : 'none'}>
-                <div className="flex items-start gap-4">
-                  <Avatar name={member.name} size="lg" status={member.status} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-semibold text-text-primary">{member.name}</h3>
-                      <Badge
-                        variant={member.riskLevel === 'low' ? 'success' : member.riskLevel === 'medium' ? 'warning' : 'error'}
-                        size="sm"
-                      >
-                        {t.team.riskLevel[member.riskLevel]}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-text-tertiary mt-0.5">{member.roleLabel} · {formatMonthYear(member.joinDate)}</p>
-
-                    <div className="grid grid-cols-3 gap-3 mt-3">
-                      <div>
-                        <p className="text-lg font-bold text-text-primary kpi-number">{member.activityScore}</p>
-                        <p className="text-[10px] text-text-tertiary">{t.common.activity}</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-bold text-text-primary kpi-number">{member.streak}</p>
-                        <p className="text-[10px] text-text-tertiary">{t.common.streak}</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-bold text-text-primary kpi-number">{member.momentumScore}</p>
-                        <p className="text-[10px] text-text-tertiary">{t.common.momentum}</p>
-                      </div>
-                    </div>
-
-                    {member.onboardingStatus === 'in_progress' && (
-                      <div className="mt-3">
-                        <Progress value={member.onboardingProgress} size="sm" variant="primary" showLabel label={t.common.onboarding} />
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      <Badge
-                        variant={
-                          member.pipelineHealth === 'strong'
-                            ? 'success'
-                            : member.pipelineHealth === 'moderate'
-                              ? 'warning'
-                              : 'error'
-                        }
-                        size="sm"
-                      >
-                        {t.team.pipelineHealth[member.pipelineHealth]} {t.common.pipeline}
-                      </Badge>
-                      <span className="text-[10px] text-text-tertiary">
-                        {t.common.lastActive}: {new Date(member.lastActive).toLocaleDateString('tr-TR', { month: 'short', day: 'numeric' })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))
-        )}
-      </motion.div>
-
-      <motion.div variants={item}>
-        <Card>
-          <CardHeader>
+      <motion.div variants={item} className="grid gap-4 xl:grid-cols-[1.55fr_0.9fr]">
+        <Card className="overflow-hidden" padding="none">
+          <div className="border-b border-border px-5 py-4">
             <CardTitle className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-primary" /> {t.team.duplicationToolkit}
+              <Users className="w-4 h-4 text-primary" />
+              {currentLocale === 'tr' ? 'Organizasyon Görünümü' : 'Organization View'}
             </CardTitle>
-          </CardHeader>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { name: t.team.launchChecklist, desc: t.team.first48h, icon: CheckCircle2 },
-              { name: t.team.scriptPacks, desc: t.team.inviteFollowUp, icon: Target },
-              { name: t.team.onboardingTemplates, desc: t.team.newMemberFlow, icon: Users },
-              { name: t.team.teamMeetingKit, desc: t.team.weeklyCallGuide, icon: Clock },
-            ].map((tool, index) => {
-              const Icon = tool.icon
-              return (
-                <div key={index} className="p-4 rounded-xl bg-surface/50 border border-border-subtle hover:border-border cursor-pointer transition-colors text-center">
-                  <Icon className="w-6 h-6 text-primary mx-auto mb-2" />
-                  <p className="text-sm font-medium text-text-primary">{tool.name}</p>
-                  <p className="text-[10px] text-text-tertiary mt-0.5">{tool.desc}</p>
-                </div>
-              )
-            })}
+            <CardDescription>
+              {currentLocale === 'tr'
+                ? 'Rol bazlı gruplar sayesinde kim nerede duruyor hızlıca gör.'
+                : 'See each role group clearly without leaving the page.'}
+            </CardDescription>
+          </div>
+
+          <div className="grid gap-4 p-5 lg:grid-cols-3">
+            <CategorySection
+              title={currentLocale === 'tr' ? 'Lider' : 'Leader'}
+              description={currentLocale === 'tr' ? 'Organizasyonu yöneten çekirdek görünüm.' : 'Core leadership visibility.'}
+              count={leaderCards.length}
+              cards={leaderCards}
+              locale={currentLocale}
+              emptyLabel={currentLocale === 'tr' ? 'Henüz lider görünümü yok.' : 'No leader view yet.'}
+            />
+            <CategorySection
+              title={currentLocale === 'tr' ? 'Distribütör' : 'Distributor'}
+              description={currentLocale === 'tr' ? 'Takip ve ivme isteyen ekip üyeleri.' : 'Members who need momentum and follow-up.'}
+              count={distributorCards.length}
+              cards={distributorCards}
+              locale={currentLocale}
+              emptyLabel={currentLocale === 'tr' ? 'Henüz distribütör yok.' : 'No distributors yet.'}
+            />
+            <CategorySection
+              title={currentLocale === 'tr' ? 'Müşteri' : 'Customer'}
+              description={currentLocale === 'tr' ? 'Korunması ve büyütülmesi gereken müşteri tabanı.' : 'Customer relationships to retain and grow.'}
+              count={customerCards.length}
+              cards={customerCards}
+              locale={currentLocale}
+              emptyLabel={currentLocale === 'tr' ? 'Henüz müşteri yok.' : 'No customers yet.'}
+            />
           </div>
         </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-secondary" />
+                {currentLocale === 'tr' ? 'Bugünün Operasyon Özeti' : 'Today’s Operating Snapshot'}
+              </CardTitle>
+            </CardHeader>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-surface/40 px-3 py-3">
+                <span className="text-text-secondary">{currentLocale === 'tr' ? 'Açık takipler' : 'Open follow-ups'}</span>
+                <strong className="text-text-primary">{openFollowUps}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-surface/40 px-3 py-3">
+                <span className="text-text-secondary">{currentLocale === 'tr' ? 'Distribütör havuzu' : 'Distributor pool'}</span>
+                <strong className="text-text-primary">{distributorCards.length}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-surface/40 px-3 py-3">
+                <span className="text-text-secondary">{currentLocale === 'tr' ? 'Müşteri tabanı' : 'Customer base'}</span>
+                <strong className="text-text-primary">{customerCards.length}</strong>
+              </div>
+            </div>
+          </Card>
+
+          <Card glow={attentionList.length > 0 ? 'warning' : 'none'}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-warning" />
+                {currentLocale === 'tr' ? 'Yakın Destek Gerektirenler' : 'Needs Support Soon'}
+              </CardTitle>
+            </CardHeader>
+            <div className="space-y-3">
+              {attentionList.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border-subtle px-4 py-6 text-center text-sm text-text-tertiary">
+                  {currentLocale === 'tr'
+                    ? 'Şu an kritik destek gerektiren kayıt görünmüyor.'
+                    : 'No critical support cases are visible right now.'}
+                </div>
+              ) : (
+                attentionList.map((card) => (
+                  <Link
+                    key={card.id}
+                    href={card.route}
+                    className="block rounded-xl border border-border-subtle bg-surface/40 px-4 py-3 transition-colors hover:border-border hover:bg-card-hover"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">{card.name}</p>
+                        <p className="mt-1 text-xs text-text-tertiary">
+                          {card.overdueTasks > 0
+                            ? (currentLocale === 'tr'
+                              ? `${card.overdueTasks} gecikmiş görev var`
+                              : `${card.overdueTasks} overdue tasks`)
+                            : (currentLocale === 'tr'
+                              ? `${daysSince(card.lastActive)} gündür temas yok`
+                              : `No touch for ${daysSince(card.lastActive)} days`)}
+                        </p>
+                      </div>
+                      <Badge variant={card.overdueTasks > 0 ? 'warning' : 'default'}>
+                        {card.role === 'customer'
+                          ? (currentLocale === 'tr' ? 'Müşteri' : 'Customer')
+                          : (currentLocale === 'tr' ? 'Distribütör' : 'Distributor')}
+                      </Badge>
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
       </motion.div>
     </motion.div>
   )

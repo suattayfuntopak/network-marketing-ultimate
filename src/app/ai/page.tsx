@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
+import { AIMessageStudio } from '@/components/ai/AIMessageStudio'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
 import { deriveCoachInsights } from '@/lib/coach'
@@ -220,6 +221,10 @@ export default function AIPage() {
             </button>
           )
         })}
+      </motion.div>
+
+      <motion.div variants={item}>
+        <AIMessageStudio contacts={contacts} />
       </motion.div>
 
       <motion.div variants={item}>

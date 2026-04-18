@@ -5,20 +5,16 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
-import { Avatar } from '@/components/ui/Avatar'
 import { useLanguage } from '@/components/common/LanguageProvider'
-import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
 import { fetchContacts, fetchTasks } from '@/lib/queries'
-import { syncAuthSessionCookie } from '@/lib/auth'
 import type { ContactRow, TaskRow } from '@/lib/queries'
-import { useState, useRef, useEffect } from 'react'
+import { useMemo } from 'react'
 import {
   LayoutDashboard, Users, ShoppingBag, GitBranch, ListTodo,
   CalendarDays, GraduationCap, Calendar, BarChart3,
   Bot, Shield, ChevronLeft, ChevronRight, Zap,
-  Target, Sparkles, X, LogOut, Settings, ChevronUp
+  Target, Sparkles, X
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -28,34 +24,18 @@ type NavItem = NavDividerItem | NavLinkItem
 
 export function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
-  const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setSidebarMobileOpen, currentUser, setCurrentUser } = useAppStore()
-  const { t, locale, setLocale } = useLanguage()
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
-  const profileMenuRef = useRef<HTMLDivElement>(null)
+  const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setSidebarMobileOpen } = useAppStore()
+  const { t, locale } = useLanguage()
 
   const { data: contacts = [] } = useQuery<ContactRow[]>({ queryKey: ['contacts'], queryFn: fetchContacts })
   const { data: tasks = [] } = useQuery<TaskRow[]>({ queryKey: ['tasks'], queryFn: fetchTasks })
 
   const contactsCount = contacts.length || undefined
   const pendingTasksCount = tasks.filter(t => t.status === 'pending').length || undefined
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
-        setProfileMenuOpen(false)
-      }
-    }
-    if (profileMenuOpen) document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [profileMenuOpen])
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    syncAuthSessionCookie(false)
-    setCurrentUser(null)
-    router.replace('/auth/login')
-  }
+  const versionLabel = useMemo(
+    () => (locale === 'tr' ? 'NMU v1.0' : 'NMU v1.0'),
+    [locale]
+  )
 
   const navItems: NavItem[] = [
     { label: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
@@ -156,98 +136,21 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* User Profile + Dropdown */}
-      <div className={cn('px-3 pb-4 shrink-0 relative', profileMenuOpen && 'z-[90]')} ref={profileMenuRef}>
-        {/* Dropdown Menu */}
-        <AnimatePresence>
-          {profileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: 8, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.96 }}
-              transition={{ duration: 0.15 }}
-              className={cn(
-                'absolute mb-2 bg-elevated border border-border rounded-xl shadow-float overflow-hidden z-[100]',
-                sidebarCollapsed
-                  ? 'bottom-0 left-full ml-3 w-60'
-                  : 'bottom-full left-0 right-0 mx-0'
-              )}
-            >
-              {/* Settings */}
-              <Link
-                href="/settings"
-                onClick={() => setProfileMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-              >
-                <Settings className="w-4 h-4 shrink-0" />
-                <span>{t.settings.title}</span>
-              </Link>
-
-              {/* Language */}
-              <div className="px-4 py-3 border-t border-border-subtle">
-                <p className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wider mb-2">
-                  {locale === 'tr' ? 'Dil' : 'Language'}
-                </p>
-                <div className="flex gap-2">
-                  {[{ locale: 'tr' as const, flag: '🇹🇷', label: 'Türkçe' }, { locale: 'en' as const, flag: '🇺🇸', label: 'English' }].map(lang => (
-                    <button
-                      key={lang.locale}
-                      onClick={() => { setLocale(lang.locale); setProfileMenuOpen(false) }}
-                      className={cn(
-                        'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
-                        locale === lang.locale
-                          ? 'bg-primary/15 text-primary border border-primary/25'
-                          : 'bg-surface text-text-secondary hover:bg-surface-hover border border-border-subtle'
-                      )}
-                    >
-                      <span>{lang.flag}</span>
-                      <span>{lang.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Logout */}
-              <div className="border-t border-border-subtle">
-                <button
-                  onClick={() => { setProfileMenuOpen(false); handleLogout() }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-text-tertiary hover:text-error hover:bg-error/10 transition-colors"
-                >
-                  <LogOut className="w-4 h-4 shrink-0" />
-                  <span>{t.sidebar.logout}</span>
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Profile Card (trigger) */}
-        <button
-          onClick={() => setProfileMenuOpen(v => !v)}
+      <div className="px-3 pb-3 shrink-0">
+        <div className="h-px bg-border-subtle mb-3" />
+        <div
           className={cn(
-            'w-full flex items-center gap-3 p-3 rounded-xl bg-surface/50 border transition-all',
-            profileMenuOpen ? 'border-primary/30 bg-primary/5' : 'border-border-subtle hover:bg-surface-hover hover:border-border',
-            sidebarCollapsed && 'justify-center'
+            'rounded-xl border border-border-subtle bg-surface/40 text-text-tertiary',
+            sidebarCollapsed ? 'px-2 py-2 text-center text-[10px]' : 'px-3 py-2.5'
           )}
         >
-          <Avatar name={currentUser?.name ?? '?'} size="sm" status="online" />
-          <AnimatePresence>
-            {!sidebarCollapsed && (
-              <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
-                className="overflow-hidden whitespace-nowrap flex-1 min-w-0 text-left"
-              >
-                <p className="text-sm font-medium text-text-primary truncate">{currentUser?.name ?? '—'}</p>
-                <p className="text-[10px] text-text-tertiary truncate">{currentUser?.role ?? t.sidebar.goldDirector}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-text-muted">
+            {sidebarCollapsed ? 'NMU' : 'Network Marketing Ultimate'}
+          </p>
           {!sidebarCollapsed && (
-            <ChevronUp className={cn('w-3.5 h-3.5 text-text-tertiary shrink-0 transition-transform', !profileMenuOpen && 'rotate-180')} />
+            <p className="mt-1 text-xs text-text-tertiary">{versionLabel}</p>
           )}
-        </button>
+        </div>
       </div>
 
       {/* Collapse Toggle */}
