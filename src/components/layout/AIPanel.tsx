@@ -9,6 +9,7 @@ import { useAppStore } from '@/store/appStore'
 import { Avatar } from '@/components/ui/Avatar'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { consumeCoachPrompt, queueCoachPrompt } from '@/lib/clientStorage'
+import { postAiChat } from '@/lib/aiClient'
 import {
   fetchAllOrders,
   fetchContacts,
@@ -238,10 +239,12 @@ export function AIPanel() {
     setChatMessages(updated)
     setStreaming(true)
 
-    const apiMessages = updated.map((entry) => ({
-      role: entry.role === 'ai' ? 'assistant' : 'user',
-      content: entry.content,
-    }))
+    const apiMessages: { role: 'user' | 'assistant'; content: string }[] = updated.map(
+      (entry) => ({
+        role: entry.role === 'ai' ? 'assistant' : 'user',
+        content: entry.content,
+      })
+    )
 
     setChatMessages((prev) => [...prev, { role: 'ai', content: '' }])
 
@@ -250,12 +253,7 @@ export function AIPanel() {
       const controller = new AbortController()
       abortRef.current = controller
 
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages }),
-        signal: controller.signal,
-      })
+      const res = await postAiChat(apiMessages, { signal: controller.signal })
 
       if (!res.ok) {
         throw new Error(

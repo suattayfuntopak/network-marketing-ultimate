@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input, Textarea } from '@/components/ui/Input'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import type { ContactRow } from '@/lib/queries'
+import { postAiChat } from '@/lib/aiClient'
 import { cn } from '@/lib/utils'
 import {
   CalendarHeart,
@@ -206,13 +207,7 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
       .join('\n')
 
     try {
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: prompt }],
-        }),
-      })
+      const response = await postAiChat([{ role: 'user', content: prompt }])
 
       if (!response.ok) {
         throw new Error('ai-route')

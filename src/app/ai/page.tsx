@@ -13,6 +13,7 @@ import { useAppStore } from '@/store/appStore'
 import { deriveCoachInsights } from '@/lib/coach'
 import { consumeCoachPrompt, queueCoachPrompt } from '@/lib/clientStorage'
 import { fetchAllOrders, fetchContacts, fetchTasks, type ContactRow, type OrderRow, type TaskRow } from '@/lib/queries'
+import { postAiChat } from '@/lib/aiClient'
 import { Bot, Sparkles, Send, Target, TrendingUp, ShoppingBag, GraduationCap, Lightbulb, MessageSquare, Zap, ArrowRight } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
@@ -114,17 +115,13 @@ export default function AIPage() {
       const controller = new AbortController()
       abortRef.current = controller
 
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: updated.map((entry) => ({
-            role: entry.role === 'ai' ? 'assistant' : 'user',
-            content: entry.content,
-          })),
-        }),
-        signal: controller.signal,
-      })
+      const apiMessages: { role: 'user' | 'assistant'; content: string }[] = updated.map(
+        (entry) => ({
+          role: entry.role === 'ai' ? 'assistant' : 'user',
+          content: entry.content,
+        })
+      )
+      const response = await postAiChat(apiMessages, { signal: controller.signal })
 
       if (!response.ok) {
         throw new Error(

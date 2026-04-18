@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest } from 'next/server'
 
 export const runtime = 'nodejs'
@@ -12,6 +13,50 @@ Kullanıcı bir network marketing profesyoneli. Görevin:
 - Türkçe veya İngilizce — kullanıcının dilinde cevap ver
 - Cevapları kısa ve odaklı tut (3-5 cümle ideal)`
 
+const RATE_LIMIT_WINDOW_MS = 60_000
+const RATE_LIMIT_MAX = 20
+const requestTimestamps = new Map<string, number[]>()
+
+function isRateLimited(userId: string): boolean {
+  const now = Date.now()
+  const windowStart = now - RATE_LIMIT_WINDOW_MS
+  const recent = (requestTimestamps.get(userId) ?? []).filter((ts) => ts > windowStart)
+
+  if (recent.length >= RATE_LIMIT_MAX) {
+    requestTimestamps.set(userId, recent)
+    return true
+  }
+
+  recent.push(now)
+  requestTimestamps.set(userId, recent)
+  return false
+}
+
+async function resolveUserId(req: NextRequest): Promise<string | null> {
+  const header = req.headers.get('authorization') ?? req.headers.get('Authorization')
+  if (!header || !header.toLowerCase().startsWith('bearer ')) {
+    return null
+  }
+
+  const token = header.slice(7).trim()
+  if (!token) return null
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null
+  }
+
+  const client = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  const { data, error } = await client.auth.getUser(token)
+  if (error || !data.user) {
+    return null
+  }
+  return data.user.id
+}
+
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
@@ -21,8 +66,23 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  const userId = await resolveUserId(req)
+  if (!userId) {
+    return Response.json(
+      { error: 'Authentication required.' },
+      { status: 401 }
+    )
+  }
+
+  if (isRateLimited(userId)) {
+    return Response.json(
+      { error: 'Rate limit exceeded. Please wait a minute before retrying.' },
+      { status: 429 }
+    )
+  }
+
   try {
-    const body = await req.json() as {
+    const body = (await req.json()) as {
       messages?: { role: 'user' | 'assistant'; content: string }[]
     }
 
@@ -34,7 +94,7 @@ export async function POST(req: NextRequest) {
     }
 
     const client = new Anthropic({ apiKey })
-    const stream = await client.messages.stream({
+    const stream = client.messages.stream({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
