@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { ActionCalendarPanel } from '@/components/tasks/ActionCalendarPanel'
+import type { CalendarContext, CalendarViewMode } from '@/components/tasks/ActionCalendarPanel'
 import { TaskComposerModal } from '@/components/tasks/TaskComposerModal'
 import { useAppStore } from '@/store/appStore'
 import { fetchContacts, fetchTasks } from '@/lib/queries'
@@ -22,6 +23,7 @@ export default function CalendarPage() {
   const { t, locale } = useLanguage()
   const { currentUser } = useAppStore()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [showAdd, setShowAdd] = useState(false)
   const [taskDraftDate, setTaskDraftDate] = useState<string | undefined>(undefined)
   const [editingTask, setEditingTask] = useState<TaskRow | null>(null)
@@ -43,6 +45,26 @@ export default function CalendarPage() {
   const pendingTasks = tasks.filter((task) => !['completed', 'skipped'].includes(task.status)).length
   const activeEvents = eventItems.filter((event) => event.status !== 'cancelled').length
   const actionCount = pendingTasks + activeEvents
+  const requestedView = searchParams.get('view')
+  const initialViewMode: CalendarViewMode =
+    requestedView === 'week' || requestedView === 'day' || requestedView === 'month'
+      ? requestedView
+      : 'month'
+  const requestedDate = searchParams.get('date')
+  const initialFocusDate = requestedDate ? new Date(`${requestedDate}T00:00:00`) : undefined
+
+  function buildCalendarReturnPath(context?: CalendarContext) {
+    if (!context) {
+      return '/calendar'
+    }
+
+    const params = new URLSearchParams({
+      view: context.viewMode,
+      date: context.focusDate,
+    })
+
+    return `/calendar?${params.toString()}`
+  }
 
   function openCreateTask(date?: string) {
     setEditingTask(null)
@@ -56,8 +78,13 @@ export default function CalendarPage() {
     setShowAdd(true)
   }
 
-  function openExistingEvent(event: Event) {
-    router.push(`/events?event=${event.id}&source=calendar`)
+  function openExistingEvent(event: Event, context?: CalendarContext) {
+    const params = new URLSearchParams({
+      event: event.id,
+      returnTo: buildCalendarReturnPath(context),
+    })
+
+    router.push(`/events?${params.toString()}`)
   }
 
   function closeTaskModal() {
@@ -85,9 +112,22 @@ export default function CalendarPage() {
           tasks={tasks}
           events={eventItems}
           contactMap={contactMap}
+          initialViewMode={initialViewMode}
+          initialFocusDate={initialFocusDate}
           onOpenEvents={() => router.push('/events')}
           onOpenTasks={() => router.push('/tasks')}
-          onCreateEvent={(date) => router.push(date ? `/events?new=1&date=${date}&source=calendar` : '/events?new=1&source=calendar')}
+          onCreateEvent={(date, context) => {
+            const params = new URLSearchParams({
+              new: '1',
+              returnTo: buildCalendarReturnPath(context),
+            })
+
+            if (date) {
+              params.set('date', date)
+            }
+
+            router.push(`/events?${params.toString()}`)
+          }}
           onCreateTask={openCreateTask}
           onOpenTask={openExistingTask}
           onOpenEvent={openExistingEvent}

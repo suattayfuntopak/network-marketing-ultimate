@@ -246,7 +246,7 @@ export default function EventsPage() {
     }
 
     const date = searchParams.get('date') ?? undefined
-    setReturnPath(searchParams.get('source') === 'calendar' ? '/calendar' : null)
+    setReturnPath(searchParams.get('returnTo'))
     openCreateModal(eventPrefillFromDate(date))
     router.replace('/events')
   }, [router, searchParams])
@@ -265,7 +265,7 @@ export default function EventsPage() {
       return
     }
 
-    setReturnPath(searchParams.get('source') === 'calendar' ? '/calendar' : null)
+    setReturnPath(searchParams.get('returnTo'))
     openDetails(matchingEvent)
     router.replace('/events')
   }, [eventItems, router, searchParams])
