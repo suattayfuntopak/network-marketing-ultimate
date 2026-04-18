@@ -11,8 +11,8 @@ import { useRouter } from 'next/navigation'
 import { completeTask, fetchContacts, fetchTasks } from '@/lib/queries'
 import type { ContactRow, TaskRow } from '@/lib/queries'
 import {
-  Flame, TrendingUp, Users, ShoppingBag,
-  UserPlus, GraduationCap, Target, ArrowRight, Clock,
+  Flame, TrendingUp, ShoppingBag,
+  UserPlus, Target, ArrowRight, Clock,
   Zap, Bot, Calendar, ChevronRight, Sparkles, BarChart3,
   CheckCircle2, Presentation
 } from 'lucide-react'
@@ -76,6 +76,18 @@ const PIPELINE_COLORS: Record<string, string> = {
   lost: '#475569',
 }
 
+function startOfDay(value: Date) {
+  const next = new Date(value)
+  next.setHours(0, 0, 0, 0)
+  return next
+}
+
+function endOfDay(value: Date) {
+  const next = new Date(value)
+  next.setHours(23, 59, 59, 999)
+  return next
+}
+
 export default function DashboardPage() {
   const { t, locale } = useLanguage()
   const { currentUser } = useAppStore()
@@ -97,12 +109,23 @@ export default function DashboardPage() {
     queryFn: fetchTasks,
   })
 
-  const urgentTasks = tasks.filter(task =>
-    (task.priority === 'urgent' || task.priority === 'high') &&
-    (task.status === 'pending' || task.status === 'overdue')
-  )
+  const todayStart = startOfDay(new Date())
+  const todayEnd = endOfDay(new Date())
+  const actionableTasks = tasks.filter(task => task.status === 'pending' || task.status === 'overdue')
+  const focusTasks = actionableTasks
+    .filter(task => new Date(task.due_date) <= todayEnd)
+    .sort((left, right) => {
+      if (left.status === 'overdue' && right.status !== 'overdue') return -1
+      if (left.status !== 'overdue' && right.status === 'overdue') return 1
+      return new Date(left.due_date).getTime() - new Date(right.due_date).getTime()
+    })
+  const urgentFocusTasks = focusTasks.filter(task => task.priority === 'urgent' || task.priority === 'high')
   const hotLeads = contacts.filter(c => c.temperature === 'hot' && c.status === 'active')
   const pendingTasks = tasks.filter(t => t.status === 'pending')
+  const recentEvents = tasks.filter(task => {
+    const dueDate = new Date(task.due_date)
+    return task.type === 'meeting' && dueDate >= todayStart && dueDate <= todayEnd
+  }).length
 
   const completeTaskMutation = useMutation({
     mutationFn: completeTask,
@@ -167,13 +190,13 @@ export default function DashboardPage() {
                 {t.dashboard.greeting}{fullName ? `, ${fullName}` : ''}
               </h1>
               <p className="text-sm text-text-secondary max-w-lg">
-                {pendingTasks.length > 0
-                  ? <><span className="text-primary font-semibold">{pendingTasks.length}</span> {t.dashboard.tasksDue} &nbsp;</>
+                {focusTasks.length > 0
+                  ? <><span className="text-primary font-semibold">{focusTasks.length}</span> {t.dashboard.tasksDue} &nbsp;</>
                   : null}
                 {hotLeads.length > 0
                   ? <><span className="text-error font-semibold">{hotLeads.length}</span> {t.dashboard.hotLeadsWaiting}</>
                   : null}
-                {pendingTasks.length === 0 && hotLeads.length === 0 && t.dashboard.momentumStrong}
+                {focusTasks.length === 0 && hotLeads.length === 0 && t.dashboard.momentumStrong}
               </p>
             </div>
           </div>
@@ -183,25 +206,25 @@ export default function DashboardPage() {
       {/* KPI Strip */}
       <motion.div variants={item} className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
         {[
-          { label: t.dashboard.kpi.newLeads, value: contacts.length, icon: Users, color: 'text-primary' },
-          { label: t.dashboard.kpi.followUps, value: pendingTasks.length, icon: Clock, color: 'text-warning' },
+          { label: locale === 'tr' ? 'Bugünkü Aksiyonlar' : "Today's Actions", value: focusTasks.length, icon: Zap, color: 'text-primary' },
+          { label: t.dashboard.hotLeads, value: hotLeads.length, icon: Flame, color: 'text-error' },
           { label: t.dashboard.kpi.presentations, value: contacts.filter(c => ['presentation_sent', 'presentation_done'].includes(c.pipeline_stage)).length, icon: Presentation, color: 'text-secondary' },
+          { label: t.nav.events, value: recentEvents, icon: Calendar, color: 'text-accent' },
           { label: t.dashboard.kpi.conversions, value: contacts.filter(c => c.pipeline_stage === 'became_customer').length, icon: Target, color: 'text-success' },
           { label: t.dashboard.kpi.customers, value: contacts.filter(c => c.pipeline_stage === 'became_customer' || c.pipeline_stage === 'became_member').length, icon: ShoppingBag, color: 'text-emerald-400' },
           { label: t.dashboard.kpi.team, value: contacts.filter(c => c.pipeline_stage === 'became_member').length, icon: UserPlus, color: 'text-violet-400' },
-          { label: t.dashboard.kpi.training, value: 0, icon: GraduationCap, color: 'text-accent' },
-          { label: t.nav.events, value: 0, icon: Calendar, color: 'text-accent' },
+          { label: locale === 'tr' ? 'Bekleyen Takipler' : 'Open Follow-ups', value: pendingTasks.length, icon: Clock, color: 'text-warning' },
         ].map((kpi, i) => {
           const Icon = kpi.icon
           const routeMap = [
-            '/contacts?segment=prospects',
             '/tasks',
+            '/contacts?temperature=hot',
             '/pipeline',
+            '/events',
             '/customers',
             '/customers',
             '/team',
-            '/academy',
-            '/events',
+            '/tasks',
           ]
           return (
             <motion.div key={i} whileHover={{ y: -2 }}
@@ -232,15 +255,20 @@ export default function DashboardPage() {
                   <Zap className="w-4 h-4 text-primary" />
                   {t.dashboard.todaysFocus}
                 </CardTitle>
-                <Badge variant="primary">{urgentTasks.length} {t.common.urgent}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="primary">{focusTasks.length} {locale === 'tr' ? 'aksiyon' : 'items'}</Badge>
+                  {urgentFocusTasks.length > 0 && (
+                    <Badge variant="error">{urgentFocusTasks.length} {t.common.urgent}</Badge>
+                  )}
+                </div>
               </CardHeader>
-              {urgentTasks.length === 0 ? (
+              {focusTasks.length === 0 ? (
                 <div className="py-8 text-center text-sm text-text-tertiary">
-                  {locale === 'tr' ? 'Bugün acil görev yok.' : 'No urgent tasks for today.'}
+                  {locale === 'tr' ? 'Bugün için planlı ya da gecikmiş görev yok.' : 'There are no planned or overdue tasks for today.'}
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {urgentTasks.slice(0, 5).map((task, i) => (
+                  {focusTasks.slice(0, 5).map((task, i) => (
                     <motion.div key={task.id}
                       initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
                       className="flex items-center gap-3 p-3 rounded-xl bg-surface/50 border border-border-subtle hover:border-border cursor-pointer group transition-all"

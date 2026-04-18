@@ -562,7 +562,7 @@ export default function LandingPage({
               </div>
               <div style={{ padding: 20 }}>
                 {/* Mini dashboard mockup */}
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "var(--text2)" }}>Kontrol Paneli</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "var(--text2)" }}>Pano</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                   {[
                     { label: "Yeni Potansiyel", val: "24", color: "var(--accent)" },
