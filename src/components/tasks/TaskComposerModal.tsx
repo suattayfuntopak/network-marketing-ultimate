@@ -18,11 +18,11 @@ type AddForm = {
   contact_id: string
 }
 
-const buildEmptyForm = (): AddForm => ({
+const buildEmptyForm = (initialDueDate?: string): AddForm => ({
   title: '',
   type: 'follow_up',
   priority: 'medium',
-  due_date: new Date().toISOString().split('T')[0],
+  due_date: initialDueDate ?? new Date().toISOString().split('T')[0],
   description: '',
   contact_id: '',
 })
@@ -33,12 +33,14 @@ export function TaskComposerModal({
   currentUserId,
   contacts,
   editingTask,
+  initialDueDate,
 }: {
   open: boolean
   onClose: () => void
   currentUserId: string
   contacts: ContactRow[]
   editingTask?: TaskRow | null
+  initialDueDate?: string
 }) {
   const { t } = useLanguage()
   const qc = useQueryClient()
@@ -60,11 +62,11 @@ export function TaskComposerModal({
         contact_id: editingTask.contact_id ?? '',
       })
     } else {
-      setForm(buildEmptyForm())
+      setForm(buildEmptyForm(initialDueDate))
     }
 
     setFormError('')
-  }, [editingTask, open])
+  }, [editingTask, initialDueDate, open])
 
   const addMutation = useMutation({
     mutationFn: (values: AddForm) => addTask(currentUserId, {

@@ -11,24 +11,52 @@ import {
   Bell,
   Calendar,
   CalendarClock,
+  CalendarDays,
+  CalendarRange,
   ChevronLeft,
   ChevronRight,
   Layers3,
-  Sparkles,
 } from 'lucide-react'
+
+type CalendarViewMode = 'month' | 'week' | 'day'
 
 type CalendarEntry = {
   id: string
   kind: 'task' | 'event'
   title: string
-  date: Date
+  day: Date
+  sortDate: Date
   tone: 'primary' | 'success' | 'warning' | 'secondary' | 'default'
   meta: string
+  task?: TaskRow
 }
 
 function startOfDay(value: Date) {
   const date = new Date(value)
   date.setHours(0, 0, 0, 0)
+  return date
+}
+
+function startOfMonth(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), 1)
+}
+
+function startOfWeek(value: Date) {
+  const date = startOfDay(value)
+  const dayIndex = (date.getDay() + 6) % 7
+  date.setDate(date.getDate() - dayIndex)
+  return date
+}
+
+function endOfWeek(value: Date) {
+  const date = startOfWeek(value)
+  date.setDate(date.getDate() + 6)
+  return date
+}
+
+function addDays(value: Date, amount: number) {
+  const date = new Date(value)
+  date.setDate(date.getDate() + amount)
   return date
 }
 
@@ -41,17 +69,33 @@ function sameDay(left: Date, right: Date) {
   return dayKey(left) === dayKey(right)
 }
 
-function buildMonthGrid(currentMonth: Date) {
-  const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
-  const weekOffset = (monthStart.getDay() + 6) % 7
-  const gridStart = new Date(monthStart)
-  gridStart.setDate(monthStart.getDate() - weekOffset)
+function isSameMonth(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth()
+}
 
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(gridStart)
-    date.setDate(gridStart.getDate() + index)
-    return date
-  })
+function isWithinRange(value: Date, from: Date, to: Date) {
+  const target = startOfDay(value).getTime()
+  return target >= startOfDay(from).getTime() && target <= startOfDay(to).getTime()
+}
+
+function buildMonthGrid(currentDate: Date) {
+  const monthStart = startOfMonth(currentDate)
+  const gridStart = startOfWeek(monthStart)
+
+  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index))
+}
+
+function buildWeekDays(currentDate: Date) {
+  const firstDay = startOfWeek(currentDate)
+  return Array.from({ length: 7 }, (_, index) => addDays(firstDay, index))
+}
+
+function toInputDate(value: Date) {
+  const date = startOfDay(value)
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function itemTone(task: TaskRow): CalendarEntry['tone'] {
@@ -61,23 +105,84 @@ function itemTone(task: TaskRow): CalendarEntry['tone'] {
   return 'default'
 }
 
+function shiftDate(value: Date, viewMode: CalendarViewMode, direction: 'prev' | 'next') {
+  const multiplier = direction === 'prev' ? -1 : 1
+
+  if (viewMode === 'day') {
+    return addDays(value, multiplier)
+  }
+
+  if (viewMode === 'week') {
+    return addDays(value, 7 * multiplier)
+  }
+
+  return new Date(value.getFullYear(), value.getMonth() + multiplier, value.getDate())
+}
+
+function formatPeriodTitle(locale: 'tr' | 'en', viewMode: CalendarViewMode, focusDate: Date) {
+  if (viewMode === 'day') {
+    return focusDate.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      weekday: 'long',
+    })
+  }
+
+  if (viewMode === 'week') {
+    const weekStart = startOfWeek(focusDate)
+    const weekEnd = endOfWeek(focusDate)
+    const startLabel = weekStart.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+      day: 'numeric',
+      month: 'short',
+    })
+    const endLabel = weekEnd.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+    return `${startLabel} - ${endLabel}`
+  }
+
+  return focusDate.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+function entryToneClasses(entry: CalendarEntry) {
+  return cn(
+    'border',
+    entry.tone === 'success' && 'bg-success/10 text-success border-success/20',
+    entry.tone === 'secondary' && 'bg-secondary/10 text-secondary border-secondary/20',
+    entry.tone === 'warning' && 'bg-warning/10 text-warning border-warning/20',
+    entry.tone === 'primary' && 'bg-primary/10 text-primary border-primary/20',
+    entry.tone === 'default' && 'bg-surface/70 text-text-secondary border-border-subtle',
+  )
+}
+
 export function ActionCalendarPanel({
   locale,
   tasks,
   events,
   contactMap,
   onOpenEvents,
+  onOpenTasks,
   onCreateTask,
+  onOpenTask,
 }: {
   locale: 'tr' | 'en'
   tasks: TaskRow[]
   events: Event[]
   contactMap: Record<string, string>
   onOpenEvents: () => void
-  onCreateTask: () => void
+  onOpenTasks: () => void
+  onCreateTask: (date?: string) => void
+  onOpenTask?: (task: TaskRow) => void
 }) {
-  const [currentMonth, setCurrentMonth] = useState(() => startOfDay(new Date()))
-  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()))
+  const today = startOfDay(new Date())
+  const [viewMode, setViewMode] = useState<CalendarViewMode>('month')
+  const [focusDate, setFocusDate] = useState(today)
 
   const labels = locale === 'tr'
     ? {
@@ -87,17 +192,16 @@ export function ActionCalendarPanel({
         allActions: 'Tüm Aksiyonlar',
         todayEvents: "Bugünün Etkinlikleri",
         dueFollowUps: 'Bugünkü Takipler',
-        selectedFlow: 'Seçili Gün Akışı',
-        monthAgenda: 'Bu Ayın Akışı',
-        noAgenda: 'Bu gün için planlanmış aksiyon yok.',
-        noMonthAgenda: 'Bu ay için planlanmış aksiyon görünmüyor.',
+        noAgenda: 'Bu alan için planlanmış aksiyon görünmüyor. Herhangi bir güne tıklayarak görev ekleyebilirsin.',
         openEvents: 'Etkinlikleri Aç',
-        newTask: 'Yeni Görev',
-        selectedDay: 'Seçili Gün',
+        openTasks: 'Görevleri Aç',
+        addTask: '+ Görev Ekle',
         more: 'daha',
         event: 'Etkinlik',
-        task: 'Takip',
-        monthView: 'Ay görünümü',
+        task: 'Görev',
+        month: 'Aylık',
+        week: 'Haftalık',
+        day: 'Günlük',
         focus: 'görev ve etkinlik',
       }
     : {
@@ -106,18 +210,17 @@ export function ActionCalendarPanel({
         today: 'Today',
         allActions: 'All Actions',
         todayEvents: "Today's Events",
-        dueFollowUps: "Today's Follow-ups",
-        selectedFlow: 'Selected Day Flow',
-        monthAgenda: 'This Month',
-        noAgenda: 'No actions planned for this day.',
-        noMonthAgenda: 'No actions planned for this month.',
+        dueFollowUps: "Today's Tasks",
+        noAgenda: 'No actions are visible here yet. Click any day to add a task.',
         openEvents: 'Open Events',
-        newTask: 'New Task',
-        selectedDay: 'Selected Day',
+        openTasks: 'Open Tasks',
+        addTask: '+ Add Task',
         more: 'more',
         event: 'Event',
         task: 'Task',
-        monthView: 'Month view',
+        month: 'Monthly',
+        week: 'Weekly',
+        day: 'Daily',
         focus: 'tasks and events',
       }
 
@@ -128,79 +231,151 @@ export function ActionCalendarPanel({
   const entries = useMemo<CalendarEntry[]>(() => {
     const taskEntries = tasks
       .filter((task) => task.status !== 'completed' && task.status !== 'skipped')
-      .map((task) => ({
-        id: `task-${task.id}`,
-        kind: 'task' as const,
-        title: task.title,
-        date: startOfDay(new Date(task.due_date)),
-        tone: itemTone(task),
-        meta: task.contact_id
-          ? contactMap[task.contact_id] ?? (locale === 'tr' ? 'Kontak görevi' : 'Contact task')
-          : (locale === 'tr' ? 'Genel görev' : 'General task'),
-      }))
+      .map((task) => {
+        const dueDate = new Date(task.due_date)
+        return {
+          id: `task-${task.id}`,
+          kind: 'task' as const,
+          title: task.title,
+          day: startOfDay(dueDate),
+          sortDate: startOfDay(dueDate),
+          tone: itemTone(task),
+          meta: task.contact_id
+            ? contactMap[task.contact_id] ?? (locale === 'tr' ? 'Kontak görevi' : 'Contact task')
+            : (locale === 'tr' ? 'Genel görev' : 'General task'),
+          task,
+        }
+      })
 
     const eventEntries = events
       .filter((event) => event.status !== 'cancelled')
-      .map((event) => ({
-        id: `event-${event.id}`,
-        kind: 'event' as const,
-        title: event.title,
-        date: startOfDay(new Date(event.startDate)),
-        tone: (event.status === 'live' ? 'success' : 'primary') as CalendarEntry['tone'],
-        meta: event.location || (event.meetingUrl ? (locale === 'tr' ? 'Sanal toplantı' : 'Virtual meeting') : (locale === 'tr' ? 'Etkinlik' : 'Event')),
-      }))
+      .map((event) => {
+        const startDate = new Date(event.startDate)
+        return {
+          id: `event-${event.id}`,
+          kind: 'event' as const,
+          title: event.title,
+          day: startOfDay(startDate),
+          sortDate: startDate,
+          tone: (event.status === 'live' ? 'success' : 'primary') as CalendarEntry['tone'],
+          meta: event.location || (event.meetingUrl ? (locale === 'tr' ? 'Sanal toplantı' : 'Virtual meeting') : (locale === 'tr' ? 'Etkinlik' : 'Event')),
+        }
+      })
 
-    return [...taskEntries, ...eventEntries].sort((left, right) => left.date.getTime() - right.date.getTime())
+    return [...taskEntries, ...eventEntries].sort((left, right) => left.sortDate.getTime() - right.sortDate.getTime())
   }, [contactMap, events, locale, tasks])
 
-  const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`
-  const monthEntries = entries.filter((entry) => `${entry.date.getFullYear()}-${entry.date.getMonth()}` === monthKey)
-  const selectedEntries = entries.filter((entry) => sameDay(entry.date, selectedDate))
-  const today = startOfDay(new Date())
-  const todayEntries = entries.filter((entry) => sameDay(entry.date, today))
+  const visibleEntries = useMemo(() => {
+    if (viewMode === 'day') {
+      return entries.filter((entry) => sameDay(entry.day, focusDate))
+    }
+
+    if (viewMode === 'week') {
+      const from = startOfWeek(focusDate)
+      const to = endOfWeek(focusDate)
+      return entries.filter((entry) => isWithinRange(entry.day, from, to))
+    }
+
+    return entries.filter((entry) => isSameMonth(entry.day, focusDate))
+  }, [entries, focusDate, viewMode])
+
+  const monthDays = useMemo(() => buildMonthGrid(focusDate), [focusDate])
+  const weekDays = useMemo(() => buildWeekDays(focusDate), [focusDate])
+  const periodTitle = formatPeriodTitle(locale, viewMode, focusDate)
+  const todayEntries = entries.filter((entry) => sameDay(entry.day, today))
   const todayEvents = todayEntries.filter((entry) => entry.kind === 'event').length
   const todayTasks = todayEntries.filter((entry) => entry.kind === 'task').length
-  const calendarDays = buildMonthGrid(currentMonth)
-  const monthTitle = currentMonth.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { month: 'long', year: 'numeric' })
-  const selectedDayTitle = selectedDate.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-    day: 'numeric',
-    month: 'long',
-    weekday: 'long',
-  })
-  const upcomingEntries = monthEntries.slice().sort((left, right) => left.date.getTime() - right.date.getTime()).slice(0, 8)
+
+  function handleOpenCreate(day: Date) {
+    setFocusDate(startOfDay(day))
+    onCreateTask(toInputDate(day))
+  }
+
+  function handleEntryDoubleClick(entry: CalendarEntry) {
+    if (entry.kind === 'task' && entry.task) {
+      onOpenTask?.(entry.task)
+    }
+  }
+
+  const viewButtons: { key: CalendarViewMode; label: string; icon: React.ElementType }[] = [
+    { key: 'day', label: labels.day, icon: Calendar },
+    { key: 'week', label: labels.week, icon: CalendarRange },
+    { key: 'month', label: labels.month, icon: CalendarDays },
+  ]
 
   return (
     <Card className="overflow-hidden">
       <div className="rounded-3xl border border-primary/10 bg-[radial-gradient(circle_at_top_left,rgba(0,212,255,0.10),transparent_30%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_26%)] p-5">
-        <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+        <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">{labels.title}</p>
-            <h2 className="mt-2 text-2xl font-bold text-text-primary capitalize">{monthTitle}</h2>
+            <h2 className="mt-2 text-2xl font-bold text-text-primary capitalize">{periodTitle}</h2>
             <p className="mt-1 text-sm text-text-secondary">{labels.subtitle}</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-surface/35 px-3 py-2">
-              <div className="w-8 h-8 rounded-xl bg-primary/12 flex items-center justify-center text-primary">
-                <Calendar className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-text-primary">{labels.monthView}</p>
-                <p className="text-[11px] text-text-tertiary">{monthEntries.length} {labels.focus}</p>
-              </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="inline-flex items-center rounded-2xl border border-border bg-surface/35 p-1">
+              <button
+                type="button"
+                onClick={() => setFocusDate((current) => shiftDate(current, viewMode, 'prev'))}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="min-w-[144px] px-3 text-center text-sm font-semibold text-text-primary capitalize">
+                {periodTitle}
+              </span>
+              <button
+                type="button"
+                onClick={() => setFocusDate((current) => shiftDate(current, viewMode, 'next'))}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setFocusDate(today)}
+            >
+              {labels.today}
+            </Button>
+
+            <div className="inline-flex items-center rounded-2xl border border-border bg-surface/35 p-1">
+              {viewButtons.map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setViewMode(key)}
+                  className={cn(
+                    'px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5',
+                    viewMode === key
+                      ? 'bg-primary text-obsidian'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface',
+                  )}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <Button size="sm" variant="outline" onClick={onOpenEvents}>
               {labels.openEvents}
             </Button>
-            <Button size="sm" onClick={onCreateTask}>
-              {labels.newTask}
+            <Button size="sm" variant="outline" onClick={onOpenTasks}>
+              {labels.openTasks}
+            </Button>
+            <Button size="sm" onClick={() => onCreateTask(toInputDate(focusDate))}>
+              {labels.addTask}
             </Button>
           </div>
         </div>
 
         <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
           {[
-            { label: labels.allActions, value: monthEntries.length, Icon: Layers3 },
+            { label: labels.allActions, value: visibleEntries.length, Icon: Layers3 },
             { label: labels.todayEvents, value: todayEvents, Icon: CalendarClock },
             { label: labels.dueFollowUps, value: todayTasks, Icon: Bell },
           ].map(({ label, value, Icon }) => (
@@ -217,39 +392,8 @@ export function ActionCalendarPanel({
         </div>
       </div>
 
-      <div className="p-5 space-y-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
-              className="w-9 h-9 rounded-xl border border-border bg-surface/50 flex items-center justify-center text-text-secondary hover:text-text-primary hover:border-border-strong transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
-              className="w-9 h-9 rounded-xl border border-border bg-surface/50 flex items-center justify-center text-text-secondary hover:text-text-primary hover:border-border-strong transition-colors"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                const now = startOfDay(new Date())
-                setCurrentMonth(now)
-                setSelectedDate(now)
-              }}
-            >
-              {labels.today}
-            </Button>
-          </div>
-          <p className="text-sm text-text-secondary">{labels.selectedDay} · {selectedDayTitle}</p>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.8fr)_minmax(320px,0.95fr)] gap-5">
+      <div className="p-5">
+        {viewMode === 'month' && (
           <div className="rounded-3xl border border-border overflow-hidden bg-surface/15">
             <div className="grid grid-cols-7 border-b border-border bg-surface/30">
               {weekdayLabels.map((label) => (
@@ -260,21 +404,28 @@ export function ActionCalendarPanel({
             </div>
 
             <div className="grid grid-cols-7">
-              {calendarDays.map((day) => {
-                const dayEntries = entries.filter((entry) => sameDay(entry.date, day))
-                const isCurrentMonth = day.getMonth() === currentMonth.getMonth()
+              {monthDays.map((day) => {
+                const dayEntries = entries.filter((entry) => sameDay(entry.day, day))
+                const isCurrentMonth = isSameMonth(day, focusDate)
                 const isToday = sameDay(day, today)
-                const isSelected = sameDay(day, selectedDate)
+                const isFocused = sameDay(day, focusDate)
 
                 return (
-                  <button
+                  <div
                     key={day.toISOString()}
-                    type="button"
-                    onClick={() => setSelectedDate(day)}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleOpenCreate(day)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        handleOpenCreate(day)
+                      }
+                    }}
                     className={cn(
-                      'min-h-[138px] border-r border-b border-border p-3 text-left align-top transition-colors last:border-r-0',
-                      isSelected && 'bg-primary/8 shadow-[inset_0_0_0_1px_rgba(0,212,255,0.18)]',
-                      !isSelected && 'hover:bg-surface/30',
+                      'min-h-[168px] border-r border-b border-border p-3 text-left align-top transition-colors last:border-r-0 cursor-pointer',
+                      isFocused && 'bg-primary/8 shadow-[inset_0_0_0_1px_rgba(0,212,255,0.18)]',
+                      !isFocused && 'hover:bg-surface/30',
                       !isCurrentMonth && 'opacity-35',
                     )}
                   >
@@ -296,20 +447,25 @@ export function ActionCalendarPanel({
 
                     <div className="mt-3 space-y-1.5">
                       {dayEntries.slice(0, 3).map((entry) => (
-                        <div
+                        <button
                           key={entry.id}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setFocusDate(day)
+                          }}
+                          onDoubleClick={(event) => {
+                            event.stopPropagation()
+                            handleEntryDoubleClick(entry)
+                          }}
                           className={cn(
-                            'rounded-lg px-2 py-1.5 text-[10px] font-medium border',
-                            entry.tone === 'success' && 'bg-success/10 text-success border-success/20',
-                            entry.tone === 'secondary' && 'bg-secondary/10 text-secondary border-secondary/20',
-                            entry.tone === 'warning' && 'bg-warning/10 text-warning border-warning/20',
-                            entry.tone === 'primary' && 'bg-primary/10 text-primary border-primary/20',
-                            entry.tone === 'default' && 'bg-surface/70 text-text-secondary border-border-subtle',
+                            'w-full rounded-lg px-2 py-1.5 text-[10px] font-medium text-left transition-colors hover:border-border',
+                            entryToneClasses(entry),
                           )}
                         >
                           <div className="truncate">{entry.title}</div>
                           <div className="mt-0.5 text-[9px] opacity-70 truncate">{entry.meta}</div>
-                        </div>
+                        </button>
                       ))}
                       {dayEntries.length > 3 && (
                         <p className="text-[10px] text-text-tertiary px-1">
@@ -317,108 +473,163 @@ export function ActionCalendarPanel({
                         </p>
                       )}
                     </div>
-                  </button>
+                  </div>
                 )
               })}
             </div>
           </div>
+        )}
 
-          <div className="space-y-4">
-            <div className="rounded-3xl border border-border bg-surface/25 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-secondary/12 flex items-center justify-center text-secondary">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-text-primary">{labels.selectedFlow}</p>
-                  <p className="text-xs text-text-tertiary">{selectedEntries.length} {labels.allActions.toLowerCase()}</p>
-                </div>
-              </div>
+        {viewMode === 'week' && (
+          <div className="grid grid-cols-1 xl:grid-cols-7 gap-4">
+            {weekDays.map((day) => {
+              const dayEntries = entries.filter((entry) => sameDay(entry.day, day))
+              const isToday = sameDay(day, today)
+              const isFocused = sameDay(day, focusDate)
 
-              {selectedEntries.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border p-5 text-center">
-                  <p className="text-sm text-text-secondary">{labels.noAgenda}</p>
-                  <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    <Button size="sm" variant="outline" onClick={onOpenEvents}>
-                      {labels.openEvents}
-                    </Button>
-                    <Button size="sm" onClick={onCreateTask}>
-                      {labels.newTask}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {selectedEntries.slice().sort((left, right) => left.date.getTime() - right.date.getTime()).map((entry) => (
-                    <div key={entry.id} className="rounded-2xl border border-border-subtle bg-card/60 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-text-primary truncate">{entry.title}</p>
-                          <p className="text-xs text-text-tertiary mt-1">{entry.meta}</p>
-                        </div>
-                        <Badge
-                          variant={entry.kind === 'event' ? 'primary' : entry.tone === 'warning' ? 'warning' : 'default'}
-                          size="sm"
-                        >
-                          {entry.kind === 'event' ? labels.event : labels.task}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-3xl border border-border bg-surface/20 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-primary/12 flex items-center justify-center text-primary">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-text-primary">{labels.monthAgenda}</p>
-                  <p className="text-xs text-text-tertiary capitalize">{monthTitle}</p>
-                </div>
-              </div>
-
-              {upcomingEntries.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border p-5 text-center">
-                  <p className="text-sm text-text-secondary">{labels.noMonthAgenda}</p>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
-                  {upcomingEntries.map((entry) => (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      onClick={() => setSelectedDate(entry.date)}
-                      className="w-full rounded-2xl border border-border-subtle bg-card/60 p-3 text-left transition-colors hover:border-border"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-text-primary truncate">{entry.title}</p>
-                          <p className="text-xs text-text-tertiary mt-1">{entry.meta}</p>
-                        </div>
-                        <Badge
-                          variant={entry.kind === 'event' ? 'primary' : entry.tone === 'warning' ? 'warning' : 'default'}
-                          size="sm"
-                        >
-                          {entry.kind === 'event' ? labels.event : labels.task}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-text-secondary mt-3">
-                        {entry.date.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-                          day: 'numeric',
-                          month: 'short',
-                          weekday: 'short',
-                        })}
+              return (
+                <div
+                  key={day.toISOString()}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleOpenCreate(day)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      handleOpenCreate(day)
+                    }
+                  }}
+                  className={cn(
+                    'rounded-3xl border border-border bg-surface/20 p-4 min-h-[420px] cursor-pointer transition-colors',
+                    isFocused ? 'shadow-[inset_0_0_0_1px_rgba(0,212,255,0.18)] bg-primary/5' : 'hover:bg-surface/30',
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-text-tertiary">
+                        {day.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { weekday: 'short' })}
                       </p>
-                    </button>
-                  ))}
+                      <p className={cn('text-lg font-bold mt-1', isToday ? 'text-primary' : 'text-text-primary')}>
+                        {day.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { day: 'numeric', month: 'short' })}
+                      </p>
+                    </div>
+                    <Badge size="sm" variant="default">{dayEntries.length}</Badge>
+                  </div>
+
+                  {dayEntries.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-text-tertiary">
+                      {labels.noAgenda}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {dayEntries.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setFocusDate(day)
+                          }}
+                          onDoubleClick={(event) => {
+                            event.stopPropagation()
+                            handleEntryDoubleClick(entry)
+                          }}
+                          className={cn(
+                            'w-full rounded-2xl px-3 py-3 text-left transition-colors hover:border-border',
+                            entryToneClasses(entry),
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate">{entry.title}</p>
+                              <p className="text-xs mt-1 opacity-75 truncate">{entry.meta}</p>
+                            </div>
+                            <Badge
+                              variant={entry.kind === 'event' ? 'primary' : entry.tone === 'warning' ? 'warning' : 'default'}
+                              size="sm"
+                            >
+                              {entry.kind === 'event' ? labels.event : labels.task}
+                            </Badge>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              )
+            })}
           </div>
-        </div>
+        )}
+
+        {viewMode === 'day' && (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => handleOpenCreate(focusDate)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                handleOpenCreate(focusDate)
+              }
+            }}
+            className="rounded-3xl border border-border bg-surface/20 p-5 min-h-[420px] cursor-pointer transition-colors hover:bg-surface/30"
+          >
+            <div className="flex items-center justify-between gap-4 mb-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-tertiary">
+                  {focusDate.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { weekday: 'long' })}
+                </p>
+                <h3 className="mt-2 text-2xl font-bold text-text-primary capitalize">
+                  {focusDate.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </h3>
+              </div>
+              <Badge size="md" variant="default">
+                {visibleEntries.length} {labels.focus}
+              </Badge>
+            </div>
+
+            {visibleEntries.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-text-tertiary">
+                {labels.noAgenda}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {visibleEntries.map((entry) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => {
+                      event.stopPropagation()
+                      handleEntryDoubleClick(entry)
+                    }}
+                    className={cn(
+                      'w-full rounded-2xl px-4 py-4 text-left transition-colors hover:border-border',
+                      entryToneClasses(entry),
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-base font-semibold truncate">{entry.title}</p>
+                        <p className="text-sm mt-1 opacity-75 truncate">{entry.meta}</p>
+                      </div>
+                      <Badge
+                        variant={entry.kind === 'event' ? 'primary' : entry.tone === 'warning' ? 'warning' : 'default'}
+                        size="sm"
+                      >
+                        {entry.kind === 'event' ? labels.event : labels.task}
+                      </Badge>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </Card>
   )

@@ -23,6 +23,8 @@ export default function CalendarPage() {
   const { currentUser } = useAppStore()
   const router = useRouter()
   const [showAdd, setShowAdd] = useState(false)
+  const [taskDraftDate, setTaskDraftDate] = useState<string | undefined>(undefined)
+  const [editingTask, setEditingTask] = useState<TaskRow | null>(null)
   const [eventItems] = usePersistentState<Event[]>('nmu-events', defaultEvents, {
     version: EVENT_STORAGE_VERSION,
   })
@@ -42,6 +44,24 @@ export default function CalendarPage() {
   const activeEvents = eventItems.filter((event) => event.status !== 'cancelled').length
   const actionCount = pendingTasks + activeEvents
 
+  function openCreateTask(date?: string) {
+    setEditingTask(null)
+    setTaskDraftDate(date)
+    setShowAdd(true)
+  }
+
+  function openExistingTask(task: TaskRow) {
+    setEditingTask(task)
+    setTaskDraftDate(undefined)
+    setShowAdd(true)
+  }
+
+  function closeTaskModal() {
+    setShowAdd(false)
+    setTaskDraftDate(undefined)
+    setEditingTask(null)
+  }
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
       <motion.div variants={item}>
@@ -60,15 +80,19 @@ export default function CalendarPage() {
           events={eventItems}
           contactMap={contactMap}
           onOpenEvents={() => router.push('/events')}
-          onCreateTask={() => setShowAdd(true)}
+          onOpenTasks={() => router.push('/tasks')}
+          onCreateTask={openCreateTask}
+          onOpenTask={openExistingTask}
         />
       </motion.div>
 
       <TaskComposerModal
         open={showAdd}
-        onClose={() => setShowAdd(false)}
+        onClose={closeTaskModal}
         currentUserId={currentUser?.id ?? ''}
         contacts={contacts}
+        editingTask={editingTask}
+        initialDueDate={taskDraftDate}
       />
     </motion.div>
   )

@@ -311,7 +311,7 @@ function ContactCreateModal({
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-text-primary">
-                  {currentLocale === 'tr' ? 'Yeni Kontak Ekle' : 'Add New Contact'}
+                  {currentLocale === 'tr' ? 'Kontak Ekle' : 'Add Contact'}
                 </h2>
                 <p className="text-sm text-text-tertiary mt-0.5">
                   {currentLocale === 'tr'
@@ -1509,7 +1509,7 @@ export default function ContactsPage() {
               {currentLocale === 'tr' ? 'Dışa Aktar' : 'Export'}
             </Button>
             <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={openAddModal}>
-              {currentLocale === 'tr' ? 'Yeni Kontak' : 'New Contact'}
+              {currentLocale === 'tr' ? 'Kontak Ekle' : 'Add Contact'}
             </Button>
           </div>
         </motion.div>
