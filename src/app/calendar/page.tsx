@@ -72,7 +72,9 @@ export default function CalendarPage() {
         <div>
           <h1 className="text-2xl font-bold text-text-primary">{t.calendar.title}</h1>
           <p className="text-sm text-text-secondary mt-0.5">
-            {actionCount} {t.calendar.subtitle}
+            {locale === 'tr'
+              ? `Ortak akışta bekleyen ${actionCount} aksiyon var.`
+              : `There are ${actionCount} actions waiting in the shared flow.`}
           </p>
         </div>
       </motion.div>
