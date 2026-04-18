@@ -13,7 +13,7 @@ import { useMemo } from 'react'
 import {
   LayoutDashboard, Users, ShoppingBag, GitBranch, ListTodo,
   CalendarDays, GraduationCap, Calendar, BarChart3,
-  Bot, Shield, ChevronLeft, ChevronRight, Zap,
+  Bot, ChevronLeft, ChevronRight,
   Target, Sparkles, X
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -51,9 +51,6 @@ export function Sidebar() {
     { label: t.nav.team, href: '/team', icon: Target },
     { label: t.nav.analytics, href: '/analytics', icon: BarChart3 },
     { label: t.nav.aiCoach, href: '/ai', icon: Bot, highlight: true },
-    { divider: true },
-    { label: t.nav.automations, href: '/automations', icon: Zap },
-    { label: t.nav.admin, href: '/admin', icon: Shield },
   ]
 
   const sidebarContent = (
