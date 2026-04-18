@@ -200,16 +200,6 @@ export default function EventsPage() {
     setCreateOpen(true)
   }
 
-  useEffect(() => {
-    if (searchParams.get('new') !== '1') {
-      return
-    }
-
-    const date = searchParams.get('date') ?? undefined
-    openCreateModal(eventPrefillFromDate(date))
-    router.replace('/events')
-  }, [router, searchParams])
-
   function openDetails(event: Event) {
     setActiveEvent(event)
     setInviteOpen(false)
@@ -227,6 +217,34 @@ export default function EventsPage() {
       status: event.status,
     })
   }
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') {
+      return
+    }
+
+    const date = searchParams.get('date') ?? undefined
+    openCreateModal(eventPrefillFromDate(date))
+    router.replace('/events')
+  }, [router, searchParams])
+
+  useEffect(() => {
+    const eventId = searchParams.get('event')
+
+    if (!eventId) {
+      return
+    }
+
+    const matchingEvent = eventItems.find((event) => event.id === eventId)
+
+    if (!matchingEvent) {
+      router.replace('/events')
+      return
+    }
+
+    openDetails(matchingEvent)
+    router.replace('/events')
+  }, [eventItems, router, searchParams])
 
   function createEvent() {
     const nextEvent: Event = {

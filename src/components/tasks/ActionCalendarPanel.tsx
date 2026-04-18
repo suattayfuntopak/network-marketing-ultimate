@@ -29,6 +29,7 @@ type CalendarEntry = {
   tone: 'primary' | 'success' | 'warning' | 'secondary' | 'default'
   meta: string
   task?: TaskRow
+  event?: Event
 }
 
 function startOfDay(value: Date) {
@@ -171,6 +172,7 @@ export function ActionCalendarPanel({
   onCreateEvent,
   onCreateTask,
   onOpenTask,
+  onOpenEvent,
 }: {
   locale: 'tr' | 'en'
   tasks: TaskRow[]
@@ -181,6 +183,7 @@ export function ActionCalendarPanel({
   onCreateEvent: (date?: string) => void
   onCreateTask: (date?: string) => void
   onOpenTask?: (task: TaskRow) => void
+  onOpenEvent?: (event: Event) => void
 }) {
   const today = startOfDay(new Date())
   const [viewMode, setViewMode] = useState<CalendarViewMode>('month')
@@ -263,6 +266,7 @@ export function ActionCalendarPanel({
           sortDate: startDate,
           tone: (event.status === 'live' ? 'success' : 'primary') as CalendarEntry['tone'],
           meta: event.location || (event.meetingUrl ? (locale === 'tr' ? 'Sanal toplantı' : 'Virtual meeting') : (locale === 'tr' ? 'Etkinlik' : 'Event')),
+          event,
         }
       })
 
@@ -324,9 +328,14 @@ export function ActionCalendarPanel({
     }
   }
 
-  function handleEntryDoubleClick(entry: CalendarEntry) {
+  function handleEntryOpen(entry: CalendarEntry) {
     if (entry.kind === 'task' && entry.task) {
       onOpenTask?.(entry.task)
+      return
+    }
+
+    if (entry.kind === 'event' && entry.event) {
+      onOpenEvent?.(entry.event)
     }
   }
 
@@ -484,14 +493,10 @@ export function ActionCalendarPanel({
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation()
-                            handleFocusDay(day)
-                          }}
-                          onDoubleClick={(event) => {
-                            event.stopPropagation()
-                            handleEntryDoubleClick(entry)
+                            handleEntryOpen(entry)
                           }}
                           className={cn(
-                            'flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-[10px] font-medium text-left transition-colors hover:border-border',
+                            'flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 text-[10px] font-medium text-left transition-colors hover:border-border',
                             entryToneClasses(entry),
                           )}
                         >
@@ -556,14 +561,10 @@ export function ActionCalendarPanel({
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation()
-                            handleFocusDay(day)
-                          }}
-                          onDoubleClick={(event) => {
-                            event.stopPropagation()
-                            handleEntryDoubleClick(entry)
+                            handleEntryOpen(entry)
                           }}
                           className={cn(
-                            'w-full rounded-2xl px-3 py-3 text-left transition-colors hover:border-border',
+                            'w-full cursor-pointer rounded-2xl px-3 py-3 text-left transition-colors hover:border-border',
                             entryToneClasses(entry),
                           )}
                         >
@@ -625,13 +626,12 @@ export function ActionCalendarPanel({
                   <button
                     key={entry.id}
                     type="button"
-                    onClick={(event) => event.stopPropagation()}
-                    onDoubleClick={(event) => {
+                    onClick={(event) => {
                       event.stopPropagation()
-                      handleEntryDoubleClick(entry)
+                      handleEntryOpen(entry)
                     }}
                     className={cn(
-                      'w-full rounded-2xl px-4 py-4 text-left transition-colors hover:border-border',
+                      'w-full cursor-pointer rounded-2xl px-4 py-4 text-left transition-colors hover:border-border',
                       entryToneClasses(entry),
                     )}
                   >

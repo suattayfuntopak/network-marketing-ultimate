@@ -56,6 +56,10 @@ export default function CalendarPage() {
     setShowAdd(true)
   }
 
+  function openExistingEvent(event: Event) {
+    router.push(`/events?event=${event.id}`)
+  }
+
   function closeTaskModal() {
     setShowAdd(false)
     setTaskDraftDate(undefined)
@@ -84,6 +88,7 @@ export default function CalendarPage() {
           onCreateEvent={(date) => router.push(date ? `/events?new=1&date=${date}` : '/events?new=1')}
           onCreateTask={openCreateTask}
           onOpenTask={openExistingTask}
+          onOpenEvent={openExistingEvent}
         />
       </motion.div>
 
