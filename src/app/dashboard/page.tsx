@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
-import { CircularProgress } from '@/components/ui/Progress'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
 import { useRouter } from 'next/navigation'
@@ -124,7 +123,6 @@ export default function DashboardPage() {
   }))
 
   const fullName = currentUser?.name ?? ''
-  const momentum = currentUser?.momentumScore ?? 0
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -164,46 +162,19 @@ export default function DashboardPage() {
         <Card className="relative overflow-hidden" padding="lg">
           <div className="absolute inset-0 opacity-30" style={{ background: 'radial-gradient(ellipse at 80% 50%, rgba(0,212,255,0.08), transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(139,92,246,0.06), transparent 50%)' }} />
           <div className="relative">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-              <div className="flex-1">
-                <h1 className="text-2xl lg:text-3xl font-bold text-text-primary mb-2">
-                  {t.dashboard.greeting}{fullName ? `, ${fullName}` : ''}
-                </h1>
-                <p className="text-sm text-text-secondary max-w-lg">
-                  {pendingTasks.length > 0
-                    ? <><span className="text-primary font-semibold">{pendingTasks.length}</span> {t.dashboard.tasksDue} &nbsp;</>
-                    : null}
-                  {hotLeads.length > 0
-                    ? <><span className="text-error font-semibold">{hotLeads.length}</span> {t.dashboard.hotLeadsWaiting}</>
-                    : null}
-                  {pendingTasks.length === 0 && hotLeads.length === 0 && t.dashboard.momentumStrong}
-                </p>
-              </div>
-              <div className="flex items-center gap-6">
-                <div className="text-center">
-                  <CircularProgress value={momentum} size={100} strokeWidth={8} variant="primary">
-                    <div className="text-center">
-                      <span className="text-2xl font-bold text-text-primary">{momentum}</span>
-                      <span className="text-[10px] text-text-tertiary block">/ 100</span>
-                    </div>
-                  </CircularProgress>
-                  <p className="text-xs text-text-secondary mt-2 font-medium">{t.dashboard.momentum}</p>
-                </div>
-                <div className="text-center">
-                  <CircularProgress
-                    value={tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'completed').length / tasks.length) * 100) : 0}
-                    size={100} strokeWidth={8} variant="success"
-                  >
-                    <div className="text-center">
-                      <span className="text-2xl font-bold text-text-primary">
-                        {tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'completed').length / tasks.length) * 100) : 0}
-                      </span>
-                      <span className="text-[10px] text-text-tertiary block">%</span>
-                    </div>
-                  </CircularProgress>
-                  <p className="text-xs text-text-secondary mt-2 font-medium">{t.dashboard.dailyFocus}</p>
-                </div>
-              </div>
+            <div className="max-w-2xl">
+              <h1 className="text-2xl lg:text-3xl font-bold text-text-primary mb-2">
+                {t.dashboard.greeting}{fullName ? `, ${fullName}` : ''}
+              </h1>
+              <p className="text-sm text-text-secondary max-w-lg">
+                {pendingTasks.length > 0
+                  ? <><span className="text-primary font-semibold">{pendingTasks.length}</span> {t.dashboard.tasksDue} &nbsp;</>
+                  : null}
+                {hotLeads.length > 0
+                  ? <><span className="text-error font-semibold">{hotLeads.length}</span> {t.dashboard.hotLeadsWaiting}</>
+                  : null}
+                {pendingTasks.length === 0 && hotLeads.length === 0 && t.dashboard.momentumStrong}
+              </p>
             </div>
           </div>
         </Card>
