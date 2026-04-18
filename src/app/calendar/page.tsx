@@ -57,7 +57,7 @@ export default function CalendarPage() {
   }
 
   function openExistingEvent(event: Event) {
-    router.push(`/events?event=${event.id}`)
+    router.push(`/events?event=${event.id}&source=calendar`)
   }
 
   function closeTaskModal() {
@@ -85,7 +85,7 @@ export default function CalendarPage() {
           contactMap={contactMap}
           onOpenEvents={() => router.push('/events')}
           onOpenTasks={() => router.push('/tasks')}
-          onCreateEvent={(date) => router.push(date ? `/events?new=1&date=${date}` : '/events?new=1')}
+          onCreateEvent={(date) => router.push(date ? `/events?new=1&date=${date}&source=calendar` : '/events?new=1&source=calendar')}
           onCreateTask={openCreateTask}
           onOpenTask={openExistingTask}
           onOpenEvent={openExistingEvent}

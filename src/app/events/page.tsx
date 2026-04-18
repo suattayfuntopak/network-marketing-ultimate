@@ -84,6 +84,7 @@ export default function EventsPage() {
   const [createForm, setCreateForm] = useState(blankEvent)
   const [activeEvent, setActiveEvent] = useState<Event | null>(null)
   const [editForm, setEditForm] = useState(blankEvent)
+  const [returnPath, setReturnPath] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteSearch, setInviteSearch] = useState('')
   const [selectedInviteIds, setSelectedInviteIds] = useState<string[]>([])
@@ -200,6 +201,21 @@ export default function EventsPage() {
     setCreateOpen(true)
   }
 
+  function navigateBackIfNeeded() {
+    if (!returnPath) {
+      return
+    }
+
+    const nextPath = returnPath
+    setReturnPath(null)
+    router.push(nextPath)
+  }
+
+  function closeCreateModal() {
+    setCreateOpen(false)
+    navigateBackIfNeeded()
+  }
+
   function openDetails(event: Event) {
     setActiveEvent(event)
     setInviteOpen(false)
@@ -218,12 +234,19 @@ export default function EventsPage() {
     })
   }
 
+  function closeDetailsModal() {
+    setInviteOpen(false)
+    setActiveEvent(null)
+    navigateBackIfNeeded()
+  }
+
   useEffect(() => {
     if (searchParams.get('new') !== '1') {
       return
     }
 
     const date = searchParams.get('date') ?? undefined
+    setReturnPath(searchParams.get('source') === 'calendar' ? '/calendar' : null)
     openCreateModal(eventPrefillFromDate(date))
     router.replace('/events')
   }, [router, searchParams])
@@ -242,6 +265,7 @@ export default function EventsPage() {
       return
     }
 
+    setReturnPath(searchParams.get('source') === 'calendar' ? '/calendar' : null)
     openDetails(matchingEvent)
     router.replace('/events')
   }, [eventItems, router, searchParams])
@@ -257,6 +281,7 @@ export default function EventsPage() {
     }
     setEventItems((current) => [nextEvent, ...current])
     setCreateOpen(false)
+    navigateBackIfNeeded()
   }
 
   function saveEvent() {
@@ -271,12 +296,14 @@ export default function EventsPage() {
       current.map((event) => (event.id === activeEvent.id ? nextEvent : event)),
     )
     setActiveEvent(nextEvent)
+    navigateBackIfNeeded()
   }
 
   function deleteEvent(eventId: string) {
     setEventItems((current) => current.filter((event) => event.id !== eventId))
     setInviteOpen(false)
     setActiveEvent(null)
+    navigateBackIfNeeded()
   }
 
   function openInviteModal() {
@@ -514,7 +541,7 @@ export default function EventsPage() {
 
       <Modal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={closeCreateModal}
         title={t.events.createEvent}
         description={locale === 'tr' ? 'Yeni bir sunum, egitim veya ekip bulusmasi planla.' : 'Plan a new presentation, training, or team session.'}
       >
@@ -554,7 +581,7 @@ export default function EventsPage() {
             <textarea value={createForm.description} onChange={(event) => setCreateForm((current) => ({ ...current, description: event.target.value }))} rows={4} className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm text-text-primary outline-none focus:border-primary/50" />
           </label>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>{t.common.cancel}</Button>
+            <Button type="button" variant="ghost" onClick={closeCreateModal}>{t.common.cancel}</Button>
             <Button type="button" onClick={createEvent}>{t.common.create}</Button>
           </div>
         </div>
@@ -562,10 +589,7 @@ export default function EventsPage() {
 
       <Modal
         open={Boolean(activeEvent)}
-        onClose={() => {
-          setInviteOpen(false)
-          setActiveEvent(null)
-        }}
+        onClose={closeDetailsModal}
         title={activeEvent?.title}
         description={activeEvent ? labels.manageHint : undefined}
       >
@@ -665,7 +689,7 @@ export default function EventsPage() {
                 <Trash2 className="w-3.5 h-3.5" /> {labels.delete}
               </Button>
               <div className="flex gap-2">
-                <Button type="button" variant="ghost" onClick={() => setActiveEvent(null)}>{t.common.cancel}</Button>
+                <Button type="button" variant="ghost" onClick={closeDetailsModal}>{t.common.cancel}</Button>
                 <Button type="button" onClick={saveEvent}>{t.common.saveChanges}</Button>
               </div>
             </div>
