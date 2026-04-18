@@ -400,7 +400,7 @@ export function ActionCalendarPanel({
             <Button size="sm" variant="outline" onClick={onOpenTasks}>
               {labels.openTasks}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => handleOpenCreateEvent(focusDate)}>
+            <Button size="sm" onClick={() => handleOpenCreateEvent(focusDate)}>
               {labels.addEvent}
             </Button>
             <Button size="sm" onClick={() => onCreateTask(toInputDate(focusDate))}>
