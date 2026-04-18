@@ -91,7 +91,7 @@ export default function EventsPage() {
   const [inviteChannel, setInviteChannel] = useState<'whatsapp' | 'telegram' | 'email' | 'sms'>('whatsapp')
   const [inviteFeedback, setInviteFeedback] = useState('')
 
-  const { data: contacts = [] } = useQuery<ContactRow[]>({
+  const { data: contacts = [], isFetched: contactsReady } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
     queryFn: fetchContacts,
   })
@@ -102,6 +102,7 @@ export default function EventsPage() {
         invite: 'Kişilere Gönder',
         inviteTitle: 'Etkinliği Kişilere Gönder',
         inviteDesc: 'Seçtiğin kontaklar davetli olarak etkinliğe eklenecek.',
+        inviteSearchLabel: 'Kontak Ara',
         inviteSearch: 'Kontak ara...',
         inviteEmpty: 'Bu etkinlik için yeni davetli bulunamadı.',
         inviteSubmit: 'Gönder',
@@ -129,6 +130,7 @@ export default function EventsPage() {
         viewContacts: 'Kontakları Gör',
         selectedCount: 'seçili',
         sentTo: 'gönderim hazırlandı',
+        addedToEvent: 'kişi etkinliğe eklendi',
         noCompatibleContacts: 'Seçilen kanala uygun iletişim bilgisi bulunamadı.',
         telegramNotice: 'Telegram bağlantısı paylaşım ekranında açıldı.',
       }
@@ -137,6 +139,7 @@ export default function EventsPage() {
         invite: 'Send to Contacts',
         inviteTitle: 'Send Event to Contacts',
         inviteDesc: 'Selected contacts will be added as invited attendees.',
+        inviteSearchLabel: 'Search Contacts',
         inviteSearch: 'Search contacts...',
         inviteEmpty: 'No additional contacts are available for this event.',
         inviteSubmit: 'Send',
@@ -164,6 +167,7 @@ export default function EventsPage() {
         viewContacts: 'View Contacts',
         selectedCount: 'selected',
         sentTo: 'delivery prepared',
+        addedToEvent: 'contacts added to the event',
         noCompatibleContacts: 'No compatible contact info is available for the selected channel.',
         telegramNotice: 'Telegram share flow has been opened.',
       }
@@ -239,6 +243,57 @@ export default function EventsPage() {
     setActiveEvent(null)
     navigateBackIfNeeded()
   }
+
+  useEffect(() => {
+    if (!contactsReady) return
+
+    const contactsById = new Map(contacts.map((contact) => [contact.id, contact]))
+
+    setEventItems((current) => {
+      let changed = false
+
+      const nextItems = current.map((event) => {
+        const nextAttendees = event.attendees
+          .filter((attendee) => contactsById.has(attendee.contactId))
+          .map((attendee) => {
+            const contact = contactsById.get(attendee.contactId)!
+
+            if (attendee.name !== contact.full_name) {
+              changed = true
+            }
+
+            return {
+              ...attendee,
+              name: contact.full_name,
+            }
+          })
+
+        if (nextAttendees.length !== event.attendees.length) {
+          changed = true
+        }
+
+        return { ...event, attendees: nextAttendees }
+      })
+
+      return changed ? nextItems : current
+    })
+  }, [contacts, contactsReady, setEventItems])
+
+  useEffect(() => {
+    if (!activeEvent) return
+
+    const refreshedEvent = eventItems.find((event) => event.id === activeEvent.id)
+
+    if (!refreshedEvent) {
+      setActiveEvent(null)
+      setInviteOpen(false)
+      return
+    }
+
+    if (refreshedEvent !== activeEvent) {
+      setActiveEvent(refreshedEvent)
+    }
+  }, [activeEvent, eventItems])
 
   useEffect(() => {
     if (searchParams.get('new') !== '1') {
@@ -404,16 +459,20 @@ export default function EventsPage() {
       return
     }
 
-    syncInvitedContacts(contactIds, true)
+    const syncedEvent = syncInvitedContacts(contactIds, true)
 
     if (inviteChannel === 'telegram') {
       window.open(links[0].link!, '_blank', 'noopener,noreferrer')
-      setInviteFeedback(labels.telegramNotice)
+      setInviteFeedback(`${links.length} ${labels.addedToEvent}. ${labels.telegramNotice}`)
     } else {
       links.forEach((entry) => {
         window.open(entry.link!, '_blank', 'noopener,noreferrer')
       })
-      setInviteFeedback(`${links.length} ${labels.sentTo}`)
+      setInviteFeedback(`${links.length} ${labels.addedToEvent}. ${links.length} ${labels.sentTo}.`)
+    }
+
+    if (syncedEvent) {
+      setActiveEvent(syncedEvent)
     }
 
     if (closeAfter) {
@@ -705,17 +764,20 @@ export default function EventsPage() {
       >
         {activeEvent && (
           <div className="p-5 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px] gap-3">
-              <div className="relative">
-                <Search className="w-4 h-4 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  value={inviteSearch}
-                  onChange={(event) => setInviteSearch(event.target.value)}
-                  placeholder={labels.inviteSearch}
-                  className="w-full h-10 rounded-xl border border-border bg-surface pl-9 pr-3 text-sm text-text-primary outline-none focus:border-primary/50"
-                />
-              </div>
-              <label className="space-y-1">
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-3 items-end">
+              <label className="space-y-1.5 block">
+                <span className="text-xs font-medium text-text-secondary">{labels.inviteSearchLabel}</span>
+                <div className="flex h-10 items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-primary/50">
+                  <Search className="w-4 h-4 shrink-0 text-text-tertiary" />
+                  <input
+                    value={inviteSearch}
+                    onChange={(event) => setInviteSearch(event.target.value)}
+                    placeholder={labels.inviteSearch}
+                    className="h-full w-full bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
+                  />
+                </div>
+              </label>
+              <label className="space-y-1.5">
                 <span className="text-xs font-medium text-text-secondary">{labels.sendChannel}</span>
                 <select
                   value={inviteChannel}

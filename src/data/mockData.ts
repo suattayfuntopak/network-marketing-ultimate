@@ -333,31 +333,21 @@ export const events: Event[] = [
     id: 'e1', userId: 'u1', title: 'Bahar Ürün Tanıtımı', description: 'En yeni cilt bakım serimizin canlı tanıtımı. Bir arkadaşını getir!',
     type: 'local', startDate: '2026-04-19T14:00:00', endDate: '2026-04-19T16:00:00',
     location: 'Downtown Community Center, Austin TX', maxAttendees: 30,
-    attendees: [
-      { contactId: 'c1', name: 'Elif Kaya', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
-      { contactId: 'c4', name: 'Rabia Aça', rsvpStatus: 'invited', followUpStatus: 'pending' },
-      { contactId: 'c10', name: 'Ezgi Şağar', rsvpStatus: 'invited', followUpStatus: 'pending' },
-    ],
+    attendees: [],
     status: 'published'
   },
   {
     id: 'e2', userId: 'u1', title: 'Haftalık Ekip Strateji Çağrısı', description: 'Tüm ekip üyeleri için haftalık uyum çağrısı. Kazanımları gözden geçir, hedefleri belirle.',
     type: 'team_zoom', startDate: '2026-04-16T19:00:00', endDate: '2026-04-16T20:00:00',
     meetingUrl: 'https://zoom.us/j/team-call', maxAttendees: 50,
-    attendees: [
-      { contactId: 'c6', name: 'Sibel Yıldız', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
-      { contactId: 'c11', name: 'Merve Akın', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
-    ],
+    attendees: [],
     status: 'published'
   },
   {
     id: 'e3', userId: 'u1', title: 'İş Fırsatı Webinarı', description: 'Potansiyel ekip üyeleri için online sunum. İş modeli hakkında bilgi edinin.',
     type: 'online_presentation', startDate: '2026-04-22T20:00:00', endDate: '2026-04-22T21:30:00',
     meetingUrl: 'https://zoom.us/j/opportunity', maxAttendees: 100,
-    attendees: [
-      { contactId: 'c1', name: 'Elif Kaya', rsvpStatus: 'invited', followUpStatus: 'pending' },
-      { contactId: 'c7', name: 'Tuğba Demir', rsvpStatus: 'confirmed', followUpStatus: 'pending' },
-    ],
+    attendees: [],
     status: 'published'
   },
 ]
