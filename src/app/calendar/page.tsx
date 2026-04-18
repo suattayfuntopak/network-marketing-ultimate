@@ -97,6 +97,7 @@ export default function CalendarPage() {
         onClose={closeTaskModal}
         currentUserId={currentUser?.id ?? ''}
         contacts={contacts}
+        tasks={tasks}
         editingTask={editingTask}
         initialDueDate={taskDraftDate}
       />

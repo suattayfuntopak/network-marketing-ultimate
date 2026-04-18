@@ -238,6 +238,7 @@ export default function TasksPage() {
         onClose={closeTaskModal}
         currentUserId={currentUser?.id ?? ''}
         contacts={contacts}
+        tasks={tasks}
         editingTask={editingTask}
       />
     </motion.div>

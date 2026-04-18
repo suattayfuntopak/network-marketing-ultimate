@@ -18,13 +18,22 @@ type AddForm = {
   contact_id: string
 }
 
-const buildEmptyForm = (initialDueDate?: string): AddForm => ({
+const buildEmptyForm = (initialDueDate?: string, contactId = ''): AddForm => ({
   title: '',
   type: 'follow_up',
   priority: 'medium',
   due_date: initialDueDate ?? new Date().toISOString().split('T')[0],
   description: '',
-  contact_id: '',
+  contact_id: contactId,
+})
+
+const buildFormFromTask = (task: TaskRow): AddForm => ({
+  title: task.title,
+  type: task.type,
+  priority: task.priority,
+  due_date: task.due_date,
+  description: task.description ?? '',
+  contact_id: task.contact_id ?? '',
 })
 
 export function TaskComposerModal({
@@ -32,6 +41,7 @@ export function TaskComposerModal({
   onClose,
   currentUserId,
   contacts,
+  tasks,
   editingTask,
   initialDueDate,
 }: {
@@ -39,12 +49,14 @@ export function TaskComposerModal({
   onClose: () => void
   currentUserId: string
   contacts: ContactRow[]
+  tasks: TaskRow[]
   editingTask?: TaskRow | null
   initialDueDate?: string
 }) {
   const { t } = useLanguage()
   const qc = useQueryClient()
   const [form, setForm] = useState<AddForm>(buildEmptyForm)
+  const [activeEditingTask, setActiveEditingTask] = useState<TaskRow | null>(null)
   const [formError, setFormError] = useState('')
 
   useEffect(() => {
@@ -53,20 +65,32 @@ export function TaskComposerModal({
     }
 
     if (editingTask) {
-      setForm({
-        title: editingTask.title,
-        type: editingTask.type,
-        priority: editingTask.priority,
-        due_date: editingTask.due_date,
-        description: editingTask.description ?? '',
-        contact_id: editingTask.contact_id ?? '',
-      })
+      setActiveEditingTask(editingTask)
+      setForm(buildFormFromTask(editingTask))
     } else {
+      setActiveEditingTask(null)
       setForm(buildEmptyForm(initialDueDate))
     }
 
     setFormError('')
   }, [editingTask, initialDueDate, open])
+
+  function findTaskForContact(contactId: string, excludeTaskId?: string) {
+    const candidateTasks = tasks
+      .filter((task) => task.contact_id === contactId && task.id !== excludeTaskId)
+      .sort((left, right) => {
+        const leftClosed = left.status === 'completed' || left.status === 'skipped'
+        const rightClosed = right.status === 'completed' || right.status === 'skipped'
+
+        if (leftClosed !== rightClosed) {
+          return leftClosed ? 1 : -1
+        }
+
+        return new Date(left.due_date).getTime() - new Date(right.due_date).getTime()
+      })
+
+    return candidateTasks[0] ?? null
+  }
 
   const addMutation = useMutation({
     mutationFn: (values: AddForm) => addTask(currentUserId, {
@@ -102,6 +126,8 @@ export function TaskComposerModal({
   })
 
   const isSaving = addMutation.isPending || updateMutation.isPending
+  const isEditing = Boolean(activeEditingTask)
+  const shouldLoadTaskOnContactChange = Boolean(editingTask)
 
   return (
     <AnimatePresence>
@@ -123,10 +149,10 @@ export function TaskComposerModal({
             <div className="flex items-center justify-between p-5 border-b border-border">
               <div>
                 <h2 className="text-base font-semibold text-text-primary">
-                  {editingTask ? 'Görevi Düzenle' : t.tasks.createTask}
+                  {isEditing ? 'Görevi Düzenle' : t.tasks.createTask}
                 </h2>
                 <p className="text-xs text-text-tertiary mt-0.5">
-                  {editingTask
+                  {isEditing
                     ? 'Kaydı güncelleyip yeniden aktif plana alabilirsin.'
                     : 'Yeni bir görev veya takip planla.'}
                 </p>
@@ -201,7 +227,27 @@ export function TaskComposerModal({
                   <label className="block text-xs font-medium text-text-secondary mb-1.5">İlgili Kontak (isteğe bağlı)</label>
                   <select
                     value={form.contact_id}
-                    onChange={(event) => setForm((current) => ({ ...current, contact_id: event.target.value }))}
+                    onChange={(event) => {
+                      const nextContactId = event.target.value
+
+                      if (!shouldLoadTaskOnContactChange || !nextContactId || nextContactId === form.contact_id) {
+                        setForm((current) => ({ ...current, contact_id: nextContactId }))
+                        return
+                      }
+
+                      const matchingTask = findTaskForContact(nextContactId, activeEditingTask?.id)
+
+                      if (matchingTask) {
+                        setActiveEditingTask(matchingTask)
+                        setForm(buildFormFromTask(matchingTask))
+                        setFormError('')
+                        return
+                      }
+
+                      setActiveEditingTask(null)
+                      setForm(buildEmptyForm(form.due_date, nextContactId))
+                      setFormError('')
+                    }}
                     className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
                   >
                     <option value="">— Kontak seç —</option>
@@ -234,14 +280,14 @@ export function TaskComposerModal({
                 className="flex-1"
                 disabled={!currentUserId || !form.title.trim() || !form.due_date || isSaving}
                 onClick={() => (
-                  editingTask
-                    ? updateMutation.mutate({ id: editingTask.id, values: form })
+                  isEditing && activeEditingTask
+                    ? updateMutation.mutate({ id: activeEditingTask.id, values: form })
                     : addMutation.mutate(form)
                 )}
               >
                 {isSaving
                   ? 'Kaydediliyor...'
-                  : editingTask
+                  : isEditing
                     ? 'Değişiklikleri Kaydet'
                     : t.common.save}
               </Button>
