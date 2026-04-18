@@ -157,10 +157,13 @@ export default function TasksPage() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.03 }}
               >
-                <Card hover padding="sm" className="group">
+                <Card hover padding="sm" className="group cursor-pointer" onClick={() => openEditModal(task)}>
                   <div className="flex items-center gap-4">
                     <button
-                      onClick={() => statusMutation.mutate({ id: task.id, status: isDone ? 'pending' : 'completed' })}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        statusMutation.mutate({ id: task.id, status: isDone ? 'pending' : 'completed' })
+                      }}
                       className="w-6 h-6 rounded-lg border-2 border-border-strong hover:border-primary hover:bg-primary/10 transition-colors shrink-0 flex items-center justify-center"
                     >
                       {isDone
@@ -183,7 +186,10 @@ export default function TasksPage() {
                         {task.description && <p className="text-xs text-text-tertiary truncate">{task.description}</p>}
                         {contactName && (
                           <button
-                            onClick={() => router.push(`/contacts?contact=${task.contact_id}`)}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              router.push(`/contacts?contact=${task.contact_id}`)
+                            }}
                             className="text-xs text-primary/70 hover:text-primary"
                           >
                             · {contactName}
@@ -201,14 +207,20 @@ export default function TasksPage() {
                       <p className="text-[10px] text-text-tertiary capitalize">{task.type.replace(/_/g, ' ')}</p>
                     </div>
                     <button
-                      onClick={() => openEditModal(task)}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openEditModal(task)
+                      }}
                       className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
                       aria-label="Edit task"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => deleteMutation.mutate(task.id)}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        deleteMutation.mutate(task.id)
+                      }}
                       className="p-1.5 rounded-lg text-text-muted hover:text-error hover:bg-error/10 opacity-0 group-hover:opacity-100 transition-all"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -58,10 +58,24 @@ function toInputDateTime(value: string) {
   return value.slice(0, 16)
 }
 
+function buildDateTime(date: string, hours: number, minutes: number) {
+  return `${date}T${`${hours}`.padStart(2, '0')}:${`${minutes}`.padStart(2, '0')}`
+}
+
+function eventPrefillFromDate(date?: string): Partial<typeof blankEvent> | undefined {
+  if (!date) return undefined
+
+  return {
+    startDate: buildDateTime(date, 20, 0),
+    endDate: buildDateTime(date, 21, 0),
+  }
+}
+
 const EVENT_STORAGE_VERSION = 3
 
 export default function EventsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { t, locale } = useLanguage()
   const [eventItems, setEventItems] = usePersistentState<Event[]>('nmu-events', events, {
     version: EVENT_STORAGE_VERSION,
@@ -185,6 +199,16 @@ export default function EventsPage() {
     setCreateForm({ ...blankEvent, ...prefill })
     setCreateOpen(true)
   }
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') {
+      return
+    }
+
+    const date = searchParams.get('date') ?? undefined
+    openCreateModal(eventPrefillFromDate(date))
+    router.replace('/events')
+  }, [router, searchParams])
 
   function openDetails(event: Event) {
     setActiveEvent(event)

@@ -168,6 +168,7 @@ export function ActionCalendarPanel({
   contactMap,
   onOpenEvents,
   onOpenTasks,
+  onCreateEvent,
   onCreateTask,
   onOpenTask,
 }: {
@@ -177,6 +178,7 @@ export function ActionCalendarPanel({
   contactMap: Record<string, string>
   onOpenEvents: () => void
   onOpenTasks: () => void
+  onCreateEvent: (date?: string) => void
   onCreateTask: (date?: string) => void
   onOpenTask?: (task: TaskRow) => void
 }) {
@@ -192,16 +194,17 @@ export function ActionCalendarPanel({
         allActions: 'Tüm Aksiyonlar',
         todayEvents: "Bugünün Etkinlikleri",
         dueFollowUps: 'Bugünkü Takipler',
-        noAgenda: 'Bu alan için planlanmış aksiyon görünmüyor. Herhangi bir güne tıklayarak görev ekleyebilirsin.',
+        noAgenda: 'Bu alan için planlanmış aksiyon görünmüyor. Herhangi bir güne çift tıklayarak görev ekleyebilirsin.',
         openEvents: 'Etkinlikleri Aç',
         openTasks: 'Görevleri Aç',
+        addEvent: '+ Etkinlik Ekle',
         addTask: '+ Görev Ekle',
         more: 'daha',
         event: 'Etkinlik',
         task: 'Görev',
-        month: 'Aylık',
-        week: 'Haftalık',
-        day: 'Günlük',
+        month: 'Ay',
+        week: 'Hafta',
+        day: 'Gün',
         focus: 'görev ve etkinlik',
       }
     : {
@@ -211,16 +214,17 @@ export function ActionCalendarPanel({
         allActions: 'All Actions',
         todayEvents: "Today's Events",
         dueFollowUps: "Today's Tasks",
-        noAgenda: 'No actions are visible here yet. Click any day to add a task.',
+        noAgenda: 'No actions are visible here yet. Double-click any day to add a task.',
         openEvents: 'Open Events',
         openTasks: 'Open Tasks',
+        addEvent: '+ Add Event',
         addTask: '+ Add Task',
         more: 'more',
         event: 'Event',
         task: 'Task',
-        month: 'Monthly',
-        week: 'Weekly',
-        day: 'Daily',
+        month: 'Month',
+        week: 'Week',
+        day: 'Day',
         focus: 'tasks and events',
       }
 
@@ -286,9 +290,38 @@ export function ActionCalendarPanel({
   const todayEvents = todayEntries.filter((entry) => entry.kind === 'event').length
   const todayTasks = todayEntries.filter((entry) => entry.kind === 'task').length
 
-  function handleOpenCreate(day: Date) {
+  const entriesByDay = useMemo(() => {
+    return entries.reduce<Record<string, CalendarEntry[]>>((accumulator, entry) => {
+      const key = dayKey(entry.day)
+      accumulator[key] ??= []
+      accumulator[key].push(entry)
+      return accumulator
+    }, {})
+  }, [entries])
+
+  function handleFocusDay(day: Date) {
     setFocusDate(startOfDay(day))
-    onCreateTask(toInputDate(day))
+  }
+
+  function handleOpenCreate(day: Date) {
+    handleFocusDay(day)
+    window.setTimeout(() => {
+      onCreateTask(toInputDate(day))
+    }, 0)
+  }
+
+  function handleOpenCreateEvent(day: Date) {
+    handleFocusDay(day)
+    window.setTimeout(() => {
+      onCreateEvent(toInputDate(day))
+    }, 0)
+  }
+
+  function handleCellKeyDown(event: React.KeyboardEvent<HTMLDivElement>, day: Date) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      handleFocusDay(day)
+    }
   }
 
   function handleEntryDoubleClick(entry: CalendarEntry) {
@@ -298,9 +331,9 @@ export function ActionCalendarPanel({
   }
 
   const viewButtons: { key: CalendarViewMode; label: string; icon: React.ElementType }[] = [
-    { key: 'day', label: labels.day, icon: Calendar },
-    { key: 'week', label: labels.week, icon: CalendarRange },
     { key: 'month', label: labels.month, icon: CalendarDays },
+    { key: 'week', label: labels.week, icon: CalendarRange },
+    { key: 'day', label: labels.day, icon: Calendar },
   ]
 
   return (
@@ -367,6 +400,9 @@ export function ActionCalendarPanel({
             <Button size="sm" variant="outline" onClick={onOpenTasks}>
               {labels.openTasks}
             </Button>
+            <Button size="sm" variant="outline" onClick={() => handleOpenCreateEvent(focusDate)}>
+              {labels.addEvent}
+            </Button>
             <Button size="sm" onClick={() => onCreateTask(toInputDate(focusDate))}>
               {labels.addTask}
             </Button>
@@ -405,7 +441,7 @@ export function ActionCalendarPanel({
 
             <div className="grid grid-cols-7">
               {monthDays.map((day) => {
-                const dayEntries = entries.filter((entry) => sameDay(entry.day, day))
+                const dayEntries = entriesByDay[dayKey(day)] ?? []
                 const isCurrentMonth = isSameMonth(day, focusDate)
                 const isToday = sameDay(day, today)
                 const isFocused = sameDay(day, focusDate)
@@ -415,15 +451,11 @@ export function ActionCalendarPanel({
                     key={day.toISOString()}
                     role="button"
                     tabIndex={0}
-                    onClick={() => handleOpenCreate(day)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        handleOpenCreate(day)
-                      }
-                    }}
+                    onClick={() => handleFocusDay(day)}
+                    onDoubleClick={() => handleOpenCreate(day)}
+                    onKeyDown={(event) => handleCellKeyDown(event, day)}
                     className={cn(
-                      'min-h-[168px] border-r border-b border-border p-3 text-left align-top transition-colors last:border-r-0 cursor-pointer',
+                      'h-[178px] overflow-hidden border-r border-b border-border p-3 text-left align-top transition-colors last:border-r-0 cursor-pointer',
                       isFocused && 'bg-primary/8 shadow-[inset_0_0_0_1px_rgba(0,212,255,0.18)]',
                       !isFocused && 'hover:bg-surface/30',
                       !isCurrentMonth && 'opacity-35',
@@ -445,26 +477,26 @@ export function ActionCalendarPanel({
                       )}
                     </div>
 
-                    <div className="mt-3 space-y-1.5">
+                    <div className="mt-3 space-y-1.5 overflow-hidden">
                       {dayEntries.slice(0, 3).map((entry) => (
                         <button
                           key={entry.id}
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation()
-                            setFocusDate(day)
+                            handleFocusDay(day)
                           }}
                           onDoubleClick={(event) => {
                             event.stopPropagation()
                             handleEntryDoubleClick(entry)
                           }}
                           className={cn(
-                            'w-full rounded-lg px-2 py-1.5 text-[10px] font-medium text-left transition-colors hover:border-border',
+                            'flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-[10px] font-medium text-left transition-colors hover:border-border',
                             entryToneClasses(entry),
                           )}
                         >
-                          <div className="truncate">{entry.title}</div>
-                          <div className="mt-0.5 text-[9px] opacity-70 truncate">{entry.meta}</div>
+                          <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-80" />
+                          <span className="truncate">{entry.title}</span>
                         </button>
                       ))}
                       {dayEntries.length > 3 && (
@@ -483,7 +515,7 @@ export function ActionCalendarPanel({
         {viewMode === 'week' && (
           <div className="grid grid-cols-1 xl:grid-cols-7 gap-4">
             {weekDays.map((day) => {
-              const dayEntries = entries.filter((entry) => sameDay(entry.day, day))
+              const dayEntries = entriesByDay[dayKey(day)] ?? []
               const isToday = sameDay(day, today)
               const isFocused = sameDay(day, focusDate)
 
@@ -492,13 +524,9 @@ export function ActionCalendarPanel({
                   key={day.toISOString()}
                   role="button"
                   tabIndex={0}
-                  onClick={() => handleOpenCreate(day)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      handleOpenCreate(day)
-                    }
-                  }}
+                  onClick={() => handleFocusDay(day)}
+                  onDoubleClick={() => handleOpenCreate(day)}
+                  onKeyDown={(event) => handleCellKeyDown(event, day)}
                   className={cn(
                     'rounded-3xl border border-border bg-surface/20 p-4 min-h-[420px] cursor-pointer transition-colors',
                     isFocused ? 'shadow-[inset_0_0_0_1px_rgba(0,212,255,0.18)] bg-primary/5' : 'hover:bg-surface/30',
@@ -528,7 +556,7 @@ export function ActionCalendarPanel({
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation()
-                            setFocusDate(day)
+                            handleFocusDay(day)
                           }}
                           onDoubleClick={(event) => {
                             event.stopPropagation()
@@ -565,13 +593,8 @@ export function ActionCalendarPanel({
           <div
             role="button"
             tabIndex={0}
-            onClick={() => handleOpenCreate(focusDate)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                handleOpenCreate(focusDate)
-              }
-            }}
+            onDoubleClick={() => handleOpenCreate(focusDate)}
+            onKeyDown={(event) => handleCellKeyDown(event, focusDate)}
             className="rounded-3xl border border-border bg-surface/20 p-5 min-h-[420px] cursor-pointer transition-colors hover:bg-surface/30"
           >
             <div className="flex items-center justify-between gap-4 mb-5">

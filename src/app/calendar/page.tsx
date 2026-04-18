@@ -81,6 +81,7 @@ export default function CalendarPage() {
           contactMap={contactMap}
           onOpenEvents={() => router.push('/events')}
           onOpenTasks={() => router.push('/tasks')}
+          onCreateEvent={(date) => router.push(date ? `/events?new=1&date=${date}` : '/events?new=1')}
           onCreateTask={openCreateTask}
           onOpenTask={openExistingTask}
         />
