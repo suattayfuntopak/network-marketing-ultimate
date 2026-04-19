@@ -10,6 +10,7 @@ import { AvatarGroup } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { EventInviteModal } from '@/components/events/EventInviteModal'
 import { useAppStore } from '@/store/appStore'
 import {
   createEvent as apiCreateEvent,
@@ -21,9 +22,8 @@ import {
   type ContactRow,
   type EventInput,
 } from '@/lib/queries'
-import { cn } from '@/lib/utils'
 import type { Event } from '@/types'
-import { Calendar, CheckSquare, Clock, Mail, MapPin, MessageCircle, Plus, Search, Send, Smartphone, Square, Trash2, Users, Video } from 'lucide-react'
+import { Calendar, Clock, MapPin, Plus, Send, Trash2, Users, Video } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -128,10 +128,6 @@ export default function EventsPage() {
   const [editForm, setEditForm] = useState(blankEvent)
   const [returnPath, setReturnPath] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
-  const [inviteSearch, setInviteSearch] = useState('')
-  const [selectedInviteIds, setSelectedInviteIds] = useState<string[]>([])
-  const [inviteChannel, setInviteChannel] = useState<'whatsapp' | 'telegram' | 'email' | 'sms'>('whatsapp')
-  const [inviteFeedback, setInviteFeedback] = useState('')
 
   const { data: eventItems = [] } = useQuery<Event[]>({
     queryKey: ['events'],
@@ -311,8 +307,6 @@ export default function EventsPage() {
   function openDetails(event: Event) {
     setActiveEventId(event.id)
     setInviteOpen(false)
-    setInviteSearch('')
-    setSelectedInviteIds([])
     setEditForm({
       title: event.title,
       description: event.description,
@@ -401,62 +395,10 @@ export default function EventsPage() {
 
   function openInviteModal() {
     if (!activeEvent) return
-    setInviteSearch('')
-    setSelectedInviteIds([])
-    setInviteFeedback('')
     setInviteOpen(true)
   }
 
-  function toggleInvite(contactId: string) {
-    setSelectedInviteIds((current) =>
-      current.includes(contactId)
-        ? current.filter((id) => id !== contactId)
-        : [...current, contactId],
-    )
-  }
-
-  function eventMessage(contactName: string, event: Event) {
-    const eventDate = new Date(event.startDate).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    })
-    const eventTime = `${new Date(event.startDate).toLocaleTimeString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })} - ${new Date(event.endDate).toLocaleTimeString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })}`
-
-    return locale === 'tr'
-      ? `Merhaba ${contactName}, seni "${event.title}" etkinliğimize davet etmek istiyorum. ${eventDate} tarihinde ${eventTime} arasında ${event.location || 'online'} olarak planlandı. ${event.meetingUrl ? `Katılım linki: ${event.meetingUrl}` : ''}`.trim()
-      : `Hi ${contactName}, I'd like to invite you to "${event.title}". It is planned for ${eventDate}, ${eventTime}, at ${event.location || 'online'}. ${event.meetingUrl ? `Join link: ${event.meetingUrl}` : ''}`.trim()
-  }
-
-  function contactLink(contact: ContactRow, event: Event, channel: typeof inviteChannel) {
-    const message = eventMessage(contact.full_name, event)
-    const encodedMessage = encodeURIComponent(message)
-    const normalizedPhone = contact.phone?.replace(/\D/g, '') ?? ''
-
-    if (channel === 'whatsapp') {
-      return normalizedPhone ? `https://wa.me/${normalizedPhone}?text=${encodedMessage}` : null
-    }
-
-    if (channel === 'sms') {
-      return normalizedPhone ? `sms:${normalizedPhone}?body=${encodedMessage}` : null
-    }
-
-    if (channel === 'email') {
-      return contact.email
-        ? `mailto:${contact.email}?subject=${encodeURIComponent(event.title)}&body=${encodedMessage}`
-        : null
-    }
-
-    return `https://t.me/share/url?url=${encodeURIComponent(event.meetingUrl || window.location.href)}&text=${encodedMessage}`
-  }
-
-  async function syncInvitedContacts(contactIds: string[], markAsSent = false) {
+  async function syncInvitedContacts(contactIds: string[], markAsSent: boolean) {
     if (!activeEvent) return
     const selectedContacts = contacts.filter((contact) => contactIds.includes(contact.id))
     if (selectedContacts.length === 0) return
@@ -476,68 +418,6 @@ export default function EventsPage() {
 
     await attendeesMutation.mutateAsync({ eventId: activeEvent.id, entries })
   }
-
-  async function sendInvites(contactIds: string[], closeAfter = false) {
-    if (!activeEvent || contactIds.length === 0) return
-
-    const selectedContacts = contacts.filter((contact) => contactIds.includes(contact.id))
-    const links = selectedContacts
-      .map((contact) => ({ contact, link: contactLink(contact, activeEvent, inviteChannel) }))
-      .filter((entry) => Boolean(entry.link))
-
-    if (links.length === 0) {
-      setInviteFeedback(labels.noCompatibleContacts)
-      return
-    }
-
-    await syncInvitedContacts(contactIds, true)
-
-    if (inviteChannel === 'telegram') {
-      window.open(links[0].link!, '_blank', 'noopener,noreferrer')
-      setInviteFeedback(`${links.length} ${labels.addedToEvent}. ${labels.telegramNotice}`)
-    } else {
-      links.forEach((entry) => {
-        window.open(entry.link!, '_blank', 'noopener,noreferrer')
-      })
-      setInviteFeedback(`${links.length} ${labels.addedToEvent}. ${links.length} ${labels.sentTo}.`)
-    }
-
-    if (closeAfter) {
-      setSelectedInviteIds([])
-    }
-  }
-
-  function selectAllInvites() {
-    setSelectedInviteIds(inviteableContacts.map((contact) => contact.id))
-  }
-
-  function selectEligibleInvites() {
-    if (!activeEvent) return
-    const eligibleIds = inviteableContacts
-      .filter((contact) => Boolean(contactLink(contact, activeEvent, inviteChannel)))
-      .map((contact) => contact.id)
-
-    setSelectedInviteIds(eligibleIds)
-  }
-
-  const inviteableContacts = useMemo(() => {
-    if (!activeEvent) return []
-
-    const attendeeIds = new Set(activeEvent.attendees.map((attendee) => attendee.contactId))
-    const query = inviteSearch.trim().toLocaleLowerCase(locale === 'tr' ? 'tr-TR' : 'en-US')
-
-    return contacts
-      .filter((contact) => !attendeeIds.has(contact.id))
-      .filter((contact) => {
-        if (!query) return true
-        const haystack = [contact.full_name, contact.location, contact.profession, contact.source]
-          .filter(Boolean)
-          .join(' ')
-          .toLocaleLowerCase(locale === 'tr' ? 'tr-TR' : 'en-US')
-        return haystack.includes(query)
-      })
-      .sort((left, right) => left.full_name.localeCompare(right.full_name))
-  }, [activeEvent, contacts, inviteSearch, locale])
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
@@ -783,128 +663,17 @@ export default function EventsPage() {
         )}
       </Modal>
 
-      <Modal
+      <EventInviteModal
         open={inviteOpen && Boolean(activeEvent)}
         onClose={() => setInviteOpen(false)}
-        title={labels.inviteTitle}
-        description={labels.inviteDesc}
-      >
-        {activeEvent && (
-          <div className="p-5 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-3 items-end">
-              <label className="space-y-1.5 block">
-                <span className="text-xs font-medium text-text-secondary">{labels.inviteSearchLabel}</span>
-                <div className="flex h-10 items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-primary/50">
-                  <Search className="w-4 h-4 shrink-0 text-text-tertiary" />
-                  <input
-                    value={inviteSearch}
-                    onChange={(event) => setInviteSearch(event.target.value)}
-                    placeholder={labels.inviteSearch}
-                    className="h-full w-full bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
-                  />
-                </div>
-              </label>
-              <label className="space-y-1.5">
-                <span className="text-xs font-medium text-text-secondary">{labels.sendChannel}</span>
-                <select
-                  value={inviteChannel}
-                  onChange={(event) => {
-                    setInviteChannel(event.target.value as typeof inviteChannel)
-                    setInviteFeedback('')
-                  }}
-                  className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50"
-                >
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="telegram">Telegram</option>
-                  <option value="email">Email</option>
-                  <option value="sms">SMS</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-              <Button type="button" variant="ghost" size="sm" onClick={selectAllInvites}>
-                <CheckSquare className="w-3.5 h-3.5" /> {labels.selectAll}
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={selectEligibleInvites}>
-                <Users className="w-3.5 h-3.5" /> {labels.selectEligible}
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedInviteIds([])}>
-                <Square className="w-3.5 h-3.5" /> {labels.clearSelection}
-              </Button>
-              <span className="text-text-tertiary">{labels.channelHint}</span>
-            </div>
-
-            {inviteFeedback && (
-              <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
-                {inviteFeedback}
-              </div>
-            )}
-
-            <div className="max-h-[360px] overflow-y-auto space-y-2 pr-1">
-              {inviteableContacts.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-text-tertiary">
-                  {labels.inviteEmpty}
-                </div>
-              ) : (
-                inviteableContacts.map((contact) => {
-                  const selected = selectedInviteIds.includes(contact.id)
-                  return (
-                    <div
-                      key={contact.id}
-                      className={cn(
-                        'w-full rounded-2xl border p-3 transition-colors',
-                        selected ? 'border-primary/40 bg-primary/8' : 'border-border-subtle bg-surface/40 hover:border-border',
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <button type="button" onClick={() => toggleInvite(contact.id)} className="flex-1 text-left min-w-0">
-                          <p className="text-sm font-semibold text-text-primary truncate">{contact.full_name}</p>
-                          <p className="text-xs text-text-tertiary mt-1 truncate">
-                            {[contact.profession, contact.location].filter(Boolean).join(' · ') || contact.source}
-                          </p>
-                        </button>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Badge variant={selected ? 'primary' : 'default'} size="sm">
-                            {selected ? labels.selected : stageLabel(contact)}
-                          </Badge>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => sendInvites([contact.id])}
-                            icon={inviteChannel === 'whatsapp'
-                              ? <MessageCircle className="w-3.5 h-3.5" />
-                              : inviteChannel === 'telegram'
-                                ? <Send className="w-3.5 h-3.5" />
-                                : inviteChannel === 'email'
-                                  ? <Mail className="w-3.5 h-3.5" />
-                                  : <Smartphone className="w-3.5 h-3.5" />}
-                          >
-                            {labels.inviteNow}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
-              <p className="text-sm text-text-secondary">
-                {selectedInviteIds.length} {labels.selectedCount}
-              </p>
-              <div className="flex gap-2">
-                <Button type="button" variant="ghost" onClick={() => setInviteOpen(false)}>{t.common.cancel}</Button>
-                <Button type="button" disabled={selectedInviteIds.length === 0 || attendeesMutation.isPending} onClick={() => sendInvites(selectedInviteIds, true)}>
-                  <Send className="w-3.5 h-3.5" /> {labels.inviteSubmit}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
+        event={activeEvent}
+        contacts={contacts}
+        locale={locale}
+        labels={{ ...labels, cancel: t.common.cancel }}
+        isSyncing={attendeesMutation.isPending}
+        stageLabel={stageLabel}
+        onSyncAttendees={syncInvitedContacts}
+      />
     </motion.div>
   )
 

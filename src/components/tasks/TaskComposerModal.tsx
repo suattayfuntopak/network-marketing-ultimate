@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, X } from 'lucide-react'
@@ -58,22 +58,22 @@ export function TaskComposerModal({
   const [form, setForm] = useState<AddForm>(buildEmptyForm)
   const [activeEditingTask, setActiveEditingTask] = useState<TaskRow | null>(null)
   const [formError, setFormError] = useState('')
+  const [lastOpenedFor, setLastOpenedFor] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!open) {
-      return
+  const openToken = open ? `${editingTask?.id ?? 'new'}:${initialDueDate ?? ''}` : null
+  if (openToken !== lastOpenedFor) {
+    setLastOpenedFor(openToken)
+    if (openToken) {
+      if (editingTask) {
+        setActiveEditingTask(editingTask)
+        setForm(buildFormFromTask(editingTask))
+      } else {
+        setActiveEditingTask(null)
+        setForm(buildEmptyForm(initialDueDate))
+      }
+      setFormError('')
     }
-
-    if (editingTask) {
-      setActiveEditingTask(editingTask)
-      setForm(buildFormFromTask(editingTask))
-    } else {
-      setActiveEditingTask(null)
-      setForm(buildEmptyForm(initialDueDate))
-    }
-
-    setFormError('')
-  }, [editingTask, initialDueDate, open])
+  }
 
   function findTaskForContact(contactId: string, excludeTaskId?: string) {
     const candidateTasks = tasks
