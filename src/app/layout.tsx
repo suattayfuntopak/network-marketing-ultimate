@@ -25,6 +25,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Network Marketing Ultimate",
   description: "Tüm network marketing işinizi tek akıllı sistemden yönetin.",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/png" },
+      { url: "/favicon.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/favicon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/favicon.svg"],
+  },
 };
 
 export default async function RootLayout({

@@ -21,7 +21,6 @@ const t = {
       title3: "Yönet",
       sub: "Ekibini büyüt, potansiyellerini takip et, YZ koçunla karar al. Tüm işini tek akıllı sistemden yönet.",
       cta: "Hemen Başla — Ücretsiz",
-      demo: "Demo İzle",
       stat1: "Aktif Distribütör",
       stat2: "Ortalama Ekip Büyümesi",
       stat3: "Zaman Tasarrufu",
@@ -143,7 +142,6 @@ const t = {
       title3: "Professionally",
       sub: "Grow your team, track prospects, make decisions with your AI coach. Manage your entire business from one intelligent system.",
       cta: "Get Started — Free",
-      demo: "Watch Demo",
       stat1: "Active Distributors",
       stat2: "Avg. Team Growth",
       stat3: "Time Saved",
@@ -540,12 +538,9 @@ export default function LandingPage({
               {text.hero.sub}
             </p>
 
-            <div className="fade-up fade-up-4" style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+            <div className="fade-up fade-up-4" style={{ display: "flex", alignItems: "center", marginTop: 4 }}>
               <button className="btn-primary" style={{ fontSize: 16, padding: "16px 32px" }} onClick={onNavigateToRegister}>
                 {text.hero.cta}
-              </button>
-              <button className="btn-ghost" style={{ fontSize: 16, padding: "16px 32px" }}>
-                ▶ {text.hero.demo}
               </button>
             </div>
           </div>
