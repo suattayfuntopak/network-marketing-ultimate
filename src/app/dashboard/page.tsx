@@ -7,103 +7,45 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
-  BarChart3,
   Calendar,
   CheckCircle2,
   ChevronRight,
-  Clock3,
   Flame,
   Presentation,
   Sparkles,
   TrendingUp,
   Zap,
 } from 'lucide-react'
-import {
-  Area,
-  AreaChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
-import { completeTask, fetchContacts, fetchTasks } from '@/lib/queries'
-import type { ContactRow, TaskRow } from '@/lib/queries'
+import { completeTask, fetchAllOrders, fetchContacts, fetchEvents, fetchTasks } from '@/lib/queries'
+import type { ContactRow, OrderRow, TaskRow } from '@/lib/queries'
+import type { Event } from '@/types'
+import {
+  addDays,
+  buildActivityHeatmap,
+  buildPipelineSegments,
+  buildReorderDue,
+  buildRevenueSnapshot,
+  buildUpcomingEvents,
+  calcDelta,
+  computeActivityStreak,
+  endOfDay,
+  formatDelta,
+  formatTRY,
+  startOfDay,
+} from '@/components/dashboard/dashboardMetrics'
+import { RevenueStrip } from '@/components/dashboard/RevenueStrip'
+import { ActivityHeatmap } from '@/components/dashboard/ActivityHeatmap'
+import { PipelineSegmentDonut } from '@/components/dashboard/PipelineSegmentDonut'
+import { ReorderDueCard } from '@/components/dashboard/ReorderDueCard'
+import { DeltaPill } from '@/components/dashboard/DeltaPill'
 
-const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
+const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }
 const item = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
-
-const WEEK_DAYS = {
-  tr: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'],
-  en: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-} as const
-
-const PIPELINE_LABELS = {
-  tr: {
-    new: 'Yeni Potansiyel',
-    contact_planned: 'İletişim Planlandı',
-    interested: 'İlgileniyor',
-    presentation_done: 'Sunum Yapıldı',
-    ready_to_buy: 'Karar Aşaması',
-    became_customer: 'Müşteri Oldu',
-    became_member: 'Ekip Üyesi',
-    lost: 'Kaybedildi',
-  },
-  en: {
-    new: 'New Lead',
-    contact_planned: 'Contact Planned',
-    interested: 'Interested',
-    presentation_done: 'Presented',
-    ready_to_buy: 'Decision Stage',
-    became_customer: 'Became Customer',
-    became_member: 'Became Member',
-    lost: 'Lost',
-  },
-} as const
-
-const PIPELINE_COLORS: Record<string, string> = {
-  new: '#00d4ff',
-  contact_planned: '#3b82f6',
-  interested: '#8b5cf6',
-  presentation_done: '#f59e0b',
-  ready_to_buy: '#f97316',
-  became_customer: '#10b981',
-  became_member: '#6366f1',
-  lost: '#ef4444',
-}
-
-const SUMMARY_STAGE_KEYS = [
-  'new',
-  'contact_planned',
-  'interested',
-  'presentation_done',
-  'ready_to_buy',
-  'became_customer',
-  'became_member',
-  'lost',
-] as const
-
-function startOfDay(value: Date) {
-  const next = new Date(value)
-  next.setHours(0, 0, 0, 0)
-  return next
-}
-
-function endOfDay(value: Date) {
-  const next = new Date(value)
-  next.setHours(23, 59, 59, 999)
-  return next
-}
-
-function addDays(value: Date, days: number) {
-  const next = new Date(value)
-  next.setDate(next.getDate() + days)
-  return next
-}
 
 function formatHeroDate(value: Date, locale: 'tr' | 'en') {
   if (locale === 'tr') {
@@ -181,7 +123,6 @@ export default function DashboardPage() {
   const { currentUser } = useAppStore()
   const router = useRouter()
   const queryClient = useQueryClient()
-  const weekDays = WEEK_DAYS[locale]
 
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -193,52 +134,74 @@ export default function DashboardPage() {
     queryFn: fetchTasks,
   })
 
+  const { data: orders = [] } = useQuery<OrderRow[]>({
+    queryKey: ['orders-all'],
+    queryFn: fetchAllOrders,
+    staleTime: 30_000,
+  })
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ['events'],
+    queryFn: fetchEvents,
+    staleTime: 30_000,
+  })
+
   const completeTaskMutation = useMutation({
     mutationFn: completeTask,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   })
 
-  const todayStart = startOfDay(new Date())
-  const todayEnd = endOfDay(new Date())
+  const now = new Date()
+  const todayStart = startOfDay(now)
+  const todayEnd = endOfDay(now)
   const weekStart = addDays(todayStart, -6)
   const weekEnd = endOfDay(addDays(todayStart, 6))
+  const previousWeekStart = addDays(weekStart, -7)
+  const previousWeekEnd = endOfDay(addDays(weekStart, -1))
   const heroDateLabel = formatHeroDate(todayStart, locale)
   const fullName = currentUser?.name ?? ''
 
-  const openTasks = tasks.filter(task => task.status === 'pending' || task.status === 'overdue')
+  const revenueSnapshot = buildRevenueSnapshot(orders, now)
+  const streak = computeActivityStreak(contacts, tasks, now)
+  const heatmap = buildActivityHeatmap(contacts, tasks, orders, now, 12)
+  const pipelineSegments = buildPipelineSegments(contacts)
+  const reorderDue = buildReorderDue(orders, contacts, now, 14)
+  const upcomingEventEntries = buildUpcomingEvents(events, now, 14)
+
+  const openTasks = tasks.filter((task) => task.status === 'pending' || task.status === 'overdue')
   const focusTasks = openTasks
-    .filter(task => new Date(task.due_date) <= todayEnd)
+    .filter((task) => new Date(task.due_date) <= todayEnd)
     .sort((left, right) => new Date(left.due_date).getTime() - new Date(right.due_date).getTime())
 
-  const overdueTasks = openTasks.filter(task => {
+  const overdueTasks = openTasks.filter((task) => {
     const due = startOfDay(new Date(task.due_date))
     return task.status === 'overdue' || due.getTime() < todayStart.getTime()
   })
 
   const hotLeads = contacts
-    .filter(contact => contact.temperature === 'hot' && contact.status === 'active')
+    .filter((contact) => contact.temperature === 'hot' && contact.status === 'active')
     .sort((left, right) => stagePriority(left.pipeline_stage) - stagePriority(right.pipeline_stage))
 
-  const staleHotLeads = hotLeads.filter(contact => {
+  const staleHotLeads = hotLeads.filter((contact) => {
     if (!contact.last_contact_date) return true
     const lastTouch = startOfDay(new Date(contact.last_contact_date))
     return lastTouch.getTime() < addDays(todayStart, -7).getTime()
   })
 
   const waitingDecisionContacts = contacts
-    .filter(contact => ['presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy'].includes(contact.pipeline_stage))
-    .filter(contact => !contact.next_follow_up_date || startOfDay(new Date(contact.next_follow_up_date)).getTime() <= todayStart.getTime())
+    .filter((contact) => ['presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy'].includes(contact.pipeline_stage))
+    .filter((contact) => !contact.next_follow_up_date || startOfDay(new Date(contact.next_follow_up_date)).getTime() <= todayStart.getTime())
 
   const upcomingSessions = tasks
-    .filter(task => ['meeting', 'presentation', 'training'].includes(task.type))
-    .filter(task => {
+    .filter((task) => ['meeting', 'presentation', 'training'].includes(task.type))
+    .filter((task) => {
       const due = new Date(task.due_date)
       return due >= todayStart && due <= weekEnd && task.status !== 'completed' && task.status !== 'skipped'
     })
     .sort((left, right) => new Date(left.due_date).getTime() - new Date(right.due_date).getTime())
 
   const riskItems: RiskItem[] = [
-    ...overdueTasks.slice(0, 3).map(task => ({
+    ...overdueTasks.slice(0, 3).map((task) => ({
       id: `task-${task.id}`,
       title: task.title,
       meta: task.description || (locale === 'tr' ? 'Takip yeniden açılmayı bekliyor' : 'Follow-up is waiting to be reopened'),
@@ -246,7 +209,7 @@ export default function DashboardPage() {
       badge: locale === 'tr' ? 'Gecikmiş takip' : 'Overdue follow-up',
       variant: 'error' as const,
     })),
-    ...staleHotLeads.slice(0, 2).map(contact => ({
+    ...staleHotLeads.slice(0, 2).map((contact) => ({
       id: `hot-${contact.id}`,
       title: contact.full_name,
       meta: formatRelativeTouch(contact.last_contact_date, locale),
@@ -254,7 +217,7 @@ export default function DashboardPage() {
       badge: locale === 'tr' ? 'Sıcak aday bekliyor' : 'Hot prospect idle',
       variant: 'warning' as const,
     })),
-    ...waitingDecisionContacts.slice(0, 2).map(contact => ({
+    ...waitingDecisionContacts.slice(0, 2).map((contact) => ({
       id: `decision-${contact.id}`,
       title: contact.full_name,
       meta: locale === 'tr' ? 'Karar aşamasında net takip bekliyor' : 'Decision-stage follow-up is missing',
@@ -264,36 +227,38 @@ export default function DashboardPage() {
     })),
   ].slice(0, 6)
 
-  const pipelineCounts = contacts.reduce<Record<string, number>>((accumulator, contact) => {
-    accumulator[contact.pipeline_stage] = (accumulator[contact.pipeline_stage] ?? 0) + 1
-    return accumulator
-  }, {})
+  const currentWeekTouches = contacts.filter((contact) => {
+    if (!contact.last_contact_date) return false
+    const date = new Date(contact.last_contact_date)
+    return date >= weekStart && date <= weekEnd
+  }).length
+  const previousWeekTouches = contacts.filter((contact) => {
+    if (!contact.last_contact_date) return false
+    const date = new Date(contact.last_contact_date)
+    return date >= previousWeekStart && date <= previousWeekEnd
+  }).length
 
-  const processSummary = SUMMARY_STAGE_KEYS.map(stage => ({
-    key: stage,
-    label: PIPELINE_LABELS[locale][stage],
-    count: pipelineCounts[stage] ?? 0,
-    color: PIPELINE_COLORS[stage] ?? '#64748b',
-  }))
-  const processSummaryMax = Math.max(...processSummary.map(stage => stage.count), 1)
+  const previousWeekFocus = tasks.filter((task) => {
+    const due = new Date(task.due_date)
+    return due >= previousWeekStart && due <= previousWeekEnd
+  }).length
+  const currentWeekFocus = tasks.filter((task) => {
+    const due = new Date(task.due_date)
+    return due >= weekStart && due <= weekEnd
+  }).length
 
-  const weeklyBuckets = weekDays.map((day, index) => {
-    const date = addDays(todayStart, -(6 - index))
-    const dateKey = date.toISOString().split('T')[0]
+  const currentWeekOverdue = overdueTasks.length
+  const previousWeekOverdue = tasks.filter((task) => {
+    if (task.status === 'completed' || task.status === 'skipped') return false
+    const due = new Date(task.due_date)
+    return due >= previousWeekStart && due <= previousWeekEnd
+  }).length
 
-    return {
-      day,
-      contacts: contacts.filter(contact => new Date(contact.created_at).toISOString().split('T')[0] === dateKey).length,
-      touches: contacts.filter(contact => contact.last_contact_date && new Date(contact.last_contact_date).toISOString().split('T')[0] === dateKey).length,
-      presentations: tasks.filter(task => task.type === 'presentation' && new Date(task.due_date).toISOString().split('T')[0] === dateKey).length,
-    }
-  })
-
-  const weeklyPulse = {
-    newContacts: weeklyBuckets.reduce((sum, entry) => sum + entry.contacts, 0),
-    touches: weeklyBuckets.reduce((sum, entry) => sum + entry.touches, 0),
-    presentations: weeklyBuckets.reduce((sum, entry) => sum + entry.presentations, 0),
-  }
+  const previousWeekSessions = tasks.filter((task) => {
+    if (!['meeting', 'presentation', 'training'].includes(task.type)) return false
+    const due = new Date(task.due_date)
+    return due >= previousWeekStart && due <= previousWeekEnd
+  }).length
 
   const kpis = [
     {
@@ -305,36 +270,40 @@ export default function DashboardPage() {
       icon: Zap,
       route: '/tasks',
       accent: 'primary',
+      delta: calcDelta(currentWeekFocus, previousWeekFocus),
+      deltaTone: 'auto' as const,
     },
     {
       label: locale === 'tr' ? 'Geciken Takipler' : 'Overdue Follow-ups',
       value: overdueTasks.length,
-      hint: locale === 'tr'
-        ? `${riskItems.length} kayıt hemen aksiyon istiyor`
-        : `${riskItems.length} records need action now`,
+      hint: locale === 'tr' ? `${riskItems.length} kayıt hemen aksiyon istiyor` : `${riskItems.length} records need action now`,
       icon: AlertTriangle,
       route: '/tasks',
       accent: 'error',
+      delta: calcDelta(currentWeekOverdue, previousWeekOverdue),
+      deltaTone: 'inverse' as const,
     },
     {
       label: locale === 'tr' ? 'Sıcak Adaylar' : 'Hot Prospects',
       value: hotLeads.length,
-      hint: locale === 'tr'
-        ? `${staleHotLeads.length} tanesinde temas zayıf`
-        : `${staleHotLeads.length} need a fresh touch`,
+      hint: locale === 'tr' ? `${staleHotLeads.length} tanesinde temas zayıf` : `${staleHotLeads.length} need a fresh touch`,
       icon: Flame,
       route: '/contacts?temperature=hot',
       accent: 'warning',
+      delta: calcDelta(currentWeekTouches, previousWeekTouches),
+      deltaTone: 'auto' as const,
     },
     {
       label: locale === 'tr' ? 'Bu Hafta Toplantı / Sunum' : 'This Week Sessions',
       value: upcomingSessions.length,
       hint: locale === 'tr'
-        ? `${upcomingSessions.filter(item => item.type === 'presentation').length} sunum, ${upcomingSessions.filter(item => item.type === 'meeting').length} toplantı`
-        : `${upcomingSessions.filter(item => item.type === 'presentation').length} presentations, ${upcomingSessions.filter(item => item.type === 'meeting').length} meetings`,
+        ? `${upcomingSessions.filter((item) => item.type === 'presentation').length} sunum, ${upcomingSessions.filter((item) => item.type === 'meeting').length} toplantı`
+        : `${upcomingSessions.filter((item) => item.type === 'presentation').length} presentations, ${upcomingSessions.filter((item) => item.type === 'meeting').length} meetings`,
       icon: Presentation,
       route: '/calendar',
       accent: 'secondary',
+      delta: calcDelta(upcomingSessions.length, previousWeekSessions),
+      deltaTone: 'auto' as const,
     },
   ] as const
 
@@ -352,7 +321,7 @@ export default function DashboardPage() {
             <div className="max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
                 <Sparkles className="h-3.5 w-3.5" />
-                {locale === 'tr' ? 'Bugünün Komuta Merkezi' : 'Today’s Command Center'}
+                {locale === 'tr' ? 'Bugünün Komuta Merkezi' : 'Today\u2019s Command Center'}
               </div>
               <h1 className="mt-4 text-2xl font-bold text-text-primary lg:text-4xl">
                 {t.dashboard.greeting}{fullName ? `, ${fullName}` : ''}
@@ -366,29 +335,26 @@ export default function DashboardPage() {
                     ? `Bugün için açık aksiyon baskısı yok. Şimdi sıcak adaylar, süreç kalitesi ve yaklaşan görüşmeler üzerinden ritmi büyütebilirsin.`
                     : `There is no immediate action pressure today. Use the room to grow momentum across hot prospects, process quality, and upcoming sessions.`}
               </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:w-[340px] lg:grid-cols-1">
-              <div className="rounded-2xl border border-border-subtle bg-surface/45 px-4 py-4 shadow-[0_18px_40px_rgba(2,6,23,0.18)]">
-                <p className="text-[11px] uppercase tracking-[0.24em] text-text-muted">
-                  {locale === 'tr' ? 'Bugünün Tarihi' : "Today's Date"}
-                </p>
-                <p className="mt-2 text-sm font-semibold text-text-primary lg:text-base">{heroDateLabel}</p>
-              </div>
-              <div className="rounded-2xl border border-border-subtle bg-surface/45 px-4 py-4 shadow-[0_18px_40px_rgba(2,6,23,0.18)]">
-                <p className="text-[11px] uppercase tracking-[0.24em] text-text-muted">
-                  {locale === 'tr' ? 'Bugünün Önceliği' : "Today's Priority"}
-                </p>
-                <p className="mt-2 text-sm font-semibold text-text-primary">
-                  {focusTasks[0]?.title ?? (locale === 'tr' ? 'Ritmi koru ve sıcak adayları hareket ettir' : 'Protect momentum and move hot prospects')}
-                </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-text-tertiary">
+                <span className="rounded-full border border-border-subtle bg-surface/40 px-3 py-1 font-semibold">{heroDateLabel}</span>
+                <span className="rounded-full border border-border-subtle bg-surface/40 px-3 py-1">
+                  {locale === 'tr' ? 'Öncelik' : 'Priority'}:{' '}
+                  <span className="font-semibold text-text-primary">
+                    {focusTasks[0]?.title ?? (locale === 'tr' ? 'Ritmi koru' : 'Protect momentum')}
+                  </span>
+                </span>
               </div>
             </div>
           </div>
         </Card>
       </motion.div>
 
+      <motion.div variants={item}>
+        <RevenueStrip snapshot={revenueSnapshot} streak={streak} />
+      </motion.div>
+
       <motion.div variants={item} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map((kpi, index) => {
+        {kpis.map((kpi) => {
           const Icon = kpi.icon
           const accentClass = {
             primary: 'from-primary/18 to-primary/5 border-primary/20',
@@ -411,8 +377,15 @@ export default function DashboardPage() {
                   <p className="mt-3 text-3xl font-bold text-text-primary">{kpi.value}</p>
                   <p className="mt-2 text-xs leading-5 text-text-secondary">{kpi.hint}</p>
                 </div>
-                <div className="rounded-2xl border border-white/8 bg-background/45 p-3 shadow-[0_8px_24px_rgba(2,6,23,0.18)]">
-                  <Icon className="h-5 w-5 text-text-primary" />
+                <div className="flex flex-col items-end gap-2">
+                  <div className="rounded-2xl border border-white/8 bg-background/45 p-3 shadow-[0_8px_24px_rgba(2,6,23,0.18)]">
+                    <Icon className="h-5 w-5 text-text-primary" />
+                  </div>
+                  <DeltaPill
+                    delta={kpi.delta}
+                    label={formatDelta(kpi.delta, locale)}
+                    tone={kpi.deltaTone}
+                  />
                 </div>
               </div>
             </motion.button>
@@ -452,7 +425,7 @@ export default function DashboardPage() {
                       : 'No planned or overdue actions are visible for today. Use the moment to work your hot prospects and upcoming sessions.'}
                   </div>
                 ) : (
-                  focusTasks.slice(0, 5).map(task => {
+                  focusTasks.slice(0, 5).map((task) => {
                     const state = dueState(task, locale)
                     return (
                       <div
@@ -461,7 +434,7 @@ export default function DashboardPage() {
                         tabIndex={0}
                         className="group flex w-full items-center gap-3 rounded-2xl border border-border-subtle bg-surface/40 p-3 text-left transition-all hover:border-border-strong hover:bg-surface/60"
                         onClick={() => router.push('/tasks')}
-                        onKeyDown={event => {
+                        onKeyDown={(event) => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault()
                             router.push('/tasks')
@@ -469,7 +442,7 @@ export default function DashboardPage() {
                         }}
                       >
                         <button
-                          onClick={event => {
+                          onClick={(event) => {
                             event.stopPropagation()
                             completeTaskMutation.mutate(task.id)
                           }}
@@ -510,128 +483,15 @@ export default function DashboardPage() {
           </motion.div>
 
           <motion.div variants={item}>
-            <Card padding="lg">
-              <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <BarChart3 className="h-4 w-4 text-secondary" />
-                    {locale === 'tr' ? 'Süreç Takibi Özeti' : 'Pipeline Snapshot'}
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    {locale === 'tr'
-                      ? 'Hangi aşamada kaç kişi olduğunu tek bakışta gör ve sıkışan alanları fark et.'
-                      : 'See how many people sit in each key stage and spot where flow is slowing down.'}
-                  </CardDescription>
-                </div>
-                <Badge variant="default">{contacts.length} {locale === 'tr' ? 'kişi' : 'people'}</Badge>
-              </CardHeader>
-
-              {contacts.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border bg-surface/25 px-4 py-8 text-center text-sm text-text-tertiary">
-                  {locale === 'tr'
-                    ? 'Henüz süreç verisi oluşmadı. İlk kontaklarla birlikte pano daha güçlü görünmeye başlayacak.'
-                    : 'Pipeline data has not formed yet. The board will come alive as your first contacts enter the system.'}
-                </div>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {processSummary.map(stage => (
-                    <button
-                      key={stage.key}
-                      onClick={() => router.push('/pipeline')}
-                      className="rounded-2xl border border-border-subtle bg-surface/35 p-4 text-left transition-all hover:border-border-strong hover:bg-surface/55"
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="inline-flex items-center gap-2 text-xs font-medium text-text-tertiary">
-                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
-                          {stage.label}
-                        </span>
-                        <span className="text-2xl font-bold text-text-primary">{stage.count}</span>
-                      </div>
-                      <div className="mt-4 h-2 overflow-hidden rounded-full bg-background/70">
-                        <div
-                          className="h-full rounded-full transition-all duration-300"
-                          style={{
-                            width: `${Math.max((stage.count / processSummaryMax) * 100, stage.count > 0 ? 12 : 0)}%`,
-                            backgroundColor: stage.color,
-                          }}
-                        />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </Card>
+            <ActivityHeatmap cells={heatmap} weeks={12} />
           </motion.div>
 
           <motion.div variants={item}>
-            <Card padding="lg">
-              <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <TrendingUp className="h-4 w-4 text-success" />
-                    {locale === 'tr' ? 'Haftalık Nabız' : 'Weekly Pulse'}
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    {locale === 'tr'
-                      ? 'Yeni aday, temas ve sunum ritminin son 7 gündeki akışı.'
-                      : 'Your seven-day rhythm across new prospects, touches, and presentations.'}
-                  </CardDescription>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="primary" dot>{locale === 'tr' ? 'Yeni aday' : 'New prospects'}</Badge>
-                  <Badge variant="secondary" dot>{locale === 'tr' ? 'Temas' : 'Touches'}</Badge>
-                  <Badge variant="warning" dot>{locale === 'tr' ? 'Sunum' : 'Presentations'}</Badge>
-                </div>
-              </CardHeader>
+            <PipelineSegmentDonut segments={pipelineSegments} totalContacts={contacts.length} />
+          </motion.div>
 
-              <div className="grid gap-3 md:grid-cols-3">
-                {[
-                  { label: locale === 'tr' ? 'Yeni Aday' : 'New Prospects', value: weeklyPulse.newContacts, accent: 'text-primary' },
-                  { label: locale === 'tr' ? 'Temas' : 'Touches', value: weeklyPulse.touches, accent: 'text-secondary' },
-                  { label: locale === 'tr' ? 'Sunum' : 'Presentations', value: weeklyPulse.presentations, accent: 'text-warning' },
-                ].map(metric => (
-                  <div key={metric.label} className="rounded-2xl border border-border-subtle bg-surface/35 px-4 py-3">
-                    <p className="text-xs font-medium text-text-tertiary">{metric.label}</p>
-                    <p className={`mt-2 text-2xl font-bold ${metric.accent}`}>{metric.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-5 h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={weeklyBuckets}>
-                    <defs>
-                      <linearGradient id="weeklyContacts" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#00d4ff" stopOpacity={0.24} />
-                        <stop offset="95%" stopColor="#00d4ff" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="weeklyTouches" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.24} />
-                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="weeklyPresentations" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.18} />
-                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-                    <Tooltip
-                      contentStyle={{
-                        background: '#1e1e2e',
-                        border: '1px solid rgba(255,255,255,0.06)',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        color: '#f1f5f9',
-                      }}
-                    />
-                    <Area type="monotone" dataKey="contacts" name={locale === 'tr' ? 'Yeni aday' : 'New prospects'} stroke="#00d4ff" fill="url(#weeklyContacts)" strokeWidth={2.4} />
-                    <Area type="monotone" dataKey="touches" name={locale === 'tr' ? 'Temas' : 'Touches'} stroke="#8b5cf6" fill="url(#weeklyTouches)" strokeWidth={2.2} />
-                    <Area type="monotone" dataKey="presentations" name={locale === 'tr' ? 'Sunum' : 'Presentations'} stroke="#f59e0b" fill="url(#weeklyPresentations)" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
+          <motion.div variants={item}>
+            <ReorderDueCard entries={reorderDue} />
           </motion.div>
         </div>
 
@@ -661,7 +521,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {riskItems.map(record => (
+                  {riskItems.map((record) => (
                     <button
                       key={record.id}
                       onClick={() => router.push(record.route)}
@@ -708,7 +568,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {hotLeads.slice(0, 5).map(lead => (
+                  {hotLeads.slice(0, 5).map((lead) => (
                     <button
                       key={lead.id}
                       onClick={() => router.push(`/contacts?contact=${lead.id}`)}
@@ -753,18 +613,18 @@ export default function DashboardPage() {
                       : 'Meetings, presentations, and training sessions already set on the calendar this week.'}
                   </CardDescription>
                 </div>
-                <Badge variant="secondary">{upcomingSessions.length}</Badge>
+                <Badge variant="secondary">{upcomingSessions.length + upcomingEventEntries.length}</Badge>
               </CardHeader>
 
-              {upcomingSessions.length === 0 ? (
+              {upcomingSessions.length === 0 && upcomingEventEntries.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border bg-surface/25 px-4 py-8 text-center text-sm text-text-tertiary">
                   {locale === 'tr'
-                    ? 'Bu hafta takvimde yaklaşan toplantı veya sunum görünmüyor.'
-                    : 'No upcoming meeting or presentation is visible for this week.'}
+                    ? 'Bu hafta takvimde yaklaşan oturum görünmüyor.'
+                    : 'No upcoming session is visible this week.'}
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {upcomingSessions.slice(0, 4).map(session => (
+                  {upcomingSessions.slice(0, 3).map((session) => (
                     <button
                       key={session.id}
                       onClick={() => router.push('/calendar')}
@@ -782,8 +642,69 @@ export default function DashboardPage() {
                       <ChevronRight className="h-4 w-4 shrink-0 text-text-muted transition-colors group-hover:text-text-primary" />
                     </button>
                   ))}
+                  {upcomingEventEntries.slice(0, 3).map((event) => {
+                    const occupancy = event.capacity && event.capacity > 0 ? Math.round((event.confirmed / event.capacity) * 100) : null
+                    return (
+                      <button
+                        key={`event-${event.id}`}
+                        onClick={() => router.push('/events')}
+                        className="group flex w-full items-center gap-3 rounded-2xl border border-border-subtle bg-surface/35 p-3 text-left transition-all hover:border-border-strong hover:bg-surface/55"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-secondary/10">
+                          <TrendingUp className="h-4 w-4 text-secondary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-semibold text-text-primary">{event.title}</p>
+                            {occupancy !== null && <Badge variant="secondary">%{occupancy}</Badge>}
+                          </div>
+                          <p className="mt-1 text-xs text-text-secondary">
+                            {formatCompactDate(event.startDate.toISOString(), locale)} · {event.confirmed}/{event.invited} {locale === 'tr' ? 'katılımcı' : 'attendees'}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-text-muted transition-colors group-hover:text-text-primary" />
+                      </button>
+                    )
+                  })}
                 </div>
               )}
+            </Card>
+          </motion.div>
+
+          <motion.div variants={item}>
+            <Card padding="lg">
+              <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <TrendingUp className="h-4 w-4 text-success" />
+                    {locale === 'tr' ? 'Bu Ay' : 'This Month'}
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    {locale === 'tr'
+                      ? 'Son 30 günün hızlı özeti.'
+                      : 'Quick pulse of the last 30 days.'}
+                  </CardDescription>
+                </div>
+              </CardHeader>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-border-subtle bg-surface/35 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-text-tertiary">{locale === 'tr' ? 'Gelir' : 'Revenue'}</p>
+                  <p className="mt-1.5 text-lg font-bold text-text-primary">{formatTRY(revenueSnapshot.monthRevenue, locale)}</p>
+                </div>
+                <div className="rounded-2xl border border-border-subtle bg-surface/35 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-text-tertiary">{locale === 'tr' ? 'Ort. Sepet' : 'Avg Order'}</p>
+                  <p className="mt-1.5 text-lg font-bold text-text-primary">{formatTRY(revenueSnapshot.avgOrderValue, locale)}</p>
+                </div>
+                <div className="rounded-2xl border border-border-subtle bg-surface/35 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-text-tertiary">{locale === 'tr' ? 'Yeniden Sipariş' : 'Reorder Due'}</p>
+                  <p className="mt-1.5 text-lg font-bold text-text-primary">{reorderDue.length}</p>
+                </div>
+                <div className="rounded-2xl border border-border-subtle bg-surface/35 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-text-tertiary">{locale === 'tr' ? 'Aktif Havuz' : 'Active Pool'}</p>
+                  <p className="mt-1.5 text-lg font-bold text-text-primary">{pipelineSegments.filter((segment) => segment.id !== 'lost').reduce((sum, segment) => sum + segment.count, 0)}</p>
+                </div>
+              </div>
             </Card>
           </motion.div>
         </div>

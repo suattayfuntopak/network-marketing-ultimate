@@ -190,6 +190,17 @@ export async function updateContactStage(id: string, stage: string): Promise<voi
   if (error) throw error
 }
 
+export async function fetchAllInteractions(): Promise<InteractionRow[]> {
+  const userId = await requireSessionUserId()
+  const { data, error } = await supabase
+    .from('nmu_interactions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('date', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as InteractionRow[]
+}
+
 export async function fetchInteractionsByContact(contactId: string): Promise<InteractionRow[]> {
   const userId = await requireSessionUserId()
   const { data, error } = await supabase
