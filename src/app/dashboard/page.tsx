@@ -13,7 +13,7 @@ import type { ContactRow, TaskRow } from '@/lib/queries'
 import {
   Flame, TrendingUp, ShoppingBag,
   UserPlus, Target, ArrowRight, Clock,
-  Zap, Bot, Calendar, ChevronRight, Sparkles, BarChart3,
+  Zap, Calendar, ChevronRight, BarChart3,
   CheckCircle2, Presentation
 } from 'lucide-react'
 import {
@@ -76,6 +76,17 @@ const PIPELINE_COLORS: Record<string, string> = {
   lost: '#475569',
 }
 
+const SUMMARY_STAGE_KEYS = [
+  'new',
+  'contact_planned',
+  'interested',
+  'presentation_done',
+  'ready_to_buy',
+  'became_customer',
+  'became_member',
+  'lost',
+] as const
+
 function startOfDay(value: Date) {
   const next = new Date(value)
   next.setHours(0, 0, 0, 0)
@@ -86,6 +97,23 @@ function endOfDay(value: Date) {
   const next = new Date(value)
   next.setHours(23, 59, 59, 999)
   return next
+}
+
+function formatHeroDate(value: Date, locale: 'tr' | 'en') {
+  if (locale === 'tr') {
+    const day = new Intl.DateTimeFormat('tr-TR', { day: 'numeric' }).format(value)
+    const month = new Intl.DateTimeFormat('tr-TR', { month: 'long' }).format(value)
+    const year = new Intl.DateTimeFormat('tr-TR', { year: 'numeric' }).format(value)
+    const weekday = new Intl.DateTimeFormat('tr-TR', { weekday: 'long' }).format(value)
+    return `${day} ${month.charAt(0).toUpperCase()}${month.slice(1)} ${year} ${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}`
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(value)
 }
 
 export default function DashboardPage() {
@@ -139,15 +167,10 @@ export default function DashboardPage() {
     acc[c.pipeline_stage] = (acc[c.pipeline_stage] ?? 0) + 1
     return acc
   }, {})
-  const pipelineDistribution = Object.entries(pipelineCounts).map(([stage, count]) => ({
-    stage: pipelineLabels[stage as keyof typeof pipelineLabels] ?? stage.replace(/_/g, ' '),
-    count,
-    color: PIPELINE_COLORS[stage] ?? '#64748b',
-  }))
-
   const fullName = currentUser?.name ?? ''
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+  const heroDateLabel = formatHeroDate(today, locale)
 
   const weeklyBuckets = emptyWeek.map((entry, index) => {
     const date = new Date(today)
@@ -177,6 +200,14 @@ export default function DashboardPage() {
     presentations: presentationCounts[bucket.dateKey] ?? 0,
   }))
 
+  const processSummary = SUMMARY_STAGE_KEYS.map(stage => ({
+    key: stage,
+    label: pipelineLabels[stage],
+    count: pipelineCounts[stage] ?? 0,
+    color: PIPELINE_COLORS[stage] ?? '#64748b',
+  }))
+  const processSummaryMax = Math.max(...processSummary.map(stage => stage.count), 1)
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
 
@@ -184,7 +215,7 @@ export default function DashboardPage() {
       <motion.div variants={item}>
         <Card className="relative overflow-hidden" padding="lg">
           <div className="absolute inset-0 opacity-30" style={{ background: 'radial-gradient(ellipse at 80% 50%, rgba(0,212,255,0.08), transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(139,92,246,0.06), transparent 50%)' }} />
-          <div className="relative">
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-2xl">
               <h1 className="text-2xl lg:text-3xl font-bold text-text-primary mb-2">
                 {t.dashboard.greeting}{fullName ? `, ${fullName}` : ''}
@@ -197,6 +228,14 @@ export default function DashboardPage() {
                   ? <><span className="text-error font-semibold">{hotLeads.length}</span> {t.dashboard.hotLeadsWaiting}</>
                   : null}
                 {focusTasks.length === 0 && hotLeads.length === 0 && t.dashboard.momentumStrong}
+              </p>
+            </div>
+            <div className="self-start rounded-2xl border border-border-subtle bg-surface/40 px-4 py-3 shadow-[0_12px_36px_rgba(2,6,23,0.16)] lg:min-w-[220px]">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-text-muted">
+                {locale === 'tr' ? 'Bugünün Tarihi' : "Today's Date"}
+              </p>
+              <p className="mt-2 text-sm font-semibold text-text-primary lg:text-base">
+                {heroDateLabel}
               </p>
             </div>
           </div>
@@ -306,37 +345,52 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
-          {/* Pipeline Overview */}
+          {/* Process Summary */}
           <motion.div variants={item}>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-secondary" />
-                  {t.dashboard.pipelineOverview}
+                  {t.dashboard.processSummary}
                 </CardTitle>
                 <Badge variant="default">
                   {contacts.length} {locale === 'tr' ? 'kişi' : 'people'}
                 </Badge>
               </CardHeader>
-              {pipelineDistribution.length === 0 ? (
+              {contacts.length === 0 ? (
                 <div className="py-8 text-center text-sm text-text-tertiary">
                   {locale === 'tr'
                     ? 'Henüz huni verisi yok. Kişi ekleyerek başlayabilirsin.'
                     : 'There is no pipeline data yet. Start by adding a few contacts.'}
                 </div>
               ) : (
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {pipelineDistribution.map((stage, i) => (
-                    <motion.div key={stage.stage}
+                <div className="space-y-3">
+                  {processSummary.map((stage, i) => (
+                    <motion.div key={stage.key}
                       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                      className="flex-1 min-w-[90px] bg-surface/50 border border-border-subtle rounded-xl p-3 text-center hover:border-border cursor-pointer transition-all"
+                      className="rounded-xl border border-border-subtle bg-surface/45 p-3 hover:border-border transition-all cursor-pointer"
                       onClick={() => router.push('/pipeline')}
                     >
-                      <div className="w-8 h-8 rounded-lg mx-auto mb-2 flex items-center justify-center text-sm font-bold"
-                        style={{ backgroundColor: `${stage.color}15`, color: stage.color }}>
-                        {stage.count}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
+                            <p className="truncate text-sm font-medium text-text-primary">{stage.label}</p>
+                          </div>
+                          <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-background/70">
+                            <div
+                              className="h-full rounded-full transition-all duration-300"
+                              style={{
+                                width: `${Math.max((stage.count / processSummaryMax) * 100, stage.count > 0 ? 12 : 0)}%`,
+                                backgroundColor: stage.color,
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="min-w-[36px] text-right">
+                          <span className="text-lg font-bold text-text-primary">{stage.count}</span>
+                        </div>
                       </div>
-                      <p className="text-[10px] text-text-tertiary font-medium truncate capitalize">{stage.stage}</p>
                     </motion.div>
                   ))}
                 </div>
@@ -407,26 +461,6 @@ export default function DashboardPage() {
         {/* Right Column */}
         <div className="space-y-6">
 
-          {/* AI Next Best Actions */}
-          <motion.div variants={item}>
-            <Card glow="primary">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-secondary" />
-                  {t.dashboard.aiRecommendations}
-                </CardTitle>
-                <Sparkles className="w-4 h-4 text-secondary animate-pulse" />
-              </CardHeader>
-              <div className="py-6 text-center">
-                <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center mx-auto mb-3">
-                  <Bot className="w-5 h-5 text-secondary" />
-                </div>
-                <p className="text-sm text-text-secondary font-medium">AI Koç aktifleştiriliyor</p>
-                <p className="text-xs text-text-tertiary mt-1">Veri eklendikçe öneriler burada görünecek</p>
-              </div>
-            </Card>
-          </motion.div>
-
           {/* Hot Leads */}
           <motion.div variants={item}>
             <Card>
@@ -439,7 +473,7 @@ export default function DashboardPage() {
               </CardHeader>
               {hotLeads.length === 0 ? (
                 <div className="py-6 text-center text-sm text-text-tertiary">
-                  Henüz sıcak lead yok
+                  {t.dashboard.noHotProspects}
                 </div>
               ) : (
                 <div className="space-y-2">
