@@ -41,7 +41,7 @@ export function InteractionMix({ data }: InteractionMixProps) {
   } as const
 
   return (
-    <Card padding="lg">
+    <Card className="h-full" padding="lg">
       <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">

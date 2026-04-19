@@ -29,7 +29,7 @@ export function ReorderDueCard({ entries }: ReorderDueCardProps) {
     entry.status === 'overdue' ? 'error' : entry.status === 'today' ? 'warning' : 'default'
 
   return (
-    <Card padding="lg" glow={overdueCount > 0 ? 'warning' : 'none'}>
+    <Card className="h-full" padding="lg" glow={overdueCount > 0 ? 'warning' : 'none'}>
       <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">

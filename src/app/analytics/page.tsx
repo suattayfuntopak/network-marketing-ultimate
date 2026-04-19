@@ -451,8 +451,8 @@ export default function AnalyticsPage() {
       </motion.div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.95fr)]">
-        <motion.div variants={item}>
-          <Card padding="lg">
+        <motion.div variants={item} className="h-full">
+          <Card className="h-full" padding="lg">
             <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
               <div>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -501,8 +501,8 @@ export default function AnalyticsPage() {
           </Card>
         </motion.div>
 
-        <motion.div variants={item}>
-          <Card padding="lg">
+        <motion.div variants={item} className="h-full">
+          <Card className="h-full" padding="lg">
             <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
               <div>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -570,10 +570,10 @@ export default function AnalyticsPage() {
       </motion.div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,1fr)]">
-        <motion.div variants={item}>
+        <motion.div variants={item} className="h-full">
           <InteractionMix data={interactionSeries} />
         </motion.div>
-        <motion.div variants={item}>
+        <motion.div variants={item} className="h-full">
           <EventPerformance rows={eventRows} />
         </motion.div>
       </div>

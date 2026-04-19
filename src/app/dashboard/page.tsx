@@ -408,9 +408,8 @@ export default function DashboardPage() {
       </motion.div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.95fr)]">
-        <div className="space-y-6">
-          <motion.div variants={item}>
-            <Card className="overflow-hidden" padding="none">
+        <motion.div variants={item} className="h-full xl:col-start-1 xl:row-start-1">
+          <Card className="h-full overflow-hidden" padding="none">
               <div className="border-b border-border px-5 py-4">
                 <CardHeader className="mb-0 items-start gap-3 sm:flex-row sm:items-center">
                   <div>
@@ -496,22 +495,20 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
-          <motion.div variants={item}>
-            <ActivityHeatmap cells={heatmap} weeks={12} />
-          </motion.div>
+        <motion.div variants={item} className="h-full xl:col-start-1 xl:row-start-2">
+          <ActivityHeatmap cells={heatmap} weeks={12} />
+        </motion.div>
 
-          <motion.div variants={item}>
-            <PipelineSegmentDonut segments={pipelineSegments} totalContacts={contacts.length} />
-          </motion.div>
+        <motion.div variants={item} className="h-full xl:col-start-1 xl:row-start-3">
+          <PipelineSegmentDonut segments={pipelineSegments} totalContacts={contacts.length} />
+        </motion.div>
 
-          <motion.div variants={item}>
-            <ReorderDueCard entries={reorderDue} />
-          </motion.div>
-        </div>
+        <motion.div variants={item} className="h-full xl:col-start-1 xl:row-start-4">
+          <ReorderDueCard entries={reorderDue} />
+        </motion.div>
 
-        <div className="space-y-6">
-          <motion.div variants={item}>
-            <Card padding="lg" glow={riskItems.length > 0 ? 'error' : 'none'}>
+        <motion.div variants={item} className="h-full xl:col-start-2 xl:row-start-1">
+          <Card className="h-full" padding="lg" glow={riskItems.length > 0 ? 'error' : 'none'}>
               <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -559,14 +556,14 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
-          <motion.div variants={item}>
-            <Card padding="lg">
-              <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Flame className="h-4 w-4 text-warning" />
-                    {locale === 'tr' ? 'Sıcak Adaylar' : 'Hot Prospects'}
-                  </CardTitle>
+        <motion.div variants={item} className="h-full xl:col-start-2 xl:row-start-2">
+          <Card className="h-full" padding="lg">
+            <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Flame className="h-4 w-4 text-warning" />
+                  {locale === 'tr' ? 'Sıcak Adaylar' : 'Hot Prospects'}
+                </CardTitle>
                   <CardDescription className="mt-1">
                     {locale === 'tr'
                       ? 'Sonraki temasla hızlı ilerleyebilecek en güçlü adaylar.'
@@ -613,14 +610,14 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
-          <motion.div variants={item}>
-            <Card padding="lg">
-              <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Calendar className="h-4 w-4 text-accent" />
-                    {locale === 'tr' ? 'Yaklaşan Oturumlar' : 'Upcoming Sessions'}
-                  </CardTitle>
+        <motion.div variants={item} className="h-full xl:col-start-2 xl:row-start-3">
+          <Card className="h-full" padding="lg">
+            <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Calendar className="h-4 w-4 text-accent" />
+                  {locale === 'tr' ? 'Yaklaşan Oturumlar' : 'Upcoming Sessions'}
+                </CardTitle>
                   <CardDescription className="mt-1">
                     {locale === 'tr'
                       ? 'Bu hafta takvime girilmiş toplantı, sunum ve eğitim akışı.'
@@ -685,14 +682,14 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
-          <motion.div variants={item}>
-            <Card padding="lg">
-              <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <TrendingUp className="h-4 w-4 text-success" />
-                    {locale === 'tr' ? 'Bu Ay' : 'This Month'}
-                  </CardTitle>
+        <motion.div variants={item} className="h-full xl:col-start-2 xl:row-start-4">
+          <Card className="h-full" padding="lg">
+            <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <TrendingUp className="h-4 w-4 text-success" />
+                  {locale === 'tr' ? 'Bu Ay' : 'This Month'}
+                </CardTitle>
                   <CardDescription className="mt-1">
                     {locale === 'tr'
                       ? 'Son 30 günün hızlı özeti.'
@@ -721,7 +718,6 @@ export default function DashboardPage() {
               </div>
             </Card>
           </motion.div>
-        </div>
       </div>
     </motion.div>
   )
