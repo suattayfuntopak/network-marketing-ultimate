@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -7,7 +8,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { getSafeRedirectTarget, syncAuthSessionCookie } from '@/lib/auth'
-import { Sparkles, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react'
+import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -46,8 +47,15 @@ export default function LoginPage() {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center mx-auto mb-4 shadow-[0_0_30px_rgba(0,212,255,0.25)]">
-            <Sparkles className="w-7 h-7 text-white" />
+          <div className="w-16 h-16 rounded-[20px] overflow-hidden border border-border-subtle bg-surface/50 flex items-center justify-center mx-auto mb-4 shadow-[0_0_36px_rgba(34,211,238,0.22)]">
+            <Image
+              src="/favicon.png"
+              alt="Network Marketing Ultimate logo"
+              width={64}
+              height={64}
+              className="w-full h-full object-cover"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Network Marketing Ultimate</h1>
           <p className="text-text-tertiary text-sm mt-1">{a.tagline}</p>
