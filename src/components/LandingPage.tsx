@@ -521,7 +521,7 @@ export default function LandingPage({
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {/* Lang flags */}
             <button onClick={() => setLang("tr")} style={{ background: "none", border: `2px solid ${lang === "tr" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇹🇷</button>
-            <button onClick={() => setLang("en")} style={{ background: "none", border: `2px solid ${lang === "en" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇬🇧</button>
+            <button onClick={() => setLang("en")} style={{ background: "none", border: `2px solid ${lang === "en" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇺🇸</button>
 
             {/* Theme toggle */}
             <button onClick={() => setTheme(isDark ? "light" : "dark")} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, width: 38, height: 38, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
