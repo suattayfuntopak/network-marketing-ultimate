@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -14,7 +15,7 @@ import {
   LayoutDashboard, Users, ShoppingBag, GitBranch, ListTodo,
   CalendarDays, GraduationCap, Calendar, BarChart3,
   Bot, ChevronLeft, ChevronRight,
-  Target, Sparkles, X
+  Target, X
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -57,8 +58,14 @@ export function Sidebar() {
     <div className="flex flex-col h-full relative">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 h-16 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-white" />
+        <div className="w-8 h-8 rounded-lg overflow-hidden border border-border-subtle bg-surface/40 shadow-[0_10px_24px_rgba(34,211,238,0.18)] flex items-center justify-center shrink-0">
+          <Image
+            src="/favicon.png"
+            alt="Network Marketing Ultimate logo"
+            width={32}
+            height={32}
+            className="w-full h-full object-cover"
+          />
         </div>
         <AnimatePresence>
           {!sidebarCollapsed && (

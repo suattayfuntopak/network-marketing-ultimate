@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -476,10 +477,26 @@ export default function LandingPage({
           {/* Logo */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: "linear-gradient(135deg, var(--accent), var(--accent2))",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-            }}>✦</div>
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              overflow: "hidden",
+              boxShadow: "0 10px 24px rgba(34,211,238,0.18)",
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}>
+              <Image
+                src="/favicon.png"
+                alt="Network Marketing Ultimate logo"
+                width={40}
+                height={40}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </div>
             <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: "-0.3px" }}>
               Network Marketing <span className="grad-text">Ultimate</span>
             </span>
@@ -750,7 +767,26 @@ export default function LandingPage({
       {/* ── Footer ── */}
       <footer style={{ borderTop: "1px solid var(--border)", padding: "28px 24px", textAlign: "center" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-          <div style={{ width: 24, height: 24, borderRadius: 7, background: "linear-gradient(135deg, var(--accent), var(--accent2))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>✦</div>
+          <div style={{
+            width: 24,
+            height: 24,
+            borderRadius: 7,
+            overflow: "hidden",
+            border: "1px solid var(--border)",
+            background: "rgba(255,255,255,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}>
+            <Image
+              src="/favicon.png"
+              alt="Network Marketing Ultimate logo"
+              width={24}
+              height={24}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </div>
           <span style={{ fontSize: 13, color: "var(--text2)" }}>{text.footer.copy}</span>
         </div>
       </footer>
