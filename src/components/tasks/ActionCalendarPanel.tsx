@@ -17,181 +17,34 @@ import {
   ChevronRight,
   Layers3,
 } from 'lucide-react'
+import {
+  CALENDAR_HOURS,
+  CALENDAR_HOUR_HEIGHT,
+  CALENDAR_HOUR_START,
+  buildMonthGrid,
+  buildWeekDays,
+  dayKey,
+  endOfWeek,
+  entryEnd,
+  entryStart,
+  entryToneClasses,
+  formatHourLabel,
+  formatPeriodTitle,
+  isSameMonth,
+  isTimedCalendarEntry,
+  isWithinRange,
+  itemTone,
+  sameDay,
+  shiftDate,
+  startOfDay,
+  startOfWeek,
+  toInputDate,
+  type CalendarContext,
+  type CalendarEntry,
+  type CalendarViewMode,
+} from './calendarHelpers'
 
-export type CalendarViewMode = 'month' | 'week' | 'day'
-
-export type CalendarContext = {
-  viewMode: CalendarViewMode
-  focusDate: string
-}
-
-type CalendarEntry = {
-  id: string
-  kind: 'task' | 'event'
-  title: string
-  day: Date
-  sortDate: Date
-  tone: 'primary' | 'success' | 'warning' | 'secondary' | 'default'
-  meta: string
-  task?: TaskRow
-  event?: Event
-}
-
-const CALENDAR_HOUR_START = 7
-const CALENDAR_HOUR_END = 21
-const CALENDAR_HOUR_HEIGHT = 56
-const CALENDAR_HOURS = Array.from(
-  { length: CALENDAR_HOUR_END - CALENDAR_HOUR_START + 1 },
-  (_, index) => CALENDAR_HOUR_START + index,
-)
-
-function startOfDay(value: Date) {
-  const date = new Date(value)
-  date.setHours(0, 0, 0, 0)
-  return date
-}
-
-function startOfMonth(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), 1)
-}
-
-function startOfWeek(value: Date) {
-  const date = startOfDay(value)
-  const dayIndex = (date.getDay() + 6) % 7
-  date.setDate(date.getDate() - dayIndex)
-  return date
-}
-
-function endOfWeek(value: Date) {
-  const date = startOfWeek(value)
-  date.setDate(date.getDate() + 6)
-  return date
-}
-
-function addDays(value: Date, amount: number) {
-  const date = new Date(value)
-  date.setDate(date.getDate() + amount)
-  return date
-}
-
-function dayKey(value: Date) {
-  const date = startOfDay(value)
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
-}
-
-function sameDay(left: Date, right: Date) {
-  return dayKey(left) === dayKey(right)
-}
-
-function isSameMonth(left: Date, right: Date) {
-  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth()
-}
-
-function isWithinRange(value: Date, from: Date, to: Date) {
-  const target = startOfDay(value).getTime()
-  return target >= startOfDay(from).getTime() && target <= startOfDay(to).getTime()
-}
-
-function buildMonthGrid(currentDate: Date) {
-  const monthStart = startOfMonth(currentDate)
-  const gridStart = startOfWeek(monthStart)
-
-  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index))
-}
-
-function buildWeekDays(currentDate: Date) {
-  const firstDay = startOfWeek(currentDate)
-  return Array.from({ length: 7 }, (_, index) => addDays(firstDay, index))
-}
-
-function toInputDate(value: Date) {
-  const date = startOfDay(value)
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function itemTone(task: TaskRow): CalendarEntry['tone'] {
-  if (task.status === 'overdue') return 'warning'
-  if (task.priority === 'urgent' || task.priority === 'high') return 'secondary'
-  if (task.priority === 'medium') return 'primary'
-  return 'default'
-}
-
-function shiftDate(value: Date, viewMode: CalendarViewMode, direction: 'prev' | 'next') {
-  const multiplier = direction === 'prev' ? -1 : 1
-
-  if (viewMode === 'day') {
-    return addDays(value, multiplier)
-  }
-
-  if (viewMode === 'week') {
-    return addDays(value, 7 * multiplier)
-  }
-
-  return new Date(value.getFullYear(), value.getMonth() + multiplier, value.getDate())
-}
-
-function formatPeriodTitle(locale: 'tr' | 'en', viewMode: CalendarViewMode, focusDate: Date) {
-  if (viewMode === 'day') {
-    return focusDate.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      weekday: 'long',
-    })
-  }
-
-  if (viewMode === 'week') {
-    const weekStart = startOfWeek(focusDate)
-    const weekEnd = endOfWeek(focusDate)
-    const startLabel = weekStart.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-      day: 'numeric',
-      month: 'short',
-    })
-    const endLabel = weekEnd.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    })
-    return `${startLabel} - ${endLabel}`
-  }
-
-  return focusDate.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-    month: 'long',
-    year: 'numeric',
-  })
-}
-
-function entryToneClasses(entry: CalendarEntry) {
-  return cn(
-    'border',
-    entry.tone === 'success' && 'bg-success/10 text-success border-success/20',
-    entry.tone === 'secondary' && 'bg-secondary/10 text-secondary border-secondary/20',
-    entry.tone === 'warning' && 'bg-warning/10 text-warning border-warning/20',
-    entry.tone === 'primary' && 'bg-primary/10 text-primary border-primary/20',
-    entry.tone === 'default' && 'bg-surface/70 text-text-secondary border-border-subtle',
-  )
-}
-
-function isTimedCalendarEntry(entry: CalendarEntry) {
-  return entry.kind === 'event' && Boolean(entry.event)
-}
-
-function entryStart(entry: CalendarEntry) {
-  if (!entry.event) return null
-  return new Date(entry.event.startDate)
-}
-
-function entryEnd(entry: CalendarEntry) {
-  if (!entry.event) return null
-  return new Date(entry.event.endDate)
-}
-
-function formatHourLabel(hour: number) {
-  return `${`${hour}`.padStart(2, '0')}:00`
-}
+export type { CalendarContext, CalendarViewMode } from './calendarHelpers'
 
 export function ActionCalendarPanel({
   locale,
