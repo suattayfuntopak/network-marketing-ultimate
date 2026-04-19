@@ -21,8 +21,6 @@ import {
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -33,199 +31,81 @@ import type { TooltipContentProps, TooltipValueType } from 'recharts'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { useLanguage } from '@/components/common/LanguageProvider'
-import { fetchAllOrders, fetchContacts, fetchTasks, type ContactRow, type OrderRow, type TaskRow } from '@/lib/queries'
+import {
+  fetchAllInteractions,
+  fetchAllOrders,
+  fetchContacts,
+  fetchEvents,
+  fetchTasks,
+  type ContactRow,
+  type InteractionRow,
+  type OrderRow,
+  type TaskRow,
+} from '@/lib/queries'
+import type { Event } from '@/types'
+import { PipelineSegmentDonut } from '@/components/dashboard/PipelineSegmentDonut'
+import { Sparkline } from '@/components/dashboard/Sparkline'
+import { buildPipelineSegments } from '@/components/dashboard/dashboardMetrics'
+import {
+  buildCohortTable,
+  buildEventPerformance,
+  buildInteractionMix,
+  buildRevenueSeries,
+  buildTeamLeaderboard,
+  buildTopProducts,
+  buildTrendSeries,
+  getRangeBounds,
+  inDateRange,
+  parseDate,
+  percent,
+  periodLabel,
+  rangeButtonLabel,
+  startOfDay,
+  type RangeOption,
+} from '@/components/analytics/analyticsMetrics'
+import { RevenueSection } from '@/components/analytics/RevenueSection'
+import { ConversionGauges } from '@/components/analytics/ConversionGauges'
+import { InteractionMix } from '@/components/analytics/InteractionMix'
+import { EventPerformance } from '@/components/analytics/EventPerformance'
+import { CohortTable } from '@/components/analytics/CohortTable'
+import { TeamLeaderboard } from '@/components/analytics/TeamLeaderboard'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
-const RANGE_OPTIONS = ['7d', '30d', '90d', 'all'] as const
-type RangeOption = (typeof RANGE_OPTIONS)[number]
-
-const STAGE_COLORS: Record<string, string> = {
-  new: '#00d4ff',
-  contact_planned: '#3b82f6',
-  first_contact: '#6366f1',
-  interested: '#8b5cf6',
-  invited: '#a855f7',
-  presentation_sent: '#f59e0b',
-  presentation_done: '#f97316',
-  followup_pending: '#ef4444',
-  objection_handling: '#fb7185',
-  ready_to_buy: '#10b981',
-  became_customer: '#059669',
-  ready_to_join: '#06b6d4',
-  became_member: '#6366f1',
-  nurture_later: '#64748b',
-  dormant: '#475569',
-  lost: '#ef4444',
-}
-
-const STAGE_LABELS: Record<string, { tr: string; en: string }> = {
-  new: { tr: 'Yeni Aday', en: 'New Lead' },
-  contact_planned: { tr: 'İletişim Planlandı', en: 'Contact Planned' },
-  first_contact: { tr: 'İlk Temas', en: 'First Contact' },
-  interested: { tr: 'İlgileniyor', en: 'Interested' },
-  invited: { tr: 'Davet Edildi', en: 'Invited' },
-  presentation_sent: { tr: 'Sunum Gönderildi', en: 'Presentation Sent' },
-  presentation_done: { tr: 'Sunum Yapıldı', en: 'Presentation Done' },
-  followup_pending: { tr: 'Takipte', en: 'Follow-up Active' },
-  objection_handling: { tr: 'İtiraz Yönetimi', en: 'Objection Handling' },
-  ready_to_buy: { tr: 'Karar Aşaması', en: 'Decision Stage' },
-  became_customer: { tr: 'Müşteri Oldu', en: 'Became Customer' },
-  ready_to_join: { tr: 'Katılıma Hazır', en: 'Ready to Join' },
-  became_member: { tr: 'Ekip Üyesi', en: 'Became Member' },
-  nurture_later: { tr: 'Sonra İlgilen', en: 'Nurture Later' },
-  dormant: { tr: 'Pasif', en: 'Dormant' },
-  lost: { tr: 'Kaybedildi', en: 'Lost' },
-}
-
-function startOfDay(value: Date) {
-  const next = new Date(value)
-  next.setHours(0, 0, 0, 0)
-  return next
-}
-
-function endOfDay(value: Date) {
-  const next = new Date(value)
-  next.setHours(23, 59, 59, 999)
-  return next
-}
-
-function addDays(value: Date, days: number) {
-  const next = new Date(value)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-function addMonths(value: Date, months: number) {
-  const next = new Date(value)
-  next.setMonth(next.getMonth() + months)
-  return next
-}
-
-function parseDate(value: string | null | undefined) {
-  if (!value) return null
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return null
-  return parsed
-}
-
-function inDateRange(value: string | null | undefined, start: Date | null, end: Date) {
-  const parsed = parseDate(value)
-  if (!parsed) return false
-  if (!start) return parsed <= end
-  return parsed >= start && parsed <= end
-}
-
-function getRangeBounds(range: RangeOption, today: Date) {
-  if (range === 'all') {
-    return { start: null, end: endOfDay(today), previousStart: null, previousEnd: null }
-  }
-
-  const days = range === '7d' ? 7 : range === '30d' ? 30 : 90
-  const end = endOfDay(today)
-  const start = startOfDay(addDays(today, -(days - 1)))
-  const previousEnd = endOfDay(addDays(start, -1))
-  const previousStart = startOfDay(addDays(previousEnd, -(days - 1)))
-  return { start, end, previousStart, previousEnd }
-}
-
-function percent(value: number, total: number) {
-  if (total <= 0) return 0
-  return Math.round((value / total) * 100)
-}
-
-function periodLabel(range: RangeOption, locale: 'tr' | 'en') {
-  if (locale === 'tr') {
-    if (range === '7d') return 'Son 7 gün'
-    if (range === '30d') return 'Son 30 gün'
-    if (range === '90d') return 'Son 90 gün'
-    return 'Tüm zamanlar'
-  }
-
-  if (range === '7d') return 'Last 7 days'
-  if (range === '30d') return 'Last 30 days'
-  if (range === '90d') return 'Last 90 days'
-  return 'All time'
-}
-
-function rangeButtonLabel(range: RangeOption, locale: 'tr' | 'en') {
-  if (range === 'all') return locale === 'tr' ? 'Tümü' : 'All'
-  return range.toUpperCase()
-}
+const RANGE_OPTIONS: RangeOption[] = ['7d', '30d', '90d', 'all']
 
 function formatDelta(current: number, previous: number | null, locale: 'tr' | 'en') {
   if (previous === null) {
     return {
       value: locale === 'tr' ? 'Genel görünüm' : 'Overall view',
       positive: true,
+      neutral: true,
     }
   }
 
   const diff = current - previous
-  const positive = diff >= 0
-  const prefix = diff > 0 ? '+' : ''
-  return {
-    value: `${prefix}${diff}`,
-    positive,
-  }
-}
-
-function formatBucketLabel(start: Date, end: Date, range: RangeOption, locale: 'tr' | 'en') {
-  const formatter = new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-US', {
-    day: 'numeric',
-    month: range === 'all' ? 'short' : 'short',
-  })
-
-  if (range === 'all') {
-    return new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-US', { month: 'short' }).format(start)
-  }
-
-  if (start.getTime() === end.getTime()) {
-    return formatter.format(start)
-  }
-
-  return `${formatter.format(start)}-${new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-US', { day: 'numeric' }).format(end)}`
-}
-
-function buildTrendSeries(
-  range: RangeOption,
-  locale: 'tr' | 'en',
-  contacts: ContactRow[],
-  tasks: TaskRow[],
-  end: Date,
-) {
-  if (range === 'all') {
-    return Array.from({ length: 6 }).map((_, index) => {
-      const monthStart = startOfDay(addMonths(new Date(end), -(5 - index)))
-      monthStart.setDate(1)
-      const monthEnd = endOfDay(addMonths(monthStart, 1))
-      monthEnd.setDate(0)
-
-      return {
-        label: formatBucketLabel(monthStart, monthStart, range, locale),
-        contacts: contacts.filter(contact => inDateRange(contact.created_at, monthStart, monthEnd)).length,
-        touches: contacts.filter(contact => inDateRange(contact.last_contact_date, monthStart, monthEnd)).length,
-        presentations: tasks.filter(task => task.type === 'presentation' && inDateRange(task.due_date, monthStart, monthEnd)).length,
-      }
-    })
-  }
-
-  const bucketSize = range === '7d' ? 1 : range === '30d' ? 5 : 15
-  const bucketCount = range === '7d' ? 7 : 6
-
-  return Array.from({ length: bucketCount }).map((_, index) => {
-    const bucketStart = startOfDay(addDays(end, -((bucketCount - 1 - index) * bucketSize)))
-    const normalizedStart = range === '7d' ? bucketStart : startOfDay(addDays(bucketStart, -(bucketSize - 1)))
-    const bucketEnd = endOfDay(range === '7d' ? bucketStart : addDays(normalizedStart, bucketSize - 1))
-
+  if (diff === 0) {
     return {
-      label: formatBucketLabel(normalizedStart, range === '7d' ? normalizedStart : bucketEnd, range, locale),
-      contacts: contacts.filter(contact => inDateRange(contact.created_at, normalizedStart, bucketEnd)).length,
-      touches: contacts.filter(contact => inDateRange(contact.last_contact_date, normalizedStart, bucketEnd)).length,
-      presentations: tasks.filter(task => task.type === 'presentation' && inDateRange(task.due_date, normalizedStart, bucketEnd)).length,
+      value: locale === 'tr' ? 'Değişim yok' : 'No change',
+      positive: true,
+      neutral: true,
     }
-  })
+  }
+  const positive = diff >= 0
+  if (previous === 0) {
+    return {
+      value: `${diff > 0 ? '+' : ''}${diff}`,
+      positive,
+      neutral: false,
+    }
+  }
+  const pct = Math.round((diff / Math.max(previous, 1)) * 100)
+  return {
+    value: `${pct > 0 ? '+' : ''}${pct}%`,
+    positive,
+    neutral: false,
+  }
 }
 
 const CustomTooltip = ({ active, payload, label }: TooltipContentProps<TooltipValueType, string | number>) => {
@@ -265,64 +145,71 @@ export default function AnalyticsPage() {
     staleTime: 30_000,
   })
 
+  const { data: interactions = [] } = useQuery<InteractionRow[]>({
+    queryKey: ['interactions-all'],
+    queryFn: fetchAllInteractions,
+    staleTime: 30_000,
+  })
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ['events'],
+    queryFn: fetchEvents,
+    staleTime: 30_000,
+  })
+
   const today = startOfDay(new Date())
   const { start, end, previousStart, previousEnd } = getRangeBounds(range, today)
+  const currentBounds = { start, end }
+  const previousBounds = previousStart && previousEnd ? { start: previousStart, end: previousEnd } : null
 
-  const currentContacts = contacts.filter(contact => inDateRange(contact.created_at, start, end))
-  const previousContacts = previousStart && previousEnd
-    ? contacts.filter(contact => inDateRange(contact.created_at, previousStart, previousEnd))
+  const currentContacts = contacts.filter((contact) => inDateRange(contact.created_at, currentBounds))
+  const previousContacts = previousBounds
+    ? contacts.filter((contact) => inDateRange(contact.created_at, previousBounds))
     : []
 
-  const currentTouches = contacts.filter(contact => inDateRange(contact.last_contact_date, start, end))
-  const previousTouches = previousStart && previousEnd
-    ? contacts.filter(contact => inDateRange(contact.last_contact_date, previousStart, previousEnd))
+  const currentTouches = contacts.filter((contact) => inDateRange(contact.last_contact_date, currentBounds))
+  const previousTouches = previousBounds
+    ? contacts.filter((contact) => inDateRange(contact.last_contact_date, previousBounds))
     : []
 
-  const currentPresentations = tasks.filter(task => task.type === 'presentation' && inDateRange(task.due_date, start, end))
-  const previousPresentations = previousStart && previousEnd
-    ? tasks.filter(task => task.type === 'presentation' && inDateRange(task.due_date, previousStart, previousEnd))
+  const currentPresentations = tasks.filter((task) => task.type === 'presentation' && inDateRange(task.due_date, currentBounds))
+  const previousPresentations = previousBounds
+    ? tasks.filter((task) => task.type === 'presentation' && inDateRange(task.due_date, previousBounds))
     : []
 
-  const currentOrders = orders.filter(order => inDateRange(order.order_date, start, end))
-  const previousOrders = previousStart && previousEnd
-    ? orders.filter(order => inDateRange(order.order_date, previousStart, previousEnd))
+  const currentOrders = orders.filter((order) => order.status !== 'cancelled' && inDateRange(order.order_date, currentBounds))
+  const previousOrders = previousBounds
+    ? orders.filter((order) => order.status !== 'cancelled' && inDateRange(order.order_date, previousBounds))
     : []
 
-  const currentRecruits = contacts.filter(contact => contact.pipeline_stage === 'became_member' && inDateRange(contact.created_at, start, end))
-  const previousRecruits = previousStart && previousEnd
-    ? contacts.filter(contact => contact.pipeline_stage === 'became_member' && inDateRange(contact.created_at, previousStart, previousEnd))
+  const currentRevenue = currentOrders.reduce((sum, order) => sum + (order.total_try ?? 0), 0)
+  const avgOrderValue = currentOrders.length > 0 ? currentRevenue / currentOrders.length : 0
+
+  const currentRecruits = contacts.filter((contact) => contact.pipeline_stage === 'became_member' && inDateRange(contact.created_at, currentBounds))
+  const previousRecruits = previousBounds
+    ? contacts.filter((contact) => contact.pipeline_stage === 'became_member' && inDateRange(contact.created_at, previousBounds))
     : []
 
-  const currentOverdueTasks = tasks.filter(task => {
+  const currentOverdueTasks = tasks.filter((task) => {
     const due = parseDate(task.due_date)
     if (!due) return false
     return (task.status === 'overdue' || (task.status === 'pending' && due < today)) && (!start || due >= start) && due <= end
   })
 
-  const previousOverdueTasks = previousStart && previousEnd
-    ? tasks.filter(task => {
-      const due = parseDate(task.due_date)
-      if (!due) return false
-      return (task.status === 'overdue' || task.status === 'pending') && due >= previousStart && due <= previousEnd
-    })
+  const previousOverdueTasks = previousBounds
+    ? tasks.filter((task) => {
+        const due = parseDate(task.due_date)
+        if (!due) return false
+        return (task.status === 'overdue' || task.status === 'pending') && due >= previousBounds.start! && due <= previousBounds.end
+      })
     : []
 
+  const pipelineSegments = buildPipelineSegments(contacts)
   const pipelineCounts = contacts.reduce<Record<string, number>>((accumulator, contact) => {
     accumulator[contact.pipeline_stage] = (accumulator[contact.pipeline_stage] ?? 0) + 1
     return accumulator
   }, {})
 
-  const stageDistribution = Object.entries(pipelineCounts)
-    .map(([stage, count]) => ({
-      key: stage,
-      label: STAGE_LABELS[stage]?.[locale] ?? stage,
-      count,
-      color: STAGE_COLORS[stage] ?? '#64748b',
-      share: percent(count, contacts.length),
-    }))
-    .sort((left, right) => right.count - left.count)
-
-  const topStage = stageDistribution[0]
   const dormantCount = (pipelineCounts.dormant ?? 0) + (pipelineCounts.lost ?? 0)
   const readyToCloseCount = (pipelineCounts.ready_to_buy ?? 0) + (pipelineCounts.became_customer ?? 0)
   const warmPipelineCount =
@@ -330,57 +217,44 @@ export default function AnalyticsPage() {
     (pipelineCounts.presentation_sent ?? 0) +
     (pipelineCounts.presentation_done ?? 0) +
     (pipelineCounts.followup_pending ?? 0)
+  const topSegment = pipelineSegments.slice().sort((left, right) => right.count - left.count)[0]
 
   const trendSeries = buildTrendSeries(range, locale, contacts, tasks, end)
+  const revenueSeries = buildRevenueSeries(range, locale, orders, end)
+  const interactionSeries = buildInteractionMix(range, locale, interactions, end)
+  const topProducts = buildTopProducts(orders, currentBounds, 6)
+  const cohortRows = buildCohortTable(contacts, locale, 6)
+  const eventRows = buildEventPerformance(events, 6)
+  const teamRows = buildTeamLeaderboard(contacts, tasks, currentBounds, today, 6)
 
-  const memberContacts = contacts.filter(contact => contact.pipeline_stage === 'became_member')
-  const teamRhythm = memberContacts
-    .map(contact => {
-      const memberTasks = tasks.filter(task => task.contact_id === contact.id)
-      const weekTaskCount = memberTasks.filter(task => inDateRange(task.due_date, addDays(today, -6), end)).length
-      const overdueCount = memberTasks.filter(task => task.status === 'overdue').length
-
-      return {
-        id: contact.id,
-        name: contact.full_name,
-        value: weekTaskCount,
-        overdue: overdueCount,
-      }
-    })
-    .sort((left, right) => right.value - left.value)
-    .slice(0, 6)
-
-  const funnelSteps = [
-    { stage: t.analytics.totalLeads, value: contacts.length },
-    { stage: t.analytics.contacted, value: contacts.filter(contact => Boolean(contact.last_contact_date)).length },
-    { stage: t.analytics.interested, value: contacts.filter(contact => ['interested', 'invited', 'presentation_sent', 'presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy'].includes(contact.pipeline_stage)).length },
-    { stage: t.analytics.presented, value: contacts.filter(contact => ['presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy', 'became_customer', 'became_member'].includes(contact.pipeline_stage)).length },
-    { stage: t.analytics.converted, value: (pipelineCounts.became_customer ?? 0) + (pipelineCounts.became_member ?? 0) },
-  ].map(step => ({
-    ...step,
-    pct: percent(step.value, contacts.length),
-  }))
-
-  const conversionEngine = [
+  const gaugeEntries = [
     {
-      label: locale === 'tr' ? 'Temasa Geçme' : 'Touch Coverage',
+      key: 'touch',
+      label: locale === 'tr' ? 'Temas' : 'Touch',
       value: percent(currentTouches.length, Math.max(currentContacts.length, 1)),
       color: '#00d4ff',
+      caption: `${currentTouches.length}/${Math.max(currentContacts.length, 1)}`,
     },
     {
-      label: locale === 'tr' ? 'Sunuma Taşıma' : 'Presentation Lift',
+      key: 'presentation',
+      label: locale === 'tr' ? 'Sunum' : 'Presentation',
       value: percent(currentPresentations.length, Math.max(currentTouches.length, 1)),
       color: '#8b5cf6',
+      caption: `${currentPresentations.length}/${Math.max(currentTouches.length, 1)}`,
     },
     {
-      label: locale === 'tr' ? 'Siparişe Dönüşüm' : 'Order Conversion',
+      key: 'order',
+      label: locale === 'tr' ? 'Sipariş' : 'Order',
       value: percent(currentOrders.length, Math.max(currentPresentations.length, 1)),
       color: '#10b981',
+      caption: `${currentOrders.length}/${Math.max(currentPresentations.length, 1)}`,
     },
     {
-      label: locale === 'tr' ? 'Ekibe Katılım' : 'Team Join Rate',
+      key: 'team',
+      label: locale === 'tr' ? 'Ekibe Katılım' : 'Team Join',
       value: percent(currentRecruits.length, Math.max(currentContacts.length, 1)),
       color: '#f59e0b',
+      caption: `${currentRecruits.length}/${Math.max(currentContacts.length, 1)}`,
     },
   ]
 
@@ -388,38 +262,62 @@ export default function AnalyticsPage() {
     {
       label: locale === 'tr' ? 'Yeni Adaylar' : 'New Prospects',
       value: currentContacts.length,
-      delta: formatDelta(currentContacts.length, previousStart ? previousContacts.length : null, locale),
+      delta: formatDelta(currentContacts.length, previousBounds ? previousContacts.length : null, locale),
       icon: Users,
+      sparkData: trendSeries.map((point) => ({ value: point.contacts })),
+      sparkColor: '#00d4ff',
+      sparkId: 'kpi-contacts',
     },
     {
       label: locale === 'tr' ? 'Temaslar' : 'Touches',
       value: currentTouches.length,
-      delta: formatDelta(currentTouches.length, previousStart ? previousTouches.length : null, locale),
+      delta: formatDelta(currentTouches.length, previousBounds ? previousTouches.length : null, locale),
       icon: Activity,
+      sparkData: trendSeries.map((point) => ({ value: point.touches })),
+      sparkColor: '#8b5cf6',
+      sparkId: 'kpi-touches',
     },
     {
       label: locale === 'tr' ? 'Sunumlar' : 'Presentations',
       value: currentPresentations.length,
-      delta: formatDelta(currentPresentations.length, previousStart ? previousPresentations.length : null, locale),
+      delta: formatDelta(currentPresentations.length, previousBounds ? previousPresentations.length : null, locale),
       icon: Presentation,
+      sparkData: trendSeries.map((point) => ({ value: point.presentations })),
+      sparkColor: '#f59e0b',
+      sparkId: 'kpi-presentations',
     },
     {
-      label: locale === 'tr' ? 'Siparişler' : 'Orders',
-      value: currentOrders.length,
-      delta: formatDelta(currentOrders.length, previousStart ? previousOrders.length : null, locale),
+      label: locale === 'tr' ? 'Gelir' : 'Revenue',
+      value: new Intl.NumberFormat(locale === 'tr' ? 'tr-TR' : 'en-US', {
+        style: 'currency',
+        currency: 'TRY',
+        maximumFractionDigits: 0,
+        notation: currentRevenue >= 1_000_000 ? 'compact' : 'standard',
+      }).format(currentRevenue),
+      delta: formatDelta(currentRevenue, previousBounds ? previousOrders.reduce((sum, order) => sum + (order.total_try ?? 0), 0) : null, locale),
       icon: ShoppingBag,
+      sparkData: revenueSeries.map((point) => ({ value: point.revenue })),
+      sparkColor: '#10b981',
+      sparkId: 'kpi-revenue',
     },
     {
       label: locale === 'tr' ? 'Ekibe Katılım' : 'Team Adds',
       value: currentRecruits.length,
-      delta: formatDelta(currentRecruits.length, previousStart ? previousRecruits.length : null, locale),
+      delta: formatDelta(currentRecruits.length, previousBounds ? previousRecruits.length : null, locale),
       icon: UserPlus,
+      sparkData: trendSeries.map(() => ({ value: 0 })),
+      sparkColor: '#f59e0b',
+      sparkId: 'kpi-recruits',
     },
     {
       label: locale === 'tr' ? 'Geciken Takipler' : 'Overdue Follow-ups',
       value: currentOverdueTasks.length,
-      delta: formatDelta(currentOverdueTasks.length, previousStart ? previousOverdueTasks.length : null, locale),
+      delta: formatDelta(currentOverdueTasks.length, previousBounds ? previousOverdueTasks.length : null, locale),
       icon: Clock3,
+      sparkData: trendSeries.map((point) => ({ value: point.presentations })),
+      sparkColor: '#ef4444',
+      sparkId: 'kpi-overdue',
+      inverseDelta: true,
     },
   ]
 
@@ -442,15 +340,15 @@ export default function AnalyticsPage() {
               <h1 className="mt-4 text-2xl font-bold text-text-primary lg:text-4xl">{t.analytics.title}</h1>
               <p className="mt-3 text-sm leading-6 text-text-secondary lg:text-base">
                 {locale === 'tr'
-                  ? `${periodLabel(range, locale)} için büyüme ritmini, süreç sağlığını ve dönüşüm motorunu tek ekranda gör.`
-                  : `See growth rhythm, process health, and conversion strength for ${periodLabel(range, locale).toLowerCase()} on a single screen.`}
+                  ? `${periodLabel(range, locale)} için gelir, süreç kalitesi, dönüşüm motoru ve ekip performansını tek ekranda gör.`
+                  : `Revenue, pipeline quality, conversion engine, and team performance for ${periodLabel(range, locale).toLowerCase()} on a single screen.`}
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3 xl:w-[520px]">
               {[
                 {
-                  label: locale === 'tr' ? 'En Yoğun Aşama' : 'Most Crowded Stage',
-                  value: topStage ? `${topStage.label} · ${topStage.count}` : locale === 'tr' ? 'Veri bekleniyor' : 'Waiting for data',
+                  label: locale === 'tr' ? 'En Büyük Segment' : 'Largest Segment',
+                  value: topSegment ? `${locale === 'tr' ? topSegment.labelTr : topSegment.labelEn} · ${topSegment.count}` : locale === 'tr' ? 'Veri bekleniyor' : 'Waiting for data',
                 },
                 {
                   label: locale === 'tr' ? 'Darboğaz' : 'Bottleneck',
@@ -459,10 +357,14 @@ export default function AnalyticsPage() {
                     : locale === 'tr' ? 'Takip tarafı temiz' : 'Follow-up side is clean',
                 },
                 {
-                  label: locale === 'tr' ? 'Kapanışa Yakın' : 'Near Close',
-                  value: locale === 'tr' ? `${readyToCloseCount} kayıt sıcak bölgede` : `${readyToCloseCount} records in the hot zone`,
+                  label: locale === 'tr' ? 'Ortalama Sepet' : 'Avg Order Value',
+                  value: new Intl.NumberFormat(locale === 'tr' ? 'tr-TR' : 'en-US', {
+                    style: 'currency',
+                    currency: 'TRY',
+                    maximumFractionDigits: 0,
+                  }).format(avgOrderValue),
                 },
-              ].map(insight => (
+              ].map((insight) => (
                 <div key={insight.label} className="rounded-2xl border border-border-subtle bg-surface/45 px-4 py-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-text-muted">{insight.label}</p>
                   <p className="mt-2 text-sm font-semibold text-text-primary">{insight.value}</p>
@@ -478,7 +380,7 @@ export default function AnalyticsPage() {
           <Filter className="h-3.5 w-3.5" />
           {locale === 'tr' ? 'Görünüm aralığı' : 'View range'}
         </div>
-        {RANGE_OPTIONS.map(option => (
+        {RANGE_OPTIONS.map((option) => (
           <button
             key={option}
             onClick={() => setRange(option)}
@@ -495,22 +397,41 @@ export default function AnalyticsPage() {
       </motion.div>
 
       <motion.div variants={item} className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        {kpis.map(kpi => {
+        {kpis.map((kpi) => {
           const Icon = kpi.icon
+          const isPositive = kpi.inverseDelta ? !kpi.delta.positive : kpi.delta.positive
+          const trendClass = kpi.delta.neutral
+            ? 'text-text-tertiary'
+            : isPositive
+              ? 'text-success'
+              : 'text-error'
           return (
             <div key={kpi.label} className="rounded-2xl border border-border bg-card p-4">
               <div className="flex items-center justify-between gap-2">
                 <Icon className="h-4 w-4 text-text-tertiary" />
-                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${kpi.delta.positive ? 'text-success' : 'text-error'}`}>
-                  {kpi.delta.positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${trendClass}`}>
+                  {!kpi.delta.neutral && (kpi.delta.positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />)}
                   {kpi.delta.value}
                 </span>
               </div>
-              <p className="mt-4 text-3xl font-bold text-text-primary">{kpi.value}</p>
+              <p className="mt-3 text-2xl font-bold text-text-primary">{kpi.value}</p>
               <p className="mt-1 text-xs text-text-tertiary">{kpi.label}</p>
+              <div className="mt-2 h-[28px]">
+                <Sparkline data={kpi.sparkData} color={kpi.sparkColor} gradientId={kpi.sparkId} height={28} />
+              </div>
             </div>
           )
         })}
+      </motion.div>
+
+      <motion.div variants={item}>
+        <RevenueSection
+          series={revenueSeries}
+          topProducts={topProducts}
+          totalRevenue={currentRevenue}
+          avgOrderValue={avgOrderValue}
+          orderCount={currentOrders.length}
+        />
       </motion.div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.95fr)]">
@@ -582,8 +503,8 @@ export default function AnalyticsPage() {
             <div className="space-y-3">
               {[
                 {
-                  label: locale === 'tr' ? 'En yoğun aşama' : 'Most crowded stage',
-                  value: topStage ? `${topStage.label} · ${topStage.count}` : locale === 'tr' ? 'Veri yok' : 'No data',
+                  label: locale === 'tr' ? 'En büyük segment' : 'Largest segment',
+                  value: topSegment ? `${locale === 'tr' ? topSegment.labelTr : topSegment.labelEn} · ${topSegment.count}` : locale === 'tr' ? 'Veri yok' : 'No data',
                   tone: 'primary',
                 },
                 {
@@ -608,7 +529,7 @@ export default function AnalyticsPage() {
                   value: locale === 'tr' ? `${warmPipelineCount} kayıt dönüşüm hattında` : `${warmPipelineCount} records moving in pipeline`,
                   tone: 'default',
                 },
-              ].map(row => (
+              ].map((row) => (
                 <div key={row.label} className="rounded-2xl border border-border-subtle bg-surface/35 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-text-primary">{row.label}</p>
@@ -624,176 +545,102 @@ export default function AnalyticsPage() {
         </motion.div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]">
-        <motion.div variants={item}>
-          <Card padding="lg">
-            <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Target className="h-4 w-4 text-secondary" />
-                  {locale === 'tr' ? 'Süreç Dağılımı' : 'Pipeline Distribution'}
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  {locale === 'tr'
-                    ? 'Hangi aşamalarda yoğunluk olduğunu ve paylarını birlikte incele.'
-                    : 'Inspect both volume and share across your active pipeline stages.'}
-                </CardDescription>
-              </div>
-              <Badge variant="default">{contacts.length} {locale === 'tr' ? 'toplam kayıt' : 'total records'}</Badge>
-            </CardHeader>
+      <motion.div variants={item}>
+        <PipelineSegmentDonut segments={pipelineSegments} totalContacts={contacts.length} />
+      </motion.div>
 
-            <div className="space-y-3">
-              {stageDistribution.map(stage => (
-                <div key={stage.key} className="rounded-2xl border border-border-subtle bg-surface/35 p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
-                        <p className="truncate text-sm font-medium text-text-primary">{stage.label}</p>
-                      </div>
-                      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-background/70">
-                        <div
-                          className="h-full rounded-full transition-all duration-300"
-                          style={{ width: `${Math.max(stage.share, stage.count > 0 ? 10 : 0)}%`, backgroundColor: stage.color }}
-                        />
-                      </div>
-                    </div>
-                    <div className="min-w-[84px] text-right">
-                      <p className="text-lg font-bold text-text-primary">{stage.count}</p>
-                      <p className="text-xs text-text-tertiary">%{stage.share}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+      <motion.div variants={item}>
+        <ConversionGauges entries={gaugeEntries} />
+      </motion.div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,1fr)]">
+        <motion.div variants={item}>
+          <InteractionMix data={interactionSeries} />
         </motion.div>
-
         <motion.div variants={item}>
-          <Card padding="lg">
-            <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TrendingUp className="h-4 w-4 text-success" />
-                  {locale === 'tr' ? 'Dönüşüm Motoru' : 'Conversion Engine'}
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  {locale === 'tr'
-                    ? 'Seçili dönem içinde temas, sunum ve kapanış hattının ne kadar çalıştığını gör.'
-                    : 'See how well the touch, presentation, and close engine worked in the selected period.'}
-                </CardDescription>
-              </div>
-            </CardHeader>
-
-            <div className="space-y-4">
-              {conversionEngine.map(metric => (
-                <div key={metric.label} className="rounded-2xl border border-border-subtle bg-surface/35 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium text-text-primary">{metric.label}</p>
-                    <p className="text-lg font-bold text-text-primary">%{metric.value}</p>
-                  </div>
-                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-background/70">
-                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${Math.max(metric.value, metric.value > 0 ? 10 : 0)}%`, backgroundColor: metric.color }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+          <EventPerformance rows={eventRows} />
         </motion.div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.2fr)]">
-        <motion.div variants={item}>
-          <Card padding="lg">
-            <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Users className="h-4 w-4 text-accent" />
-                  {locale === 'tr' ? 'Takım Ritmi' : 'Team Rhythm'}
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  {locale === 'tr'
-                    ? 'Ekip üyelerinin son 7 gündeki görev ritmini ve geciken yükünü gör.'
-                    : 'Review team members’ seven-day task rhythm and overdue load.'}
-                </CardDescription>
-              </div>
-            </CardHeader>
+      <motion.div variants={item}>
+        <CohortTable rows={cohortRows} />
+      </motion.div>
 
-            {teamRhythm.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border bg-surface/25 px-4 py-8 text-center text-sm text-text-tertiary">
+      <motion.div variants={item}>
+        <TeamLeaderboard rows={teamRows} />
+      </motion.div>
+
+      <motion.div variants={item}>
+        <Card padding="lg">
+          <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Target className="h-4 w-4 text-secondary" />
+                {t.analytics.conversionFunnel}
+              </CardTitle>
+              <CardDescription className="mt-1">
                 {locale === 'tr'
-                  ? 'Ekip ritmi gösterecek üye verisi henüz yok.'
-                  : 'There is no member data yet to show team rhythm.'}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {teamRhythm.map(member => (
-                  <div key={member.id} className="rounded-2xl border border-border-subtle bg-surface/35 p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-semibold text-text-primary">{member.name}</p>
-                        <p className="mt-1 text-xs text-text-secondary">
-                          {locale === 'tr'
-                            ? `${member.value} görev hareketi · ${member.overdue} gecikmiş`
-                            : `${member.value} task moves · ${member.overdue} overdue`}
-                        </p>
-                      </div>
-                      <Badge variant={member.overdue > 0 ? 'warning' : 'success'}>
-                        {member.value}
-                      </Badge>
-                    </div>
-                    <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-background/70">
-                      <div
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{ width: `${Math.max(percent(member.value, Math.max(teamRhythm[0]?.value ?? 1, 1)), member.value > 0 ? 10 : 0)}%`, backgroundColor: member.overdue > 0 ? '#f59e0b' : '#00d4ff' }}
+                  ? 'Ham temasın dönüşüme nasıl indiğini aşama-aşama gör.'
+                  : 'Track how raw contact volume cascades into real conversion.'}
+              </CardDescription>
+            </div>
+          </CardHeader>
+
+          <div className="space-y-2">
+            {[
+              { stage: t.analytics.totalLeads, value: contacts.length, color: '#00d4ff' },
+              { stage: t.analytics.contacted, value: contacts.filter((contact) => Boolean(contact.last_contact_date)).length, color: '#3b82f6' },
+              {
+                stage: t.analytics.interested,
+                value: contacts.filter((contact) =>
+                  ['interested', 'invited', 'presentation_sent', 'presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy'].includes(contact.pipeline_stage),
+                ).length,
+                color: '#8b5cf6',
+              },
+              {
+                stage: t.analytics.presented,
+                value: contacts.filter((contact) =>
+                  ['presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy', 'became_customer', 'became_member'].includes(contact.pipeline_stage),
+                ).length,
+                color: '#f59e0b',
+              },
+              {
+                stage: t.analytics.converted,
+                value: (pipelineCounts.became_customer ?? 0) + (pipelineCounts.became_member ?? 0),
+                color: '#10b981',
+              },
+            ]
+              .map((step, index, array) => {
+                const pct = percent(step.value, Math.max(contacts.length, 1))
+                const dropFromPrev = index === 0 ? null : array[index - 1].value - step.value
+                return { ...step, pct, dropFromPrev }
+              })
+              .map((step, index) => (
+                <div key={step.stage} className="rounded-2xl border border-border-subtle bg-surface/35 p-3">
+                  <div className="flex items-center gap-4">
+                    <div className="w-28 shrink-0 text-xs font-semibold text-text-secondary">{step.stage}</div>
+                    <div className="relative h-9 flex-1 overflow-hidden rounded-2xl bg-background/70">
+                      <motion.div
+                        className="h-full rounded-2xl"
+                        style={{ backgroundColor: step.color }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.max(step.pct, step.value > 0 ? 8 : 0)}%` }}
+                        transition={{ duration: 0.8, delay: index * 0.08 }}
                       />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-text-primary">{step.value}</span>
                     </div>
+                    <div className="w-16 text-right text-xs font-semibold text-text-primary">%{step.pct}</div>
                   </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        </motion.div>
-
-        <motion.div variants={item}>
-          <Card padding="lg">
-            <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <BarChart3 className="h-4 w-4 text-primary" />
-                  {t.analytics.conversionFunnel}
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  {locale === 'tr'
-                    ? 'Ham temasın gerçek dönüşüme nasıl indiğini yüzdelerle gör.'
-                    : 'Track how raw contact volume cascades into real conversion.'}
-                </CardDescription>
-              </div>
-            </CardHeader>
-
-            <div className="space-y-3">
-              {funnelSteps.map((step, index) => (
-                <div key={step.stage} className="flex items-center gap-4">
-                  <div className="w-24 shrink-0 text-xs text-text-secondary">{step.stage}</div>
-                  <div className="relative h-9 flex-1 overflow-hidden rounded-2xl bg-surface">
-                    <motion.div
-                      className="h-full rounded-2xl"
-                      style={{ backgroundColor: ['#00d4ff', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981'][index] }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.max(step.pct, step.value > 0 ? 12 : 0)}%` }}
-                      transition={{ duration: 0.8, delay: index * 0.08 }}
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-text-primary">
-                      {step.value}
-                    </span>
-                  </div>
-                  <div className="w-12 text-right text-xs font-semibold text-text-primary">%{step.pct}</div>
+                  {step.dropFromPrev !== null && step.dropFromPrev > 0 && (
+                    <p className="mt-2 pl-[132px] text-[10px] text-text-tertiary">
+                      ↓ {step.dropFromPrev} {locale === 'tr' ? 'kişi önceki aşamadan devam etmedi' : 'dropped from previous stage'}
+                    </p>
+                  )}
                 </div>
               ))}
-            </div>
-          </Card>
-        </motion.div>
-      </div>
+          </div>
+        </Card>
+      </motion.div>
     </motion.div>
   )
 }
