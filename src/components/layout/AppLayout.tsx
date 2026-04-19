@@ -61,6 +61,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     type ProfileRow = Database['public']['Tables']['nmu_user_profiles']['Row']
+    let mounted = true
 
     async function fetchProfile(userId: string, email: string) {
       const { data, error } = await supabase
@@ -88,7 +89,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         profile = upserted as ProfileRow | null
       }
 
-      if (profile) {
+      if (profile && mounted) {
         setCurrentUser({
           id: profile.id,
           email: profile.email,
@@ -108,41 +109,39 @@ export function AppLayout({ children }: { children: ReactNode }) {
       }
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    async function applySession(session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']) {
       syncAuthSessionCookie(Boolean(session?.user))
 
-      if (session?.user) {
-        fetchProfile(session.user.id, session.user.email ?? '')
-          .catch(() => {
-            setCurrentUser(null)
-            syncAuthSessionCookie(false)
-          })
-          .finally(() => setAuthReady(true))
-      } else {
-        setCurrentUser(null)
-        syncAuthSessionCookie(false)
-        setAuthReady(true)
+      if (!session?.user) {
+        if (mounted) {
+          setCurrentUser(null)
+          setAuthReady(true)
+        }
+        return
       }
-    })
+
+      try {
+        await fetchProfile(session.user.id, session.user.email ?? '')
+      } catch {
+        if (mounted) {
+          setCurrentUser(null)
+          syncAuthSessionCookie(false)
+        }
+      } finally {
+        if (mounted) {
+          setAuthReady(true)
+        }
+      }
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      syncAuthSessionCookie(Boolean(session?.user))
-
-      if (session?.user) {
-        void fetchProfile(session.user.id, session.user.email ?? '')
-          .catch(() => {
-            setCurrentUser(null)
-            syncAuthSessionCookie(false)
-          })
-      } else {
-        setCurrentUser(null)
-        syncAuthSessionCookie(false)
-      }
-
-      setAuthReady(true)
+      void applySession(session)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [setCurrentUser])
 
   useEffect(() => {
