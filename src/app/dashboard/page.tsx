@@ -19,6 +19,7 @@ import {
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
 import { completeTask, fetchAllOrders, fetchContacts, fetchEvents, fetchTasks } from '@/lib/queries'
@@ -124,27 +125,37 @@ export default function DashboardPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
 
-  const { data: contacts = [] } = useQuery<ContactRow[]>({
+  const contactsQuery = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
     queryFn: fetchContacts,
   })
+  const contacts = contactsQuery.data ?? []
 
-  const { data: tasks = [] } = useQuery<TaskRow[]>({
+  const tasksQuery = useQuery<TaskRow[]>({
     queryKey: ['tasks'],
     queryFn: fetchTasks,
   })
+  const tasks = tasksQuery.data ?? []
 
-  const { data: orders = [] } = useQuery<OrderRow[]>({
+  const ordersQuery = useQuery<OrderRow[]>({
     queryKey: ['orders-all'],
     queryFn: fetchAllOrders,
     staleTime: 30_000,
   })
+  const orders = ordersQuery.data ?? []
 
-  const { data: events = [] } = useQuery<Event[]>({
+  const eventsQuery = useQuery<Event[]>({
     queryKey: ['events'],
     queryFn: fetchEvents,
     staleTime: 30_000,
   })
+  const events = eventsQuery.data ?? []
+
+  const isInitialLoading =
+    (contactsQuery.isPending && !contactsQuery.data) ||
+    (tasksQuery.isPending && !tasksQuery.data) ||
+    (ordersQuery.isPending && !ordersQuery.data) ||
+    (eventsQuery.isPending && !eventsQuery.data)
 
   const completeTaskMutation = useMutation({
     mutationFn: completeTask,
@@ -354,7 +365,10 @@ export default function DashboardPage() {
       </motion.div>
 
       <motion.div variants={item} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map((kpi) => {
+        {isInitialLoading && Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={`kpi-skeleton-${index}`} className="h-[148px]" />
+        ))}
+        {!isInitialLoading && kpis.map((kpi) => {
           const Icon = kpi.icon
           const accentClass = {
             primary: 'from-primary/18 to-primary/5 border-primary/20',

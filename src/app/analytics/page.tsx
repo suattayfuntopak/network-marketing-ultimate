@@ -30,6 +30,7 @@ import {
 import type { TooltipContentProps, TooltipValueType } from 'recharts'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import {
   fetchAllInteractions,
@@ -127,35 +128,47 @@ export default function AnalyticsPage() {
   const { t, locale } = useLanguage()
   const [range, setRange] = useState<RangeOption>('30d')
 
-  const { data: contacts = [] } = useQuery<ContactRow[]>({
+  const contactsQuery = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
     queryFn: fetchContacts,
     staleTime: 30_000,
   })
+  const contacts = contactsQuery.data ?? []
 
-  const { data: tasks = [] } = useQuery<TaskRow[]>({
+  const tasksQuery = useQuery<TaskRow[]>({
     queryKey: ['tasks'],
     queryFn: fetchTasks,
     staleTime: 30_000,
   })
+  const tasks = tasksQuery.data ?? []
 
-  const { data: orders = [] } = useQuery<OrderRow[]>({
+  const ordersQuery = useQuery<OrderRow[]>({
     queryKey: ['orders-all'],
     queryFn: fetchAllOrders,
     staleTime: 30_000,
   })
+  const orders = ordersQuery.data ?? []
 
-  const { data: interactions = [] } = useQuery<InteractionRow[]>({
+  const interactionsQuery = useQuery<InteractionRow[]>({
     queryKey: ['interactions-all'],
     queryFn: fetchAllInteractions,
     staleTime: 30_000,
   })
+  const interactions = interactionsQuery.data ?? []
 
-  const { data: events = [] } = useQuery<Event[]>({
+  const eventsQuery = useQuery<Event[]>({
     queryKey: ['events'],
     queryFn: fetchEvents,
     staleTime: 30_000,
   })
+  const events = eventsQuery.data ?? []
+
+  const isInitialLoading =
+    (contactsQuery.isPending && !contactsQuery.data) ||
+    (tasksQuery.isPending && !tasksQuery.data) ||
+    (ordersQuery.isPending && !ordersQuery.data) ||
+    (interactionsQuery.isPending && !interactionsQuery.data) ||
+    (eventsQuery.isPending && !eventsQuery.data)
 
   const today = startOfDay(new Date())
   const { start, end, previousStart, previousEnd } = getRangeBounds(range, today)
@@ -397,7 +410,10 @@ export default function AnalyticsPage() {
       </motion.div>
 
       <motion.div variants={item} className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        {kpis.map((kpi) => {
+        {isInitialLoading && Array.from({ length: 6 }).map((_, index) => (
+          <Skeleton key={`kpi-skeleton-${index}`} className="h-[148px]" />
+        ))}
+        {!isInitialLoading && kpis.map((kpi) => {
           const Icon = kpi.icon
           const isPositive = kpi.inverseDelta ? !kpi.delta.positive : kpi.delta.positive
           const trendClass = kpi.delta.neutral
