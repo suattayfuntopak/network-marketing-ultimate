@@ -54,7 +54,7 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-obsidian flex items-center justify-center p-4">
+      <div className="min-h-screen bg-obsidian flex items-center justify-center px-4 py-8 sm:p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -83,7 +83,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-obsidian flex items-center justify-center p-4">
+      <div className="min-h-screen bg-obsidian flex items-center justify-center px-4 py-8 sm:p-4">
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -91,8 +91,8 @@ export default function SignupPage() {
         className="w-full max-w-md"
       >
         {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-[20px] overflow-hidden border border-border-subtle bg-surface/50 flex items-center justify-center mx-auto mb-4 shadow-[0_0_36px_rgba(34,211,238,0.22)]">
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[18px] sm:rounded-[20px] overflow-hidden border border-border-subtle bg-surface/50 flex items-center justify-center mx-auto mb-4 shadow-[0_0_36px_rgba(34,211,238,0.22)]">
             <Image
               src="/favicon.png"
               alt="Network Marketing Ultimate logo"
@@ -102,12 +102,12 @@ export default function SignupPage() {
               priority
             />
           </div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Network Marketing Ultimate</h1>
-          <p className="text-text-tertiary text-sm mt-1">{a.tagline}</p>
+          <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Network Marketing Ultimate</h1>
+          <p className="text-text-tertiary text-sm mt-1 max-w-[280px] sm:max-w-none mx-auto">{a.tagline}</p>
         </div>
 
         {/* Card */}
-        <div className="bg-card border border-border rounded-2xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+        <div className="bg-card border border-border rounded-2xl p-5 sm:p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
           <h2 className="text-xl font-semibold text-text-primary mb-1">{a.signup}</h2>
           <p className="text-text-tertiary text-sm mb-6">
             {locale === 'tr'

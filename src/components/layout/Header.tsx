@@ -85,7 +85,7 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-20 h-16 bg-graphite/80 backdrop-blur-xl border-b border-border">
-        <div className="flex items-center justify-between h-full px-4 lg:px-6">
+        <div className="flex items-center justify-between h-full px-3 sm:px-4 lg:px-6 gap-2">
           {/* Left */}
           <div className="flex items-center gap-3">
             <button
@@ -98,7 +98,7 @@ export function Header() {
             {/* Search */}
             <button
               onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2 h-9 px-3 rounded-xl bg-surface/60 border border-border-subtle text-text-tertiary hover:text-text-secondary hover:border-border transition-all text-sm"
+              className="flex items-center justify-center sm:justify-start gap-2 h-9 w-9 sm:w-auto px-0 sm:px-3 rounded-xl bg-surface/60 border border-border-subtle text-text-tertiary hover:text-text-secondary hover:border-border transition-all text-sm shrink-0"
             >
               <Search className="w-4 h-4" />
               <span className="hidden sm:inline">{t.common.search}</span>
@@ -109,7 +109,7 @@ export function Header() {
           </div>
 
           {/* Right */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             {/* Streak */}
             {streak > 0 && (
               <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-warning/10 border border-warning/15">
@@ -134,7 +134,7 @@ export function Header() {
               whileTap={{ scale: 0.95 }}
               onClick={toggleAIPanel}
               className={cn(
-                'flex items-center gap-2 h-9 px-3 rounded-xl text-sm font-medium transition-all',
+                'flex items-center gap-2 h-9 px-2.5 sm:px-3 rounded-xl text-sm font-medium transition-all shrink-0',
                 aiPanelOpen
                   ? 'bg-secondary text-white shadow-[0_0_20px_rgba(139,92,246,0.3)]'
                   : 'bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20'
@@ -148,7 +148,7 @@ export function Header() {
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               title={theme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-surface/60 border border-border-subtle text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-all"
+              className="w-9 h-9 hidden sm:flex items-center justify-center rounded-xl bg-surface/60 border border-border-subtle text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-all shrink-0"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
@@ -178,7 +178,7 @@ export function Header() {
                       initial={{ opacity: 0, y: 8, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                      className="absolute right-0 top-full mt-2 w-[360px] bg-elevated border border-border rounded-2xl shadow-float z-50 overflow-hidden"
+                      className="absolute right-0 top-full mt-2 w-[min(360px,calc(100vw-1rem))] bg-elevated border border-border rounded-2xl shadow-float z-50 overflow-hidden"
                     >
                       <div className="flex items-center justify-between p-4 border-b border-border">
                         <h3 className="text-sm font-semibold text-text-primary">{t.notificationsPage.title}</h3>
@@ -234,7 +234,7 @@ export function Header() {
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setUserMenuOpen((current) => !current)}
-                className="flex items-center gap-2 rounded-full border border-border-subtle bg-surface/60 px-2 py-1.5 text-left transition-all hover:border-border hover:bg-surface-hover"
+                className="flex items-center gap-2 rounded-full border border-border-subtle bg-surface/60 px-2 py-1.5 text-left transition-all hover:border-border hover:bg-surface-hover min-w-0 shrink-0"
               >
                 <Avatar
                   name={currentUser?.name ?? 'NMU'}
@@ -257,7 +257,7 @@ export function Header() {
                       initial={{ opacity: 0, y: 8, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                      className="absolute right-0 top-full mt-2 w-[300px] overflow-hidden rounded-2xl border border-border bg-elevated shadow-float z-50"
+                      className="absolute right-0 top-full mt-2 w-[min(300px,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-border bg-elevated shadow-float z-50"
                     >
                       <div className="p-4 border-b border-border">
                         <p className="text-lg font-semibold text-text-primary">{currentUser?.name ?? 'NMU'}</p>
@@ -358,7 +358,7 @@ export function Header() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center pt-[15vh]"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center px-3 pt-[12vh] sm:pt-[15vh]"
             onClick={() => setSearchOpen(false)}
           >
             <motion.div

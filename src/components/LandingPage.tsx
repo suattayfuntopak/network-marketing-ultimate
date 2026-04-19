@@ -280,6 +280,7 @@ export default function LandingPage({
   const [theme, setTheme] = useState<Theme>("dark");
   const [scrolled, setScrolled] = useState(false);
   const [statsVisible, setStatsVisible] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(1280);
   const statsRef = useRef<HTMLDivElement>(null);
   const text = t[lang];
 
@@ -294,6 +295,13 @@ export default function LandingPage({
   }, []);
 
   useEffect(() => {
+    const syncViewport = () => setViewportWidth(window.innerWidth);
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+    return () => window.removeEventListener("resize", syncViewport);
+  }, []);
+
+  useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting) setStatsVisible(true); },
       { threshold: 0.3 }
@@ -303,6 +311,8 @@ export default function LandingPage({
   }, []);
 
   const isDark = theme === "dark";
+  const isMobile = viewportWidth < 768;
+  const isTablet = viewportWidth >= 768 && viewportWidth < 1100;
 
   // ── CSS variables injected via style tag ──
   const cssVars = isDark
@@ -462,6 +472,13 @@ export default function LandingPage({
           gap: 6px;
         }
         .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .landing-shell { max-width: 1200px; margin: 0 auto; width: 100%; }
+        @media (max-width: 767px) {
+          .btn-primary, .btn-ghost { width: 100%; justify-content: center; }
+          .feature-card { padding: 24px; border-radius: 18px; }
+          .pricing-card { padding: 28px 22px; border-radius: 20px; }
+          .step-num { font-size: 56px; }
+        }
       `}</style>
 
       {/* ── Navbar ── */}
@@ -471,75 +488,98 @@ export default function LandingPage({
         backdropFilter: scrolled ? "blur(20px)" : "none",
         borderBottom: scrolled ? `1px solid var(--border)` : "1px solid transparent",
         transition: "all 0.3s",
-        padding: "0 24px",
+        padding: isMobile ? "10px 16px 12px" : "0 24px",
       }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="landing-shell" style={{
+          minHeight: isMobile ? "auto" : 64,
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: isMobile ? "stretch" : "center",
+          justifyContent: "space-between",
+          gap: isMobile ? 12 : 24,
+        }}>
           {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              overflow: "hidden",
-              boxShadow: "0 10px 24px rgba(34,211,238,0.18)",
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid var(--border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}>
-              <Image
-                src="/favicon.png"
-                alt="Network Marketing Ultimate logo"
-                width={40}
-                height={40}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: isMobile ? "space-between" : "flex-start", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <div style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                overflow: "hidden",
+                boxShadow: "0 10px 24px rgba(34,211,238,0.18)",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid var(--border)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <Image
+                  src="/favicon.png"
+                  alt="Network Marketing Ultimate logo"
+                  width={40}
+                  height={40}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </div>
+              <span style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16, letterSpacing: "-0.3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                Network Marketing <span className="grad-text">Ultimate</span>
+              </span>
             </div>
-            <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: "-0.3px" }}>
-              Network Marketing <span className="grad-text">Ultimate</span>
-            </span>
+            {isMobile && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button onClick={() => setLang("tr")} style={{ background: "none", border: `2px solid ${lang === "tr" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇹🇷</button>
+                <button onClick={() => setLang("en")} style={{ background: "none", border: `2px solid ${lang === "en" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇺🇸</button>
+                <button onClick={() => setTheme(isDark ? "light" : "dark")} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, width: 38, height: 38, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
+                  {isDark ? "☀️" : "🌙"}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Nav links — desktop */}
-          <div style={{ display: "flex", alignItems: "center", gap: 32 }} className="nav-links">
-            {[
-              ["#features", text.nav.features],
-              ["#how", text.nav.howItWorks],
-              ["#pricing", text.nav.pricing],
-            ].map(([href, label]) => (
-              <a key={href} href={href} style={{ color: "var(--text2)", fontSize: 14, fontWeight: 500, textDecoration: "none", transition: "color 0.2s" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "var(--accent)")}
-                onMouseLeave={e => (e.currentTarget.style.color = "var(--text2)")}>
-                {label}
-              </a>
-            ))}
-          </div>
+          {!isMobile && (
+            <div style={{ display: "flex", alignItems: "center", gap: isTablet ? 20 : 32 }} className="nav-links">
+              {[
+                ["#features", text.nav.features],
+                ["#how", text.nav.howItWorks],
+                ["#pricing", text.nav.pricing],
+              ].map(([href, label]) => (
+                <a key={href} href={href} style={{ color: "var(--text2)", fontSize: 14, fontWeight: 500, textDecoration: "none", transition: "color 0.2s" }}
+                  onMouseEnter={e => (e.currentTarget.style.color = "var(--accent)")}
+                  onMouseLeave={e => (e.currentTarget.style.color = "var(--text2)")}>
+                  {label}
+                </a>
+              ))}
+            </div>
+          )}
 
           {/* Right controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {/* Lang flags */}
-            <button onClick={() => setLang("tr")} style={{ background: "none", border: `2px solid ${lang === "tr" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇹🇷</button>
-            <button onClick={() => setLang("en")} style={{ background: "none", border: `2px solid ${lang === "en" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇺🇸</button>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: isMobile ? "stretch" : "flex-end", gap: 10, width: isMobile ? "100%" : "auto" }}>
+            {!isMobile && (
+              <>
+                <button onClick={() => setLang("tr")} style={{ background: "none", border: `2px solid ${lang === "tr" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇹🇷</button>
+                <button onClick={() => setLang("en")} style={{ background: "none", border: `2px solid ${lang === "en" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇺🇸</button>
+                <button onClick={() => setTheme(isDark ? "light" : "dark")} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, width: 38, height: 38, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
+                  {isDark ? "☀️" : "🌙"}
+                </button>
+              </>
+            )}
 
-            {/* Theme toggle */}
-            <button onClick={() => setTheme(isDark ? "light" : "dark")} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, width: 38, height: 38, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
-              {isDark ? "☀️" : "🌙"}
-            </button>
-
-            <button className="btn-ghost" style={{ padding: "8px 18px", fontSize: 14 }} onClick={onNavigateToLogin}>{text.nav.login}</button>
-            <button className="btn-primary" style={{ padding: "8px 18px", fontSize: 14 }} onClick={onNavigateToRegister}>{text.nav.start}</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, width: isMobile ? "100%" : "auto" }}>
+              <button className="btn-ghost" style={{ padding: isMobile ? "10px 16px" : "8px 18px", fontSize: 14, flex: isMobile ? 1 : undefined }} onClick={onNavigateToLogin}>{text.nav.login}</button>
+              <button className="btn-primary" style={{ padding: isMobile ? "10px 16px" : "8px 18px", fontSize: 14, flex: isMobile ? 1 : undefined }} onClick={onNavigateToRegister}>{text.nav.start}</button>
+            </div>
           </div>
         </div>
       </nav>
 
       {/* ── Hero ── */}
-      <section style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 80 }}>
+      <section style={{ position: "relative", minHeight: isMobile ? "auto" : "100vh", display: "flex", alignItems: "center", paddingTop: isMobile ? 132 : 80 }}>
         <div className="mesh-bg" />
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "80px 24px", width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center", position: "relative", zIndex: 1 }}>
+        <div className="landing-shell" style={{ padding: isMobile ? "36px 20px 56px" : "80px 24px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 36 : isTablet ? 40 : 64, alignItems: "center", position: "relative", zIndex: 1 }}>
           {/* Left */}
-          <div>
+          <div style={{ order: isMobile ? 1 : 0 }}>
             <div className="fade-up fade-up-1" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(124,106,247,0.12)", border: "1px solid rgba(124,106,247,0.25)", borderRadius: 100, padding: "6px 16px", marginBottom: 24 }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />
               <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}>{text.hero.badge}</span>
@@ -551,19 +591,19 @@ export default function LandingPage({
               <br />{text.hero.title3}
             </h1>
 
-            <p className="fade-up fade-up-3" style={{ fontSize: 18, color: "var(--text2)", lineHeight: 1.7, marginBottom: 40, maxWidth: 500 }}>
+            <p className="fade-up fade-up-3" style={{ fontSize: isMobile ? 16 : 18, color: "var(--text2)", lineHeight: 1.7, marginBottom: isMobile ? 28 : 40, maxWidth: 500 }}>
               {text.hero.sub}
             </p>
 
             <div className="fade-up fade-up-4" style={{ display: "flex", alignItems: "center", marginTop: 4 }}>
-              <button className="btn-primary" style={{ fontSize: 16, padding: "16px 32px" }} onClick={onNavigateToRegister}>
+              <button className="btn-primary" style={{ fontSize: 16, padding: isMobile ? "15px 24px" : "16px 32px", maxWidth: isMobile ? "100%" : "fit-content" }} onClick={onNavigateToRegister}>
                 {text.hero.cta}
               </button>
             </div>
           </div>
 
           {/* Right — Dashboard preview */}
-          <div className="float" style={{ position: "relative" }}>
+          <div className="float" style={{ position: "relative", order: isMobile ? 2 : 0, maxWidth: isMobile ? 440 : "none", width: "100%", margin: isMobile ? "0 auto" : "0" }}>
             <div style={{ position: "absolute", inset: -20, background: "radial-gradient(circle, rgba(124,106,247,0.15) 0%, transparent 70%)", borderRadius: "50%", pointerEvents: "none" }} />
             <div className="dash-preview" style={{ boxShadow: "0 40px 100px rgba(0,0,0,0.4)" }}>
               <div className="dash-bar">
@@ -617,8 +657,8 @@ export default function LandingPage({
       </section>
 
       {/* ── Stats ── */}
-      <section ref={statsRef} style={{ background: "var(--bg2)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", padding: "60px 24px" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 40, textAlign: "center" }}>
+      <section ref={statsRef} style={{ background: "var(--bg2)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", padding: isMobile ? "40px 20px" : "60px 24px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: isMobile ? 24 : 40, textAlign: "center" }}>
           {[
             { val: stat1, suffix: "+", label: text.hero.stat1 },
             { val: stat2, suffix: "%", label: text.hero.stat2 },
@@ -635,15 +675,15 @@ export default function LandingPage({
       </section>
 
       {/* ── Features ── */}
-      <section id="features" style={{ padding: "100px 24px" }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 64 }}>
+      <section id="features" style={{ padding: isMobile ? "72px 20px" : "100px 24px" }}>
+        <div className="landing-shell">
+          <div style={{ textAlign: "center", marginBottom: isMobile ? 40 : 64 }}>
             <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, letterSpacing: "-1px", marginBottom: 16 }}>
               {text.features.title}
             </h2>
-            <p style={{ fontSize: 18, color: "var(--text2)", maxWidth: 520, margin: "0 auto" }}>{text.features.sub}</p>
+            <p style={{ fontSize: isMobile ? 16 : 18, color: "var(--text2)", maxWidth: 520, margin: "0 auto" }}>{text.features.sub}</p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
             {text.features.items.map((f) => (
               <div key={f.title} className="feature-card">
                 <div style={{ fontSize: 36, marginBottom: 16 }}>{f.icon}</div>
@@ -656,12 +696,12 @@ export default function LandingPage({
       </section>
 
       {/* ── How It Works ── */}
-      <section id="how" style={{ background: "var(--bg2)", padding: "100px 24px", borderTop: "1px solid var(--border)" }}>
+      <section id="how" style={{ background: "var(--bg2)", padding: isMobile ? "72px 20px" : "100px 24px", borderTop: "1px solid var(--border)" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, letterSpacing: "-1px", textAlign: "center", marginBottom: 72 }}>
+          <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, letterSpacing: "-1px", textAlign: "center", marginBottom: isMobile ? 40 : 72 }}>
             {text.how.title}
           </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 48 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 32 : 48 }}>
             {text.how.steps.map((s) => (
               <div key={s.n} style={{ position: "relative" }}>
                 <div className="step-num">{s.n}</div>
@@ -674,20 +714,20 @@ export default function LandingPage({
       </section>
 
       {/* ── Pricing ── */}
-      <section id="pricing" style={{ padding: "100px 24px", position: "relative" }}>
+      <section id="pricing" style={{ padding: isMobile ? "72px 20px" : "100px 24px", position: "relative" }}>
         <div className="mesh-bg" />
         <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative", zIndex: 1 }}>
-          <div style={{ textAlign: "center", marginBottom: 64 }}>
+          <div style={{ textAlign: "center", marginBottom: isMobile ? 40 : 64 }}>
             <div style={{ display: "inline-block", background: "rgba(124,106,247,0.12)", border: "1px solid rgba(124,106,247,0.25)", borderRadius: 100, padding: "4px 14px", marginBottom: 16 }}>
               <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600 }}>{text.pricing.badge}</span>
             </div>
             <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, letterSpacing: "-1px", marginBottom: 14 }}>
               {text.pricing.title}
             </h2>
-            <p style={{ fontSize: 17, color: "var(--text2)" }}>{text.pricing.sub}</p>
+            <p style={{ fontSize: isMobile ? 16 : 17, color: "var(--text2)" }}>{text.pricing.sub}</p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24, alignItems: "start" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "1fr" : "repeat(3, 1fr)", gap: 24, alignItems: "start" }}>
             {/* Free */}
             <div className="pricing-card">
               <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text2)", marginBottom: 8 }}>{text.pricing.free.name}</div>
@@ -704,7 +744,7 @@ export default function LandingPage({
             </div>
 
             {/* Pro */}
-            <div className="pricing-card popular" style={{ marginTop: -12 }}>
+            <div className="pricing-card popular" style={{ marginTop: isMobile || isTablet ? 0 : -12 }}>
               <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: "linear-gradient(135deg, var(--accent), var(--accent2))", color: "#fff", borderRadius: 100, padding: "4px 16px", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
                 {text.pricing.pro.popular}
               </div>
@@ -746,13 +786,13 @@ export default function LandingPage({
       </section>
 
       {/* ── Final CTA ── */}
-      <section style={{ background: "var(--bg2)", borderTop: "1px solid var(--border)", padding: "100px 24px", textAlign: "center" }}>
+      <section style={{ background: "var(--bg2)", borderTop: "1px solid var(--border)", padding: isMobile ? "72px 20px" : "100px 24px", textAlign: "center" }}>
         <div style={{ maxWidth: 600, margin: "0 auto" }}>
           <h2 style={{ fontSize: "clamp(28px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-1px", marginBottom: 16 }}>
             {text.cta.title}
           </h2>
-          <p style={{ fontSize: 18, color: "var(--text2)", marginBottom: 40, lineHeight: 1.65 }}>{text.cta.sub}</p>
-          <button className="btn-primary" style={{ fontSize: 17, padding: "18px 40px" }} onClick={onNavigateToRegister}>
+          <p style={{ fontSize: isMobile ? 16 : 18, color: "var(--text2)", marginBottom: 40, lineHeight: 1.65 }}>{text.cta.sub}</p>
+          <button className="btn-primary" style={{ fontSize: 17, padding: isMobile ? "16px 24px" : "18px 40px", maxWidth: isMobile ? "100%" : "fit-content" }} onClick={onNavigateToRegister}>
             {text.cta.btn}
           </button>
           <div style={{ marginTop: 20, fontSize: 14, color: "var(--text2)" }}>
@@ -765,8 +805,8 @@ export default function LandingPage({
       </section>
 
       {/* ── Footer ── */}
-      <footer style={{ borderTop: "1px solid var(--border)", padding: "28px 24px", textAlign: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+      <footer style={{ borderTop: "1px solid var(--border)", padding: isMobile ? "24px 20px" : "28px 24px", textAlign: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
           <div style={{
             width: 24,
             height: 24,

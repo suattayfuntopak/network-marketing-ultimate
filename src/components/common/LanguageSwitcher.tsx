@@ -12,13 +12,13 @@ export function LanguageSwitcher() {
   const { locale, setLocale } = useLanguage()
 
   return (
-    <div className="flex items-center gap-1 p-1 rounded-xl bg-surface/60 border border-border-subtle">
+    <div className="flex items-center gap-0.5 p-0.5 sm:gap-1 sm:p-1 rounded-xl bg-surface/60 border border-border-subtle">
       {languages.map(lang => (
         <button
           key={lang.locale}
           onClick={() => setLocale(lang.locale)}
           title={lang.label}
-          className={`w-8 h-7 rounded-lg flex items-center justify-center text-base transition-all ${
+          className={`w-7 h-7 sm:w-8 sm:h-7 rounded-lg flex items-center justify-center text-sm sm:text-base transition-all ${
             locale === lang.locale
               ? 'bg-primary/15 ring-1 ring-primary/30 scale-105'
               : 'opacity-50 hover:opacity-80 hover:bg-surface-hover'
