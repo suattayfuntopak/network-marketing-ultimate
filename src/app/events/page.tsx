@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
@@ -10,9 +10,17 @@ import { AvatarGroup } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
-import { usePersistentState } from '@/hooks/usePersistentState'
-import { events } from '@/data/mockData'
-import { fetchContacts, type ContactRow } from '@/lib/queries'
+import { useAppStore } from '@/store/appStore'
+import {
+  createEvent as apiCreateEvent,
+  deleteEvent as apiDeleteEvent,
+  fetchContacts,
+  fetchEvents,
+  updateEvent as apiUpdateEvent,
+  upsertEventAttendees,
+  type ContactRow,
+  type EventInput,
+} from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import type { Event } from '@/types'
 import { Calendar, CheckSquare, Clock, Mail, MapPin, MessageCircle, Plus, Search, Send, Smartphone, Square, Trash2, Users, Video } from 'lucide-react'
@@ -42,7 +50,19 @@ const EVENT_TYPE_KEY: Record<string, string> = {
   global: 'global',
 }
 
-const blankEvent: Omit<Event, 'id' | 'userId' | 'attendees'> = {
+type EventFormShape = {
+  title: string
+  description: string
+  type: Event['type']
+  startDate: string
+  endDate: string
+  location: string
+  meetingUrl: string
+  maxAttendees: number
+  status: Event['status']
+}
+
+const blankEvent: EventFormShape = {
   title: '',
   description: '',
   type: 'online_presentation',
@@ -54,15 +74,26 @@ const blankEvent: Omit<Event, 'id' | 'userId' | 'attendees'> = {
   status: 'draft',
 }
 
-function toInputDateTime(value: string) {
-  return value.slice(0, 16)
+function pad(value: number) {
+  return `${value}`.padStart(2, '0')
+}
+
+function isoToInputDateTime(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso.slice(0, 16)
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function inputToIso(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toISOString()
 }
 
 function buildDateTime(date: string, hours: number, minutes: number) {
-  return `${date}T${`${hours}`.padStart(2, '0')}:${`${minutes}`.padStart(2, '0')}`
+  return `${date}T${pad(hours)}:${pad(minutes)}`
 }
 
-function eventPrefillFromDate(date?: string): Partial<typeof blankEvent> | undefined {
+function eventPrefillFromDate(date?: string): Partial<EventFormShape> | undefined {
   if (!date) return undefined
 
   return {
@@ -71,18 +102,29 @@ function eventPrefillFromDate(date?: string): Partial<typeof blankEvent> | undef
   }
 }
 
-const EVENT_STORAGE_VERSION = 3
+function formToInput(form: EventFormShape, fallbackTitle: string): EventInput {
+  return {
+    title: form.title.trim() || fallbackTitle,
+    description: form.description.trim(),
+    type: form.type,
+    start_date: inputToIso(form.startDate),
+    end_date: inputToIso(form.endDate),
+    location: form.location.trim() ? form.location.trim() : null,
+    meeting_url: form.meetingUrl.trim() ? form.meetingUrl.trim() : null,
+    max_attendees: form.maxAttendees || null,
+    status: form.status,
+  }
+}
 
 export default function EventsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { t, locale } = useLanguage()
-  const [eventItems, setEventItems] = usePersistentState<Event[]>('nmu-events', events, {
-    version: EVENT_STORAGE_VERSION,
-  })
+  const { currentUser } = useAppStore()
+  const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState(blankEvent)
-  const [activeEvent, setActiveEvent] = useState<Event | null>(null)
+  const [activeEventId, setActiveEventId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState(blankEvent)
   const [returnPath, setReturnPath] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -91,9 +133,55 @@ export default function EventsPage() {
   const [inviteChannel, setInviteChannel] = useState<'whatsapp' | 'telegram' | 'email' | 'sms'>('whatsapp')
   const [inviteFeedback, setInviteFeedback] = useState('')
 
-  const { data: contacts = [], isFetched: contactsReady } = useQuery<ContactRow[]>({
+  const { data: eventItems = [] } = useQuery<Event[]>({
+    queryKey: ['events'],
+    queryFn: fetchEvents,
+  })
+
+  const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
     queryFn: fetchContacts,
+  })
+
+  const activeEvent = useMemo(
+    () => eventItems.find((event) => event.id === activeEventId) ?? null,
+    [activeEventId, eventItems],
+  )
+
+  const invalidateEvents = () => queryClient.invalidateQueries({ queryKey: ['events'] })
+
+  const createMutation = useMutation({
+    mutationFn: async (form: EventFormShape) => {
+      if (!currentUser) throw new Error('Authentication required.')
+      const fallback = locale === 'tr' ? 'Yeni Etkinlik' : 'New Event'
+      return apiCreateEvent(currentUser.id, formToInput(form, fallback))
+    },
+    onSuccess: invalidateEvents,
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, input }: { id: string; input: Partial<EventInput> }) => {
+      await apiUpdateEvent(id, input)
+    },
+    onSuccess: invalidateEvents,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: apiDeleteEvent,
+    onSuccess: invalidateEvents,
+  })
+
+  const attendeesMutation = useMutation({
+    mutationFn: async ({
+      eventId,
+      entries,
+    }: {
+      eventId: string
+      entries: Parameters<typeof upsertEventAttendees>[1]
+    }) => {
+      await upsertEventAttendees(eventId, entries)
+    },
+    onSuccess: invalidateEvents,
   })
 
   const labels = locale === 'tr'
@@ -200,7 +288,7 @@ export default function EventsPage() {
     return contacts.find((contact) => contact.id === contactId)?.full_name ?? fallback
   }
 
-  function openCreateModal(prefill?: Partial<typeof blankEvent>) {
+  function openCreateModal(prefill?: Partial<EventFormShape>) {
     setCreateForm({ ...blankEvent, ...prefill })
     setCreateOpen(true)
   }
@@ -221,7 +309,7 @@ export default function EventsPage() {
   }
 
   function openDetails(event: Event) {
-    setActiveEvent(event)
+    setActiveEventId(event.id)
     setInviteOpen(false)
     setInviteSearch('')
     setSelectedInviteIds([])
@@ -229,8 +317,8 @@ export default function EventsPage() {
       title: event.title,
       description: event.description,
       type: event.type,
-      startDate: toInputDateTime(event.startDate),
-      endDate: toInputDateTime(event.endDate),
+      startDate: isoToInputDateTime(event.startDate),
+      endDate: isoToInputDateTime(event.endDate),
       location: event.location ?? '',
       meetingUrl: event.meetingUrl ?? '',
       maxAttendees: event.maxAttendees ?? 25,
@@ -240,60 +328,9 @@ export default function EventsPage() {
 
   function closeDetailsModal() {
     setInviteOpen(false)
-    setActiveEvent(null)
+    setActiveEventId(null)
     navigateBackIfNeeded()
   }
-
-  useEffect(() => {
-    if (!contactsReady) return
-
-    const contactsById = new Map(contacts.map((contact) => [contact.id, contact]))
-
-    setEventItems((current) => {
-      let changed = false
-
-      const nextItems = current.map((event) => {
-        const nextAttendees = event.attendees
-          .filter((attendee) => contactsById.has(attendee.contactId))
-          .map((attendee) => {
-            const contact = contactsById.get(attendee.contactId)!
-
-            if (attendee.name !== contact.full_name) {
-              changed = true
-            }
-
-            return {
-              ...attendee,
-              name: contact.full_name,
-            }
-          })
-
-        if (nextAttendees.length !== event.attendees.length) {
-          changed = true
-        }
-
-        return { ...event, attendees: nextAttendees }
-      })
-
-      return changed ? nextItems : current
-    })
-  }, [contacts, contactsReady, setEventItems])
-
-  useEffect(() => {
-    if (!activeEvent) return
-
-    const refreshedEvent = eventItems.find((event) => event.id === activeEvent.id)
-
-    if (!refreshedEvent) {
-      setActiveEvent(null)
-      setInviteOpen(false)
-      return
-    }
-
-    if (refreshedEvent !== activeEvent) {
-      setActiveEvent(refreshedEvent)
-    }
-  }, [activeEvent, eventItems])
 
   useEffect(() => {
     if (searchParams.get('new') !== '1') {
@@ -325,39 +362,40 @@ export default function EventsPage() {
     router.replace('/events')
   }, [eventItems, router, searchParams])
 
-  function createEvent() {
-    const nextEvent: Event = {
-      id: `event-${Date.now()}`,
-      userId: 'u1',
-      attendees: [],
-      ...createForm,
-      title: createForm.title.trim() || (locale === 'tr' ? 'Yeni Etkinlik' : 'New Event'),
-      description: createForm.description.trim(),
-    }
-    setEventItems((current) => [nextEvent, ...current])
+  async function createEvent() {
+    const created = await createMutation.mutateAsync(createForm)
     setCreateOpen(false)
     navigateBackIfNeeded()
+    if (created) {
+      setActiveEventId(created.id)
+      setEditForm({
+        title: created.title,
+        description: created.description,
+        type: created.type,
+        startDate: isoToInputDateTime(created.startDate),
+        endDate: isoToInputDateTime(created.endDate),
+        location: created.location ?? '',
+        meetingUrl: created.meetingUrl ?? '',
+        maxAttendees: created.maxAttendees ?? 25,
+        status: created.status,
+      })
+    }
   }
 
-  function saveEvent() {
+  async function saveEvent() {
     if (!activeEvent) return
-
-    const nextEvent: Event = {
-      ...activeEvent,
-      ...editForm,
-    }
-
-    setEventItems((current) =>
-      current.map((event) => (event.id === activeEvent.id ? nextEvent : event)),
-    )
-    setActiveEvent(nextEvent)
+    const fallback = locale === 'tr' ? 'Yeni Etkinlik' : 'New Event'
+    await updateMutation.mutateAsync({
+      id: activeEvent.id,
+      input: formToInput(editForm, fallback),
+    })
     navigateBackIfNeeded()
   }
 
-  function deleteEvent(eventId: string) {
-    setEventItems((current) => current.filter((event) => event.id !== eventId))
+  async function deleteEvent(eventId: string) {
+    await deleteMutation.mutateAsync(eventId)
     setInviteOpen(false)
-    setActiveEvent(null)
+    setActiveEventId(null)
     navigateBackIfNeeded()
   }
 
@@ -418,35 +456,28 @@ export default function EventsPage() {
     return `https://t.me/share/url?url=${encodeURIComponent(event.meetingUrl || window.location.href)}&text=${encodedMessage}`
   }
 
-  function syncInvitedContacts(contactIds: string[], markAsSent = false) {
-    if (!activeEvent) return activeEvent
-
+  async function syncInvitedContacts(contactIds: string[], markAsSent = false) {
+    if (!activeEvent) return
     const selectedContacts = contacts.filter((contact) => contactIds.includes(contact.id))
-    const attendeeMap = new Map(activeEvent.attendees.map((attendee) => [attendee.contactId, attendee]))
+    if (selectedContacts.length === 0) return
 
-    selectedContacts.forEach((contact) => {
-      const existing = attendeeMap.get(contact.id)
-      attendeeMap.set(contact.id, {
-        contactId: contact.id,
-        name: contact.full_name,
-        rsvpStatus: existing?.rsvpStatus ?? 'invited',
-        followUpStatus: markAsSent ? 'sent' : existing?.followUpStatus ?? 'pending',
-      })
+    const existingMap = new Map(activeEvent.attendees.map((attendee) => [attendee.contactId, attendee]))
+    const entries = selectedContacts.map((contact) => {
+      const existing = existingMap.get(contact.id)
+      return {
+        contact_id: contact.id,
+        contact_name: contact.full_name,
+        rsvp_status: existing?.rsvpStatus ?? ('invited' as const),
+        follow_up_status: markAsSent
+          ? ('sent' as const)
+          : existing?.followUpStatus ?? ('pending' as const),
+      }
     })
 
-    const nextEvent: Event = {
-      ...activeEvent,
-      attendees: Array.from(attendeeMap.values()),
-    }
-
-    setEventItems((current) =>
-      current.map((event) => (event.id === activeEvent.id ? nextEvent : event)),
-    )
-    setActiveEvent(nextEvent)
-    return nextEvent
+    await attendeesMutation.mutateAsync({ eventId: activeEvent.id, entries })
   }
 
-  function sendInvites(contactIds: string[], closeAfter = false) {
+  async function sendInvites(contactIds: string[], closeAfter = false) {
     if (!activeEvent || contactIds.length === 0) return
 
     const selectedContacts = contacts.filter((contact) => contactIds.includes(contact.id))
@@ -459,7 +490,7 @@ export default function EventsPage() {
       return
     }
 
-    const syncedEvent = syncInvitedContacts(contactIds, true)
+    await syncInvitedContacts(contactIds, true)
 
     if (inviteChannel === 'telegram') {
       window.open(links[0].link!, '_blank', 'noopener,noreferrer')
@@ -469,10 +500,6 @@ export default function EventsPage() {
         window.open(entry.link!, '_blank', 'noopener,noreferrer')
       })
       setInviteFeedback(`${links.length} ${labels.addedToEvent}. ${links.length} ${labels.sentTo}.`)
-    }
-
-    if (syncedEvent) {
-      setActiveEvent(syncedEvent)
     }
 
     if (closeAfter) {
@@ -628,11 +655,11 @@ export default function EventsPage() {
             </label>
             <label className="space-y-1.5">
               <span className="text-xs font-medium text-text-secondary">{labels.location}</span>
-              <input value={createForm.location ?? ''} onChange={(event) => setCreateForm((current) => ({ ...current, location: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
+              <input value={createForm.location} onChange={(event) => setCreateForm((current) => ({ ...current, location: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
             </label>
             <label className="space-y-1.5">
               <span className="text-xs font-medium text-text-secondary">{labels.meetingUrl}</span>
-              <input value={createForm.meetingUrl ?? ''} onChange={(event) => setCreateForm((current) => ({ ...current, meetingUrl: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
+              <input value={createForm.meetingUrl} onChange={(event) => setCreateForm((current) => ({ ...current, meetingUrl: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
             </label>
           </div>
           <label className="space-y-1.5 block">
@@ -641,7 +668,7 @@ export default function EventsPage() {
           </label>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={closeCreateModal}>{t.common.cancel}</Button>
-            <Button type="button" onClick={createEvent}>{t.common.create}</Button>
+            <Button type="button" onClick={createEvent} disabled={createMutation.isPending}>{t.common.create}</Button>
           </div>
         </div>
       </Modal>
@@ -677,7 +704,7 @@ export default function EventsPage() {
               </label>
               <label className="space-y-1.5">
                 <span className="text-xs font-medium text-text-secondary">{labels.location}</span>
-                <input value={editForm.location ?? ''} onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
+                <input value={editForm.location} onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
               </label>
               <label className="space-y-1.5">
                 <span className="text-xs font-medium text-text-secondary">{labels.start}</span>
@@ -689,7 +716,7 @@ export default function EventsPage() {
               </label>
               <label className="space-y-1.5 sm:col-span-2">
                 <span className="text-xs font-medium text-text-secondary">{labels.meetingUrl}</span>
-                <input value={editForm.meetingUrl ?? ''} onChange={(event) => setEditForm((current) => ({ ...current, meetingUrl: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
+                <input value={editForm.meetingUrl} onChange={(event) => setEditForm((current) => ({ ...current, meetingUrl: event.target.value }))} className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50" />
               </label>
             </div>
 
@@ -744,12 +771,12 @@ export default function EventsPage() {
             </div>
 
             <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">
-              <Button type="button" variant="danger" size="sm" onClick={() => deleteEvent(activeEvent.id)}>
+              <Button type="button" variant="danger" size="sm" onClick={() => deleteEvent(activeEvent.id)} disabled={deleteMutation.isPending}>
                 <Trash2 className="w-3.5 h-3.5" /> {labels.delete}
               </Button>
               <div className="flex gap-2">
                 <Button type="button" variant="ghost" onClick={closeDetailsModal}>{t.common.cancel}</Button>
-                <Button type="button" onClick={saveEvent}>{t.common.saveChanges}</Button>
+                <Button type="button" onClick={saveEvent} disabled={updateMutation.isPending}>{t.common.saveChanges}</Button>
               </div>
             </div>
           </div>
@@ -870,7 +897,7 @@ export default function EventsPage() {
               </p>
               <div className="flex gap-2">
                 <Button type="button" variant="ghost" onClick={() => setInviteOpen(false)}>{t.common.cancel}</Button>
-                <Button type="button" disabled={selectedInviteIds.length === 0} onClick={() => sendInvites(selectedInviteIds, true)}>
+                <Button type="button" disabled={selectedInviteIds.length === 0 || attendeesMutation.isPending} onClick={() => sendInvites(selectedInviteIds, true)}>
                   <Send className="w-3.5 h-3.5" /> {labels.inviteSubmit}
                 </Button>
               </div>

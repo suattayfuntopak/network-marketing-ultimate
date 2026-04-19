@@ -3,12 +3,15 @@
 // ============================================================
 import { supabase } from './supabase'
 import type { Database } from './database.types'
+import type { Event, EventAttendee } from '@/types'
 
 export type ContactRow = Database['public']['Tables']['nmu_contacts']['Row']
 export type TaskRow = Database['public']['Tables']['nmu_tasks']['Row']
 export type InteractionRow = Database['public']['Tables']['nmu_interactions']['Row']
 export type ProductRow = Database['public']['Tables']['nmu_products']['Row']
 export type OrderRow = Database['public']['Tables']['nmu_orders']['Row']
+export type EventRow = Database['public']['Tables']['nmu_events']['Row']
+export type EventAttendeeRow = Database['public']['Tables']['nmu_event_attendees']['Row']
 
 async function requireSessionUserId() {
   const {
@@ -443,5 +446,137 @@ export async function deleteOrder(id: string): Promise<void> {
     .delete()
     .eq('id', id)
     .eq('user_id', userId)
+  if (error) throw error
+}
+
+// ─── EVENTS ───────────────────────────────────────────────────
+
+export type EventInput = {
+  title: string
+  description: string
+  type: Event['type']
+  start_date: string
+  end_date: string
+  location?: string | null
+  meeting_url?: string | null
+  max_attendees?: number | null
+  status: Event['status']
+}
+
+function mapAttendeeRow(row: EventAttendeeRow): EventAttendee {
+  return {
+    contactId: row.contact_id,
+    name: row.contact_name,
+    rsvpStatus: row.rsvp_status,
+    followUpStatus: row.follow_up_status,
+  }
+}
+
+function mapEventRow(row: EventRow, attendees: EventAttendeeRow[]): Event {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    description: row.description,
+    type: row.type as Event['type'],
+    startDate: row.start_date,
+    endDate: row.end_date,
+    location: row.location ?? undefined,
+    meetingUrl: row.meeting_url ?? undefined,
+    maxAttendees: row.max_attendees ?? undefined,
+    status: row.status,
+    attendees: attendees
+      .filter((attendee) => attendee.event_id === row.id)
+      .map(mapAttendeeRow),
+  }
+}
+
+export async function fetchEvents(): Promise<Event[]> {
+  const userId = await requireSessionUserId()
+  const { data: eventRows, error: eventsError } = await supabase
+    .from('nmu_events')
+    .select('*')
+    .eq('user_id', userId)
+    .order('start_date', { ascending: false })
+  if (eventsError) throw eventsError
+
+  const rows = (eventRows ?? []) as EventRow[]
+  if (rows.length === 0) return []
+
+  const eventIds = rows.map((row) => row.id)
+  const { data: attendeeRows, error: attendeesError } = await supabase
+    .from('nmu_event_attendees')
+    .select('*')
+    .in('event_id', eventIds)
+  if (attendeesError) throw attendeesError
+
+  const attendees = (attendeeRows ?? []) as EventAttendeeRow[]
+  return rows.map((row) => mapEventRow(row, attendees))
+}
+
+export async function createEvent(userId: string, input: EventInput): Promise<Event> {
+  const { data, error } = await supabase
+    .from('nmu_events')
+    .insert({
+      user_id: userId,
+      title: input.title,
+      description: input.description,
+      type: input.type,
+      start_date: input.start_date,
+      end_date: input.end_date,
+      location: input.location ?? null,
+      meeting_url: input.meeting_url ?? null,
+      max_attendees: input.max_attendees ?? null,
+      status: input.status,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return mapEventRow(data as EventRow, [])
+}
+
+export async function updateEvent(
+  id: string,
+  input: Partial<EventInput>
+): Promise<void> {
+  const userId = await requireSessionUserId()
+  const { error } = await supabase
+    .from('nmu_events')
+    .update(input)
+    .eq('id', id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  const userId = await requireSessionUserId()
+  const { error } = await supabase
+    .from('nmu_events')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function upsertEventAttendees(
+  eventId: string,
+  entries: {
+    contact_id: string
+    contact_name: string
+    rsvp_status?: EventAttendeeRow['rsvp_status']
+    follow_up_status?: EventAttendeeRow['follow_up_status']
+  }[]
+): Promise<void> {
+  if (entries.length === 0) return
+  const payload = entries.map((entry) => ({
+    event_id: eventId,
+    contact_id: entry.contact_id,
+    contact_name: entry.contact_name,
+    rsvp_status: entry.rsvp_status ?? 'invited',
+    follow_up_status: entry.follow_up_status ?? 'pending',
+  }))
+  const { error } = await supabase
+    .from('nmu_event_attendees')
+    .upsert(payload, { onConflict: 'event_id,contact_id' })
   if (error) throw error
 }

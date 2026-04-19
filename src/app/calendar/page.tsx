@@ -4,20 +4,17 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { usePersistentState } from '@/hooks/usePersistentState'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { ActionCalendarPanel } from '@/components/tasks/ActionCalendarPanel'
 import type { CalendarContext, CalendarViewMode } from '@/components/tasks/ActionCalendarPanel'
 import { TaskComposerModal } from '@/components/tasks/TaskComposerModal'
 import { useAppStore } from '@/store/appStore'
-import { fetchContacts, fetchTasks } from '@/lib/queries'
+import { fetchContacts, fetchEvents, fetchTasks } from '@/lib/queries'
 import type { ContactRow, TaskRow } from '@/lib/queries'
-import { events as defaultEvents } from '@/data/mockData'
 import type { Event } from '@/types'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
-const EVENT_STORAGE_VERSION = 3
 
 export default function CalendarPage() {
   const { t, locale } = useLanguage()
@@ -27,9 +24,6 @@ export default function CalendarPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [taskDraftDate, setTaskDraftDate] = useState<string | undefined>(undefined)
   const [editingTask, setEditingTask] = useState<TaskRow | null>(null)
-  const [eventItems] = usePersistentState<Event[]>('nmu-events', defaultEvents, {
-    version: EVENT_STORAGE_VERSION,
-  })
 
   const { data: tasks = [] } = useQuery<TaskRow[]>({
     queryKey: ['tasks'],
@@ -39,6 +33,11 @@ export default function CalendarPage() {
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
     queryFn: fetchContacts,
+  })
+
+  const { data: eventItems = [] } = useQuery<Event[]>({
+    queryKey: ['events'],
+    queryFn: fetchEvents,
   })
 
   const contactMap = Object.fromEntries(contacts.map((contact) => [contact.id, contact.full_name]))
