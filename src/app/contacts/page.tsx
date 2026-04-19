@@ -1,6 +1,6 @@
 'use client'
 
-import { type Dispatch, type FormEvent, type SetStateAction, useMemo, useRef, useState } from 'react'
+import { type FormEvent, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -10,6 +10,22 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
+import { ContactCreateModal } from '@/components/contacts/ContactCreateModal'
+import { InteractionModal } from '@/components/contacts/InteractionModal'
+import { ContactTaskModal } from '@/components/contacts/ContactTaskModal'
+import {
+  INTERACTION_TYPE_LABELS,
+  OUTCOME_LABELS,
+  OUTCOME_VARIANTS,
+  PIPELINE_STAGE_OPTIONS,
+  TASK_PRIORITY_LABELS,
+  TASK_PRIORITY_VARIANTS,
+  TASK_TYPE_LABELS,
+  stageMeta,
+  type AddContactForm,
+  type ContactTaskFormValues,
+  type InteractionFormValues,
+} from '@/components/contacts/contactLabels'
 import {
   fetchContacts,
   addContact,
@@ -25,7 +41,6 @@ import {
 import { cn } from '@/lib/utils'
 import type { ContactRow, InteractionRow, TaskRow } from '@/lib/queries'
 import {
-  AlertCircle,
   ArrowLeft,
   CalendarClock,
   CalendarDays,
@@ -57,108 +72,7 @@ const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 const validSegments = ['all', 'prospects', 'customers', 'team', 'follow_up', 'hot'] as const
 type SegmentKey = (typeof validSegments)[number]
 
-const PIPELINE_STAGE_OPTIONS = [
-  'new',
-  'contact_planned',
-  'first_contact',
-  'interested',
-  'invited',
-  'presentation_sent',
-  'presentation_done',
-  'followup_pending',
-  'objection_handling',
-  'ready_to_buy',
-  'became_customer',
-  'ready_to_join',
-  'became_member',
-  'nurture_later',
-  'dormant',
-  'lost',
-] as const
-
-type PipelineStage = (typeof PIPELINE_STAGE_OPTIONS)[number]
-
-const TASK_TYPE_LABELS: Record<TaskRow['type'], { tr: string; en: string }> = {
-  follow_up: { tr: 'Takip', en: 'Follow-up' },
-  call: { tr: 'Arama', en: 'Call' },
-  meeting: { tr: 'Toplantı', en: 'Meeting' },
-  presentation: { tr: 'Sunum', en: 'Presentation' },
-  onboarding: { tr: 'Oryantasyon', en: 'Onboarding' },
-  training: { tr: 'Eğitim', en: 'Training' },
-  custom: { tr: 'Özel', en: 'Custom' },
-}
-
-const TASK_PRIORITY_LABELS: Record<TaskRow['priority'], { tr: string; en: string }> = {
-  low: { tr: 'Düşük', en: 'Low' },
-  medium: { tr: 'Orta', en: 'Medium' },
-  high: { tr: 'Yüksek', en: 'High' },
-  urgent: { tr: 'Acil', en: 'Urgent' },
-}
-
-const TASK_PRIORITY_VARIANTS: Record<TaskRow['priority'], 'default' | 'primary' | 'warning' | 'error'> = {
-  low: 'default',
-  medium: 'primary',
-  high: 'warning',
-  urgent: 'error',
-}
-
-const INTERACTION_TYPE_LABELS: Record<InteractionRow['type'], { tr: string; en: string }> = {
-  call: { tr: 'Arama', en: 'Call' },
-  message: { tr: 'Mesaj', en: 'Message' },
-  meeting: { tr: 'Toplantı', en: 'Meeting' },
-  email: { tr: 'E-posta', en: 'Email' },
-  note: { tr: 'Not', en: 'Note' },
-  presentation: { tr: 'Sunum', en: 'Presentation' },
-  follow_up: { tr: 'Takip', en: 'Follow-up' },
-}
-
-const OUTCOME_VARIANTS: Record<NonNullable<InteractionRow['outcome']>, 'success' | 'default' | 'error' | 'warning'> = {
-  positive: 'success',
-  neutral: 'default',
-  negative: 'error',
-  no_response: 'warning',
-}
-
-const OUTCOME_LABELS: Record<NonNullable<InteractionRow['outcome']>, { tr: string; en: string }> = {
-  positive: { tr: 'Olumlu', en: 'Positive' },
-  neutral: { tr: 'Nötr', en: 'Neutral' },
-  negative: { tr: 'Olumsuz', en: 'Negative' },
-  no_response: { tr: 'Dönüş Yok', en: 'No Response' },
-}
-
-type AddForm = {
-  full_name: string
-  phone: string
-  email: string
-  location: string
-  profession: string
-  temperature: 'cold' | 'warm' | 'hot' | 'frozen'
-  interest_type: 'unknown' | 'product' | 'business' | 'both'
-  source: string
-  notes: string
-  pipeline_stage: PipelineStage
-}
-
-type InteractionFormValues = {
-  type: InteractionRow['type']
-  channel: string
-  content: string
-  outcome?: InteractionRow['outcome']
-  date: string
-  next_action?: string
-  next_follow_up_date?: string
-  duration_minutes?: number
-}
-
-type ContactTaskFormValues = {
-  title: string
-  type: TaskRow['type']
-  priority: TaskRow['priority']
-  due_date: string
-  description?: string
-}
-
-function createEmptyForm(segment: SegmentKey): AddForm {
+function createEmptyForm(segment: SegmentKey): AddContactForm {
   return {
     full_name: '',
     phone: '',
@@ -202,29 +116,6 @@ function formatDateTime(value: string, locale: 'tr' | 'en') {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function stageMeta(stage: string) {
-  const labels: Record<string, { tr: string; en: string; className: string }> = {
-    new: { tr: 'Yeni Potansiyel', en: 'New Lead', className: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20' },
-    contact_planned: { tr: 'İletişim Planlandı', en: 'Contact Planned', className: 'bg-blue-500/10 text-blue-300 border-blue-500/20' },
-    first_contact: { tr: 'İlk İletişim', en: 'First Contact', className: 'bg-violet-500/10 text-violet-300 border-violet-500/20' },
-    interested: { tr: 'İlgileniyor', en: 'Interested', className: 'bg-purple-500/10 text-purple-300 border-purple-500/20' },
-    invited: { tr: 'Davet Edildi', en: 'Invited', className: 'bg-amber-500/10 text-amber-300 border-amber-500/20' },
-    presentation_sent: { tr: 'Sunum Gönderildi', en: 'Presentation Sent', className: 'bg-orange-500/10 text-orange-300 border-orange-500/20' },
-    presentation_done: { tr: 'Sunum Yapıldı', en: 'Presentation Done', className: 'bg-orange-400/10 text-orange-200 border-orange-400/20' },
-    followup_pending: { tr: 'Takip Ediliyor', en: 'Follow-up Active', className: 'bg-red-500/10 text-red-300 border-red-500/20' },
-    objection_handling: { tr: 'İtiraz Yönetimi', en: 'Objection Handling', className: 'bg-rose-500/10 text-rose-300 border-rose-500/20' },
-    ready_to_buy: { tr: 'Karar Aşamasında', en: 'Decision Stage', className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' },
-    became_customer: { tr: 'Müşteri', en: 'Customer', className: 'bg-teal-500/10 text-teal-300 border-teal-500/20' },
-    ready_to_join: { tr: 'Katılmaya Hazır', en: 'Ready to Join', className: 'bg-sky-500/10 text-sky-300 border-sky-500/20' },
-    became_member: { tr: 'Ekip Üyesi', en: 'Team Member', className: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' },
-    nurture_later: { tr: 'Sonra İlgilen', en: 'Nurture Later', className: 'bg-slate-500/10 text-slate-300 border-slate-500/20' },
-    dormant: { tr: 'Pasif', en: 'Dormant', className: 'bg-slate-600/10 text-slate-300 border-slate-600/20' },
-    lost: { tr: 'Kaybedildi', en: 'Lost', className: 'bg-zinc-500/10 text-zinc-300 border-zinc-500/20' },
-  }
-
-  return labels[stage] ?? { tr: stage, en: stage, className: 'bg-surface-hover text-text-secondary border-border' }
 }
 
 function buildContactsHref(segment: SegmentKey, options?: { contactId?: string; newModal?: boolean }) {
@@ -271,557 +162,6 @@ function ChannelButtons({ contact }: { contact: ContactRow }) {
   )
 }
 
-function ContactCreateModal({
-  currentLocale,
-  form,
-  setForm,
-  error,
-  loading,
-  onClose,
-  onSubmit,
-}: {
-  currentLocale: 'tr' | 'en'
-  form: AddForm
-  setForm: Dispatch<SetStateAction<AddForm>>
-  error: string
-  loading: boolean
-  onClose: () => void
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="w-full max-w-2xl bg-elevated border border-border rounded-3xl shadow-float overflow-hidden"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <form onSubmit={onSubmit} className="flex max-h-[85vh] flex-col">
-          <div className="flex items-center justify-between p-5 border-b border-border">
-            <div className="flex items-start gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-primary/12 text-primary flex items-center justify-center shrink-0">
-                <UserPlus className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-text-primary">
-                  {currentLocale === 'tr' ? 'Kontak Ekle' : 'Add Contact'}
-                </h2>
-                <p className="text-sm text-text-tertiary mt-0.5">
-                  {currentLocale === 'tr'
-                    ? 'Kontak merkezine hızlıca yeni bir kisi ekle.'
-                    : 'Create a new person inside your contact workspace.'}
-                </p>
-              </div>
-            </div>
-            <button onClick={onClose} type="button" className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {error && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" />{error}
-            </div>
-          )}
-
-            <div className="rounded-2xl border border-border bg-surface/30 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-tertiary mb-4">
-                {currentLocale === 'tr' ? 'Temel Bilgiler' : 'Core Details'}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                    {currentLocale === 'tr' ? 'Ad Soyad *' : 'Full Name *'}
-                  </label>
-                  <input
-                    value={form.full_name}
-                    onChange={(event) => setForm((current) => ({ ...current, full_name: event.target.value }))}
-                    placeholder={currentLocale === 'tr' ? 'Ornek: Ayse Kaya' : 'Example: Ayse Kaya'}
-                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                    {currentLocale === 'tr' ? 'Telefon' : 'Phone'}
-                  </label>
-                  <input
-                    value={form.phone}
-                    onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-                    placeholder={currentLocale === 'tr' ? '05xx xxx xx xx' : '+90 5xx xxx xx xx'}
-                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                    {currentLocale === 'tr' ? 'E-posta' : 'Email'}
-                  </label>
-                  <input
-                    value={form.email}
-                    onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                    placeholder="ornek@mail.com"
-                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                    {currentLocale === 'tr' ? 'Konum' : 'Location'}
-                  </label>
-                  <input
-                    value={form.location}
-                    onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
-                    placeholder={currentLocale === 'tr' ? 'Sehir / Ilce' : 'City / District'}
-                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                    {currentLocale === 'tr' ? 'Meslek' : 'Profession'}
-                  </label>
-                  <input
-                    value={form.profession}
-                    onChange={(event) => setForm((current) => ({ ...current, profession: event.target.value }))}
-                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                    {currentLocale === 'tr' ? 'Kaynak' : 'Source'}
-                  </label>
-                  <input
-                    value={form.source}
-                    onChange={(event) => setForm((current) => ({ ...current, source: event.target.value }))}
-                    placeholder={currentLocale === 'tr' ? 'Instagram, referans, etkinlik...' : 'Instagram, referral, event...'}
-                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-surface/30 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-tertiary mb-4">
-                {currentLocale === 'tr' ? 'Süreç Ayarları' : 'Pipeline Settings'}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                    {currentLocale === 'tr' ? 'Sıcaklık' : 'Temperature'}
-                  </label>
-                  <select
-                    value={form.temperature}
-                    onChange={(event) => setForm((current) => ({ ...current, temperature: event.target.value as AddForm['temperature'] }))}
-                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                  >
-                    <option value="hot">{currentLocale === 'tr' ? 'Sıcak' : 'Hot'}</option>
-                    <option value="warm">{currentLocale === 'tr' ? 'Ilık' : 'Warm'}</option>
-                    <option value="cold">{currentLocale === 'tr' ? 'Soğuk' : 'Cold'}</option>
-                    <option value="frozen">{currentLocale === 'tr' ? 'Donuk' : 'Frozen'}</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                    {currentLocale === 'tr' ? 'İlgi Türü' : 'Interest Type'}
-                  </label>
-                  <select
-                    value={form.interest_type}
-                    onChange={(event) => setForm((current) => ({ ...current, interest_type: event.target.value as AddForm['interest_type'] }))}
-                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                  >
-                    <option value="unknown">{currentLocale === 'tr' ? 'Belirsiz' : 'Unknown'}</option>
-                    <option value="product">{currentLocale === 'tr' ? 'Ürün' : 'Product'}</option>
-                    <option value="business">{currentLocale === 'tr' ? 'İş' : 'Business'}</option>
-                    <option value="both">{currentLocale === 'tr' ? 'Her İkisi' : 'Both'}</option>
-                  </select>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                    {currentLocale === 'tr' ? 'Aşama' : 'Stage'}
-                  </label>
-                  <select
-                    value={form.pipeline_stage}
-                    onChange={(event) => setForm((current) => ({ ...current, pipeline_stage: event.target.value as PipelineStage }))}
-                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                  >
-                    {PIPELINE_STAGE_OPTIONS.map((stage) => (
-                      <option key={stage} value={stage}>{stageMeta(stage)[currentLocale]}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                {currentLocale === 'tr' ? 'Notlar' : 'Notes'}
-              </label>
-              <textarea
-                value={form.notes}
-                onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                rows={3}
-                placeholder={currentLocale === 'tr' ? 'Kisa bir hatirlatma veya ilk notlarini yaz...' : 'Add a quick context note...'}
-                className="w-full px-3 py-2.5 bg-surface border border-border rounded-2xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all resize-none"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-3 p-5 border-t border-border bg-elevated/95">
-            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-              {currentLocale === 'tr' ? 'İptal' : 'Cancel'}
-            </Button>
-            <Button type="submit" className="flex-1" loading={loading}>
-              {currentLocale === 'tr' ? 'Kontağı Kaydet' : 'Save Contact'}
-            </Button>
-          </div>
-        </form>
-      </motion.div>
-    </motion.div>
-  )
-}
-
-function InteractionModal({
-  currentLocale,
-  contactName,
-  onClose,
-  onSubmit,
-  loading,
-  error,
-}: {
-  currentLocale: 'tr' | 'en'
-  contactName: string
-  onClose: () => void
-  onSubmit: (values: InteractionFormValues) => void
-  loading: boolean
-  error: string
-}) {
-  const [form, setForm] = useState({
-    type: 'call' as InteractionRow['type'],
-    channel: 'phone',
-    content: '',
-    outcome: 'positive' as '' | NonNullable<InteractionRow['outcome']>,
-    date: new Date().toISOString().split('T')[0],
-    next_action: '',
-    next_follow_up_date: '',
-    duration_minutes: '',
-  })
-
-  function handleSubmit() {
-    if (!form.content.trim()) return
-
-    onSubmit({
-      type: form.type,
-      channel: form.channel,
-      content: form.content.trim(),
-      outcome: form.outcome || undefined,
-      date: form.date,
-      next_action: form.next_action.trim() || undefined,
-      next_follow_up_date: form.next_follow_up_date || undefined,
-      duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
-    })
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="w-full max-w-xl bg-elevated border border-border rounded-2xl shadow-float overflow-hidden"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <div>
-            <h2 className="text-base font-semibold text-text-primary">
-              {currentLocale === 'tr' ? 'İletişim Kaydı' : 'Interaction Log'}
-            </h2>
-            <p className="text-xs text-text-tertiary mt-0.5">{contactName}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-          {error && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" />{error}
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                {currentLocale === 'tr' ? 'Tür' : 'Type'}
-              </label>
-              <select
-                value={form.type}
-                onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as InteractionRow['type'] }))}
-                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-              >
-                {Object.entries(INTERACTION_TYPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label[currentLocale]}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                {currentLocale === 'tr' ? 'Kanal' : 'Channel'}
-              </label>
-              <select
-                value={form.channel}
-                onChange={(event) => setForm((current) => ({ ...current, channel: event.target.value }))}
-                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-              >
-                <option value="phone">{currentLocale === 'tr' ? 'Telefon' : 'Phone'}</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="email">{currentLocale === 'tr' ? 'E-posta' : 'Email'}</option>
-                <option value="in_person">{currentLocale === 'tr' ? 'Yüz Yüze' : 'In Person'}</option>
-                <option value="social_dm">{currentLocale === 'tr' ? 'DM' : 'DM'}</option>
-                <option value="video_call">{currentLocale === 'tr' ? 'Video' : 'Video'}</option>
-                <option value="manual">{currentLocale === 'tr' ? 'Diğer' : 'Other'}</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">
-              {currentLocale === 'tr' ? 'Not *' : 'Note *'}
-            </label>
-            <textarea
-              value={form.content}
-              onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))}
-              rows={4}
-              className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all resize-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                {currentLocale === 'tr' ? 'Sonuç' : 'Outcome'}
-              </label>
-              <select
-                value={form.outcome}
-                onChange={(event) => setForm((current) => ({ ...current, outcome: event.target.value as '' | NonNullable<InteractionRow['outcome']> }))}
-                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-              >
-                <option value="">{currentLocale === 'tr' ? 'Seçilmedi' : 'Not selected'}</option>
-                {Object.entries(OUTCOME_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label[currentLocale]}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                {currentLocale === 'tr' ? 'Tarih' : 'Date'}
-              </label>
-              <input
-                type="date"
-                value={form.date}
-                onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
-                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                {currentLocale === 'tr' ? 'Sonraki Aksiyon' : 'Next Action'}
-              </label>
-              <input
-                value={form.next_action}
-                onChange={(event) => setForm((current) => ({ ...current, next_action: event.target.value }))}
-                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                {currentLocale === 'tr' ? 'Sonraki Takip' : 'Next Follow-up'}
-              </label>
-              <input
-                type="date"
-                value={form.next_follow_up_date}
-                onChange={(event) => setForm((current) => ({ ...current, next_follow_up_date: event.target.value }))}
-                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3 p-5 border-t border-border">
-          <Button variant="outline" className="flex-1" onClick={onClose}>
-            {currentLocale === 'tr' ? 'İptal' : 'Cancel'}
-          </Button>
-          <Button className="flex-1" loading={loading} disabled={!form.content.trim()} onClick={handleSubmit}>
-            {currentLocale === 'tr' ? 'Kaydı Ekle' : 'Save Log'}
-          </Button>
-        </div>
-      </motion.div>
-    </motion.div>
-  )
-}
-
-function ContactTaskModal({
-  currentLocale,
-  contactName,
-  onClose,
-  onSubmit,
-  loading,
-  error,
-}: {
-  currentLocale: 'tr' | 'en'
-  contactName: string
-  onClose: () => void
-  onSubmit: (values: ContactTaskFormValues) => void
-  loading: boolean
-  error: string
-}) {
-  const [form, setForm] = useState({
-    title: '',
-    type: 'follow_up' as TaskRow['type'],
-    priority: 'medium' as TaskRow['priority'],
-    due_date: new Date().toISOString().split('T')[0],
-    description: '',
-  })
-
-  function handleSubmit() {
-    if (!form.title.trim()) return
-    onSubmit({
-      title: form.title.trim(),
-      type: form.type,
-      priority: form.priority,
-      due_date: form.due_date,
-      description: form.description.trim() || undefined,
-    })
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="w-full max-w-lg bg-elevated border border-border rounded-2xl shadow-float overflow-hidden"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <div>
-            <h2 className="text-base font-semibold text-text-primary">
-              {currentLocale === 'tr' ? 'Kontağa Görev Ekle' : 'Add Task for Contact'}
-            </h2>
-            <p className="text-xs text-text-tertiary mt-0.5">{contactName}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          {error && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" />{error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">
-              {currentLocale === 'tr' ? 'Başlık *' : 'Title *'}
-            </label>
-            <input
-              value={form.title}
-              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-              className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                {currentLocale === 'tr' ? 'Tür' : 'Type'}
-              </label>
-              <select
-                value={form.type}
-                onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as TaskRow['type'] }))}
-                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-              >
-                {Object.entries(TASK_TYPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label[currentLocale]}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                {currentLocale === 'tr' ? 'Öncelik' : 'Priority'}
-              </label>
-              <select
-                value={form.priority}
-                onChange={(event) => setForm((current) => ({ ...current, priority: event.target.value as TaskRow['priority'] }))}
-                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-              >
-                {Object.entries(TASK_PRIORITY_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label[currentLocale]}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">
-              {currentLocale === 'tr' ? 'Son Tarih' : 'Due Date'}
-            </label>
-            <input
-              type="date"
-              value={form.due_date}
-              onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))}
-              className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">
-              {currentLocale === 'tr' ? 'Açıklama' : 'Description'}
-            </label>
-            <textarea
-              value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              rows={3}
-              className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all resize-none"
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-3 p-5 border-t border-border">
-          <Button variant="outline" className="flex-1" onClick={onClose}>
-            {currentLocale === 'tr' ? 'İptal' : 'Cancel'}
-          </Button>
-          <Button className="flex-1" loading={loading} disabled={!form.title.trim()} onClick={handleSubmit}>
-            {currentLocale === 'tr' ? 'Görevi Ekle' : 'Add Task'}
-          </Button>
-        </div>
-      </motion.div>
-    </motion.div>
-  )
-}
-
 export default function ContactsPage() {
   const { t, locale } = useLanguage()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
@@ -845,7 +185,7 @@ export default function ContactsPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [showInteractionModal, setShowInteractionModal] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
-  const [form, setForm] = useState<AddForm>(() => createEmptyForm(activeSegment))
+  const [form, setForm] = useState<AddContactForm>(() => createEmptyForm(activeSegment))
   const [formError, setFormError] = useState('')
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState('')
@@ -873,7 +213,7 @@ export default function ContactsPage() {
     t.interest?.[value as keyof typeof t.interest] ?? value
 
   const addMutation = useMutation({
-    mutationFn: (values: AddForm) =>
+    mutationFn: (values: AddContactForm) =>
       addContact(currentUser!.id, {
         full_name: values.full_name,
         phone: values.phone || undefined,
@@ -1117,8 +457,8 @@ export default function ContactsPage() {
           email: row.email || undefined,
           profession: row.profession || undefined,
           location: row.location || undefined,
-          temperature: (row.temperature as AddForm['temperature']) || 'cold',
-          interest_type: (row.interest_type as AddForm['interest_type']) || 'unknown',
+          temperature: (row.temperature as AddContactForm['temperature']) || 'cold',
+          interest_type: (row.interest_type as AddContactForm['interest_type']) || 'unknown',
           source: row.source || undefined,
           notes: row.notes || undefined,
           pipeline_stage: row.pipeline_stage || undefined,
