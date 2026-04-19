@@ -1,7 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
-import type { User, Contact, Task, Notification, AIRecommendation, PipelineStage } from '@/types'
+import type { User, Notification, AIRecommendation, PipelineStage } from '@/types'
 import { markAllNotificationReadIds, markNotificationReadId } from '@/lib/clientStorage'
 
 function countUnreadNotifications(notifications: Notification[]) {
@@ -30,20 +30,6 @@ interface AppState {
   searchQuery: string
   setSearchOpen: (open: boolean) => void
   setSearchQuery: (query: string) => void
-
-  // Contacts
-  contacts: Contact[]
-  setContacts: (contacts: Contact[]) => void
-  addContact: (contact: Contact) => void
-  updateContact: (id: string, updates: Partial<Contact>) => void
-  deleteContact: (id: string) => void
-
-  // Tasks
-  tasks: Task[]
-  setTasks: (tasks: Task[]) => void
-  addTask: (task: Task) => void
-  updateTask: (id: string, updates: Partial<Task>) => void
-  completeTask: (id: string) => void
 
   // Notifications
   notifications: Notification[]
@@ -86,26 +72,6 @@ export const useAppStore = create<AppState>((set) => ({
   searchQuery: '',
   setSearchOpen: (open) => set({ searchOpen: open }),
   setSearchQuery: (query) => set({ searchQuery: query }),
-
-  contacts: [],
-  setContacts: (contacts) => set({ contacts }),
-  addContact: (contact) => set((s) => ({ contacts: [contact, ...s.contacts] })),
-  updateContact: (id, updates) => set((s) => ({
-    contacts: s.contacts.map(c => c.id === id ? { ...c, ...updates } : c)
-  })),
-  deleteContact: (id) => set((s) => ({
-    contacts: s.contacts.filter(c => c.id !== id)
-  })),
-
-  tasks: [],
-  setTasks: (tasks) => set({ tasks }),
-  addTask: (task) => set((s) => ({ tasks: [task, ...s.tasks] })),
-  updateTask: (id, updates) => set((s) => ({
-    tasks: s.tasks.map(t => t.id === id ? { ...t, ...updates } : t)
-  })),
-  completeTask: (id) => set((s) => ({
-    tasks: s.tasks.map(t => t.id === id ? { ...t, status: 'completed', completedAt: new Date().toISOString() } : t)
-  })),
 
   notifications: [],
   setNotifications: (notifications) => set({ notifications, unreadCount: countUnreadNotifications(notifications) }),
