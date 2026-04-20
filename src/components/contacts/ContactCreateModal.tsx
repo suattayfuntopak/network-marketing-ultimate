@@ -78,7 +78,7 @@ export function ContactCreateModal({ currentLocale, form, setForm, error, loadin
                   <input
                     value={form.full_name}
                     onChange={(event) => setForm((current) => ({ ...current, full_name: event.target.value }))}
-                    placeholder={currentLocale === 'tr' ? 'Ornek: Ayse Kaya' : 'Example: Ayse Kaya'}
+                    placeholder={currentLocale === 'tr' ? 'Örnek: Ayşe Kaya' : 'Example: Ayse Kaya'}
                     className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
                   />
                 </div>
@@ -111,7 +111,7 @@ export function ContactCreateModal({ currentLocale, form, setForm, error, loadin
                   <input
                     value={form.location}
                     onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
-                    placeholder={currentLocale === 'tr' ? 'Sehir / Ilce' : 'City / District'}
+                    placeholder={currentLocale === 'tr' ? 'Şehir / İlçe' : 'City / District'}
                     className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
                   />
                 </div>
@@ -199,7 +199,7 @@ export function ContactCreateModal({ currentLocale, form, setForm, error, loadin
                 value={form.notes}
                 onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
                 rows={3}
-                placeholder={currentLocale === 'tr' ? 'Kisa bir hatirlatma veya ilk notlarini yaz...' : 'Add a quick context note...'}
+                placeholder={currentLocale === 'tr' ? 'Kısa bir hatırlatma veya ilk notlarını yaz...' : 'Add a quick context note...'}
                 className="w-full px-3 py-2.5 bg-surface border border-border rounded-2xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all resize-none"
               />
             </div>
