@@ -474,7 +474,8 @@ function AIMessageGeneratorModalContent({
 
   return (
     <div className="grid max-h-[72vh] gap-0 overflow-hidden lg:grid-cols-[1.08fr_0.92fr]">
-      <div className="space-y-4 overflow-y-auto border-b border-border p-4 pb-2 lg:border-b-0 lg:border-r">
+      <div className="flex min-h-0 flex-col border-b border-border lg:border-b-0 lg:border-r">
+        <div className="space-y-4 overflow-y-auto p-4">
         <div className="space-y-3">
           {selectedContact ? (
             <div className="rounded-2xl border border-border-subtle bg-surface/40 p-4">
@@ -614,8 +615,9 @@ function AIMessageGeneratorModalContent({
           </div>
         </div>
 
-        <div className="relative sticky bottom-0 z-10 -mx-4 mt-1 border-t border-border-subtle bg-card/95 px-4 pb-2 pt-3 backdrop-blur">
-          <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
+        </div>
+        <div className="relative border-t border-border-subtle bg-card/95 px-4 pb-3 pt-3">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
           <Button
             type="button"
             size="lg"
