@@ -208,7 +208,7 @@ export function AIMessageGeneratorModal({
       open={open}
       onClose={onClose}
       className="max-w-4xl"
-      title={locale === 'tr' ? 'AI Mesaj Üretici' : 'AI Message Generator'}
+      title={locale === 'tr' ? 'YZ Mesaj Üretici' : 'AI Message Generator'}
       description={locale === 'tr' ? 'Kişiye özel, doğal ve gönderilebilir mesajlar üret.' : 'Create natural, send-ready message drafts.'}
     >
       {open ? (
@@ -266,42 +266,42 @@ function AIMessageGeneratorModalContent({
 
     const prompt = [
       locale === 'tr'
-        ? 'Sen Network Marketing Ultimate icin calisan ust duzey bir mesaj stratejistisin.'
+        ? 'Sen Network Marketing Ultimate için çalışan üst düzey bir mesaj stratejistisin.'
         : 'You are a senior message strategist working for Network Marketing Ultimate.',
       locale === 'tr'
-        ? 'Tam olarak 3 farkli mesaj varyasyonu yaz. Varyasyonlari sadece --- ile ayir.'
+        ? 'Tam olarak 3 farklı mesaj varyasyonu yaz. Varyasyonları sadece --- ile ayır.'
         : 'Write exactly 3 distinct message variants. Separate the variants only with ---.',
       locale === 'tr'
-        ? 'Baslik, aciklama, numara, emoji, markdown veya not ekleme. Sadece gonderilebilir mesaj metni ver.'
+        ? 'Başlık, açıklama, numara, emoji, markdown veya not ekleme. Sadece gönderilebilir mesaj metni ver.'
         : 'Do not add headings, explanations, numbering, emojis, markdown, or notes. Output only send-ready message copy.',
       locale === 'tr'
-        ? 'Ton dogal, modern, ikna edici ama asla baskici veya yapay olmamali.'
+        ? 'Ton doğal, modern, ikna edici ama asla baskıcı veya yapay olmamalı.'
         : 'The tone must feel natural, modern, persuasive, but never pushy or fake.',
       `${locale === 'tr' ? 'Kategori' : 'Category'}: ${getLabel(CATEGORY_META, locale, category)}`,
       `${locale === 'tr' ? 'Kanal' : 'Channel'}: ${getLabel(CHANNEL_META, locale, channel)}`,
       `${locale === 'tr' ? 'Ton' : 'Tone'}: ${getLabel(TONE_META, locale, tone)}`,
       contact
-        ? `${locale === 'tr' ? 'Kisi' : 'Contact'}: ${contact.full_name}${contact.profession ? `, ${contact.profession}` : ''}${contact.location ? `, ${contact.location}` : ''}`
+        ? `${locale === 'tr' ? 'Kişi' : 'Contact'}: ${contact.full_name}${contact.profession ? `, ${contact.profession}` : ''}${contact.location ? `, ${contact.location}` : ''}`
         : locale === 'tr'
-          ? 'Kisi: Genel mesaj, spesifik bir kontak secilmedi.'
+          ? 'Kişi: Genel mesaj, spesifik bir kontak seçilmedi.'
           : 'Contact: General message, no specific contact selected.',
       contactStage
-        ? `${locale === 'tr' ? 'Asama' : 'Stage'}: ${contactStage[locale]}`
+        ? `${locale === 'tr' ? 'Aşama' : 'Stage'}: ${contactStage[locale]}`
         : '',
       contact?.temperature
-        ? `${locale === 'tr' ? 'Sicaklik' : 'Temperature'}: ${contact.temperature}`
+        ? `${locale === 'tr' ? 'Sıcaklık' : 'Temperature'}: ${contact.temperature}`
         : '',
       contact?.last_contact_date
         ? `${locale === 'tr' ? 'Son temas' : 'Last contact'}: ${contact.last_contact_date}`
         : '',
       contact?.next_follow_up_date
-        ? `${locale === 'tr' ? 'Siradaki takip' : 'Next follow-up'}: ${contact.next_follow_up_date}`
+        ? `${locale === 'tr' ? 'Sıradaki takip' : 'Next follow-up'}: ${contact.next_follow_up_date}`
         : '',
       contact?.birthday && category === 'birthday'
-        ? `${locale === 'tr' ? 'Dogum gunu' : 'Birthday'}: ${contact.birthday}`
+        ? `${locale === 'tr' ? 'Doğum günü' : 'Birthday'}: ${contact.birthday}`
         : '',
       extraContext
-        ? `${locale === 'tr' ? 'Ek baglam' : 'Extra context'}: ${extraContext}`
+        ? `${locale === 'tr' ? 'Ek bağlam' : 'Extra context'}: ${extraContext}`
         : '',
     ]
       .filter(Boolean)
@@ -437,7 +437,7 @@ function AIMessageGeneratorModalContent({
           ) : (
             <div className="rounded-2xl border border-dashed border-border-subtle bg-surface/30 p-4 text-sm text-text-secondary">
               {locale === 'tr'
-                ? 'Belirli bir kontak secmeden genel bir mesaj da uretebilirsin.'
+                ? 'Belirli bir kontak seçmeden genel bir mesaj da üretebilirsin.'
                 : 'You can also generate a general message without picking a specific contact.'}
             </div>
           )}
@@ -445,7 +445,7 @@ function AIMessageGeneratorModalContent({
           {presetLabel ? (
             <div className="rounded-2xl border border-primary/20 bg-primary/8 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-                {locale === 'tr' ? 'Hazir Plan' : 'Preset'}
+                {locale === 'tr' ? 'Hazır Plan' : 'Preset'}
               </p>
               <p className="mt-2 text-sm font-semibold text-text-primary">{presetLabel}</p>
               {presetReason ? <p className="mt-1 text-xs text-text-secondary">{presetReason}</p> : null}
@@ -455,7 +455,7 @@ function AIMessageGeneratorModalContent({
 
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
-            {locale === 'tr' ? 'Kategori sec' : 'Choose category'}
+            {locale === 'tr' ? 'Kategori seç' : 'Choose category'}
           </p>
           <div className="flex flex-wrap gap-2">
             {categoryOptions.map((item) => (
@@ -479,7 +479,7 @@ function AIMessageGeneratorModalContent({
         <div className="grid gap-5 md:grid-cols-2">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
-              {locale === 'tr' ? 'Kanal sec' : 'Choose channel'}
+              {locale === 'tr' ? 'Kanal seç' : 'Choose channel'}
             </p>
             <div className="flex flex-wrap gap-2">
               {channelOptions.map((item) => (
@@ -502,7 +502,7 @@ function AIMessageGeneratorModalContent({
 
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
-              {locale === 'tr' ? 'Ton sec' : 'Choose tone'}
+              {locale === 'tr' ? 'Ton seç' : 'Choose tone'}
             </p>
             <div className="flex flex-wrap gap-2">
               {toneOptions.map((item) => (
@@ -531,7 +531,7 @@ function AIMessageGeneratorModalContent({
           onChange={(event) => setExtraContext(event.target.value)}
           placeholder={
             locale === 'tr'
-              ? 'Orn: Gecen hafta sunuma katilmisti, simdi tekrar yumusak bir takip yapmak istiyorum.'
+              ? 'Örn: Geçen hafta sunuma katılmıştı, şimdi tekrar yumuşak bir takip yapmak istiyorum.'
               : 'Example: They joined the presentation last week and I want to follow up gently.'
           }
         />
@@ -544,7 +544,7 @@ function AIMessageGeneratorModalContent({
           icon={<Sparkles className="h-4 w-4" />}
           className="w-full"
         >
-          {locale === 'tr' ? 'Uret' : 'Generate'}
+          {locale === 'tr' ? 'Üret' : 'Generate'}
         </Button>
         {error ? <p className="text-xs text-warning">{error}</p> : null}
       </div>
@@ -556,11 +556,11 @@ function AIMessageGeneratorModalContent({
           </div>
           <div>
             <p className="text-sm font-semibold text-text-primary">
-              {locale === 'tr' ? 'Hazir Varyasyonlar' : 'Ready Variants'}
+              {locale === 'tr' ? 'Hazır Varyasyonlar' : 'Ready Variants'}
             </p>
             <p className="text-xs text-text-tertiary">
               {locale === 'tr'
-                ? 'Mesaji kopyala, kaydet veya dogrudan gonder.'
+                ? 'Mesajı kopyala, kaydet veya doğrudan gönder.'
                 : 'Copy, save, or send the message directly.'}
             </p>
           </div>
@@ -570,11 +570,11 @@ function AIMessageGeneratorModalContent({
           <div className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed border-border-subtle bg-surface/20 p-6 text-center">
             <Sparkles className="mb-3 h-8 w-8 text-warning" />
             <p className="text-lg font-semibold text-text-primary">
-              {locale === 'tr' ? 'AI Mesaj Uretici' : 'AI Message Generator'}
+              {locale === 'tr' ? 'YZ Mesaj Üretici' : 'AI Message Generator'}
             </p>
             <p className="mt-2 max-w-xs text-sm text-text-secondary">
               {locale === 'tr'
-                ? 'Kontagina ozel, dogal ve gonderilebilir mesajlari burada goreceksin.'
+                ? 'Kontağına özel, doğal ve gönderilebilir mesajları burada göreceksin.'
                 : 'You will see natural, send-ready drafts for your contact here.'}
             </p>
           </div>
@@ -621,7 +621,7 @@ function AIMessageGeneratorModalContent({
                       icon={variantState.savedIndex === index ? <Check className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
                       onClick={() => handleSaveTemplate(variant, index)}
                     >
-                      {locale === 'tr' ? 'Sablona Kaydet' : 'Save Template'}
+                      {locale === 'tr' ? 'Şablona Kaydet' : 'Save Template'}
                     </Button>
                     {sendHref ? (
                       <a href={sendHref} target="_blank" rel="noreferrer" className="inline-flex">
@@ -634,10 +634,10 @@ function AIMessageGeneratorModalContent({
                               ? <Mail className="h-3.5 w-3.5" />
                               : channel === 'sms'
                                 ? <Send className="h-3.5 w-3.5" />
-                                : <MessageCircle className="h-3.5 w-3.5" />
+                              : <MessageCircle className="h-3.5 w-3.5" />
                           }
                         >
-                          {locale === 'tr' ? 'Gonder' : 'Send'}
+                          {locale === 'tr' ? 'Gönder' : 'Send'}
                         </Button>
                       </a>
                     ) : null}
