@@ -131,20 +131,22 @@ export function Header() {
             )}
 
             {/* AI Button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => router.push('/ai')}
-              className={cn(
-                'flex items-center gap-2 h-9 px-2.5 sm:px-3 rounded-xl text-sm font-medium transition-all shrink-0',
-                aiPageActive
-                  ? 'bg-secondary text-white shadow-[0_0_20px_rgba(139,92,246,0.3)]'
-                  : 'bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20'
-              )}
-            >
-              <Bot className="w-4 h-4" />
-              <span className="hidden sm:inline">{t.header.aiCoach}</span>
-            </motion.button>
+            {pathname !== '/dashboard' ? (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => router.push('/ai')}
+                className={cn(
+                  'flex items-center gap-2 h-9 px-2.5 sm:px-3 rounded-xl text-sm font-medium transition-all shrink-0',
+                  aiPageActive
+                    ? 'bg-secondary text-white shadow-[0_0_20px_rgba(139,92,246,0.3)]'
+                    : 'bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20'
+                )}
+              >
+                <Bot className="w-4 h-4" />
+                <span className="hidden sm:inline">{t.header.aiCoach}</span>
+              </motion.button>
+            ) : null}
 
             {/* Dark / Light Toggle */}
             <button

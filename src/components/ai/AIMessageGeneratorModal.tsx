@@ -1,15 +1,16 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
-import { Textarea } from '@/components/ui/Input'
+import { Input, Textarea } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { stageMeta } from '@/components/contacts/contactLabels'
 import { cn } from '@/lib/utils'
 import { postAiChat } from '@/lib/aiClient'
-import type { ContactRow } from '@/lib/queries'
+import { fetchContacts, type ContactRow } from '@/lib/queries'
 import {
   Check,
   Copy,
@@ -261,11 +262,18 @@ function AIMessageGeneratorModalContent({
   onGenerated,
   onSaveTemplate,
 }: Omit<Props, 'open' | 'onClose'>) {
+  const { data: contacts = [] } = useQuery<ContactRow[]>({
+    queryKey: ['contacts'],
+    queryFn: fetchContacts,
+    staleTime: 30_000,
+  })
   const [category, setCategory] = useState<MessageCategory>(initialCategory)
   const [defaultSendChannel] = useState<MessageChannel>(initialChannel)
   const [tone, setTone] = useState<MessageTone>(initialTone)
   const [extraContext, setExtraContext] = useState(initialExtraContext)
   const [variantCount, setVariantCount] = useState<(typeof VARIANT_COUNT_OPTIONS)[number]>(3)
+  const [contactSearch, setContactSearch] = useState('')
+  const [selectedContactId, setSelectedContactId] = useState<string>(contact?.id ?? 'all')
   const [variants, setVariants] = useState<string[]>([])
   const [sendChannelsByVariant, setSendChannelsByVariant] = useState<Record<number, MessageChannel>>({})
   const [openSendMenuIndex, setOpenSendMenuIndex] = useState<number | null>(null)
@@ -276,7 +284,23 @@ function AIMessageGeneratorModalContent({
     savedIndex: null,
   })
 
-  const contactStage = useMemo(() => (contact ? stageMeta(contact.pipeline_stage) : null), [contact])
+  const selectableContacts = useMemo(() => {
+    const sorted = [...contacts].sort((left, right) =>
+      left.full_name.localeCompare(right.full_name, locale === 'tr' ? 'tr' : 'en', { sensitivity: 'base' }),
+    )
+    if (!contactSearch.trim()) return sorted
+    const needle = contactSearch.toLocaleLowerCase(locale)
+    return sorted.filter((item) =>
+      `${item.full_name} ${item.phone ?? ''} ${item.email ?? ''}`.toLocaleLowerCase(locale).includes(needle),
+    )
+  }, [contactSearch, contacts, locale])
+
+  const selectedContact = useMemo(() => {
+    if (selectedContactId === 'all') return null
+    return contacts.find((item) => item.id === selectedContactId) ?? (contact?.id === selectedContactId ? contact : null)
+  }, [contact, contacts, selectedContactId])
+
+  const contactStage = useMemo(() => (selectedContact ? stageMeta(selectedContact.pipeline_stage) : null), [selectedContact])
 
   const categoryOptions = Object.keys(CATEGORY_META) as MessageCategory[]
   const toneOptions = Object.keys(TONE_META) as MessageTone[]
@@ -300,25 +324,25 @@ function AIMessageGeneratorModalContent({
         : 'The tone must feel natural, modern, persuasive, but never pushy or fake.',
       `${locale === 'tr' ? 'Kategori' : 'Category'}: ${getLabel(CATEGORY_META, locale, category)}`,
       `${locale === 'tr' ? 'Ton' : 'Tone'}: ${getLabel(TONE_META, locale, tone)}`,
-      contact
-        ? `${locale === 'tr' ? 'Kişi' : 'Contact'}: ${contact.full_name}${contact.profession ? `, ${contact.profession}` : ''}${contact.location ? `, ${contact.location}` : ''}`
+      selectedContact
+        ? `${locale === 'tr' ? 'Kişi' : 'Contact'}: ${selectedContact.full_name}${selectedContact.profession ? `, ${selectedContact.profession}` : ''}${selectedContact.location ? `, ${selectedContact.location}` : ''}`
         : locale === 'tr'
           ? 'Kişi: Genel mesaj, spesifik bir kontak seçilmedi.'
           : 'Contact: General message, no specific contact selected.',
       contactStage
         ? `${locale === 'tr' ? 'Aşama' : 'Stage'}: ${contactStage[locale]}`
         : '',
-      contact?.temperature
-        ? `${locale === 'tr' ? 'Sıcaklık' : 'Temperature'}: ${contact.temperature}`
+      selectedContact?.temperature
+        ? `${locale === 'tr' ? 'Sıcaklık' : 'Temperature'}: ${selectedContact.temperature}`
         : '',
-      contact?.last_contact_date
-        ? `${locale === 'tr' ? 'Son temas' : 'Last contact'}: ${contact.last_contact_date}`
+      selectedContact?.last_contact_date
+        ? `${locale === 'tr' ? 'Son temas' : 'Last contact'}: ${selectedContact.last_contact_date}`
         : '',
-      contact?.next_follow_up_date
-        ? `${locale === 'tr' ? 'Sıradaki takip' : 'Next follow-up'}: ${contact.next_follow_up_date}`
+      selectedContact?.next_follow_up_date
+        ? `${locale === 'tr' ? 'Sıradaki takip' : 'Next follow-up'}: ${selectedContact.next_follow_up_date}`
         : '',
-      contact?.birthday && category === 'birthday'
-        ? `${locale === 'tr' ? 'Doğum günü' : 'Birthday'}: ${contact.birthday}`
+      selectedContact?.birthday && category === 'birthday'
+        ? `${locale === 'tr' ? 'Doğum günü' : 'Birthday'}: ${selectedContact.birthday}`
         : '',
       extraContext
         ? `${locale === 'tr' ? 'Ek bağlam' : 'Extra context'}: ${extraContext}`
@@ -346,8 +370,8 @@ function AIMessageGeneratorModalContent({
       setOpenSendMenuIndex(null)
       onGenerated({
         id: crypto.randomUUID(),
-        contactId: contact?.id ?? null,
-        contactName: contact?.full_name ?? null,
+        contactId: selectedContact?.id ?? null,
+        contactName: selectedContact?.full_name ?? null,
         prompt,
         category,
         channel: defaultSendChannel,
@@ -362,7 +386,7 @@ function AIMessageGeneratorModalContent({
       const fallback = Array.from({ length: variantCount }, (_, variant) =>
         buildFallbackVariant({
           locale,
-          contact,
+          contact: selectedContact,
           category,
           tone,
           extraContext,
@@ -379,8 +403,8 @@ function AIMessageGeneratorModalContent({
       )
       onGenerated({
         id: crypto.randomUUID(),
-        contactId: contact?.id ?? null,
-        contactName: contact?.full_name ?? null,
+        contactId: selectedContact?.id ?? null,
+        contactName: selectedContact?.full_name ?? null,
         prompt,
         category,
         channel: defaultSendChannel,
@@ -407,6 +431,7 @@ function AIMessageGeneratorModalContent({
   function handleSaveTemplate(message: string, index: number) {
     onSaveTemplate({
       name: `${getLabel(CATEGORY_META, locale, category)}${contact ? ` • ${contact.full_name}` : ''}`,
+      name: `${getLabel(CATEGORY_META, locale, category)}${selectedContact ? ` • ${selectedContact.full_name}` : ''}`,
       category,
       channel: sendChannelsByVariant[index] ?? defaultSendChannel,
       tone,
@@ -419,7 +444,7 @@ function AIMessageGeneratorModalContent({
   }
 
   function buildPhoneDigits() {
-    return contact?.phone?.replace(/\D/g, '') ?? ''
+    return selectedContact?.phone?.replace(/\D/g, '') ?? ''
   }
 
   function getSendHref(message: string, channel: MessageChannel) {
@@ -428,7 +453,7 @@ function AIMessageGeneratorModalContent({
 
     if (channel === 'whatsapp') return `https://wa.me/${phoneDigits || ''}?text=${encoded}`
     if (channel === 'sms') return phoneDigits ? `sms:${phoneDigits}?body=${encoded}` : null
-    if (channel === 'email') return contact?.email ? `mailto:${contact.email}?body=${encoded}` : null
+    if (channel === 'email') return selectedContact?.email ? `mailto:${selectedContact.email}?body=${encoded}` : null
     if (channel === 'telegram') return 'https://t.me/'
     if (channel === 'instagram_dm') return 'https://instagram.com/'
     return null
@@ -454,14 +479,14 @@ function AIMessageGeneratorModalContent({
     <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
       <div className="space-y-5 border-b border-border p-5 lg:border-b-0 lg:border-r">
         <div className="space-y-3">
-          {contact ? (
+          {selectedContact ? (
             <div className="rounded-2xl border border-border-subtle bg-surface/40 p-4">
               <div className="flex items-start gap-3">
-                <Avatar name={contact.full_name} size="md" />
+                <Avatar name={selectedContact.full_name} size="md" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-text-primary">{contact.full_name}</p>
+                  <p className="text-sm font-semibold text-text-primary">{selectedContact.full_name}</p>
                   <p className="text-xs text-text-tertiary">
-                    {[contact.profession, contact.location].filter(Boolean).join(' • ') || (locale === 'tr' ? 'Genel kontak' : 'General contact')}
+                    {[selectedContact.profession, selectedContact.location].filter(Boolean).join(' • ') || (locale === 'tr' ? 'Genel kontak' : 'General contact')}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {contactStage ? (
@@ -474,10 +499,29 @@ function AIMessageGeneratorModalContent({
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-border-subtle bg-surface/30 p-4 text-sm text-text-secondary">
-              {locale === 'tr'
-                ? 'Belirli bir kontak seçmeden genel bir mesaj da üretebilirsin.'
-                : 'You can also generate a general message without picking a specific contact.'}
+            <div className="space-y-3 rounded-2xl border border-dashed border-border-subtle bg-surface/30 p-4">
+              <Input
+                value={contactSearch}
+                onChange={(event) => setContactSearch(event.target.value)}
+                placeholder={locale === 'tr' ? 'Kişi ara...' : 'Search contact...'}
+              />
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                  {locale === 'tr' ? 'Kişi Seç' : 'Select Contact'}
+                </p>
+                <select
+                  value={selectedContactId}
+                  onChange={(event) => setSelectedContactId(event.target.value)}
+                  className="w-full rounded-xl border border-border-subtle bg-surface/40 px-3 py-2 text-sm text-text-primary outline-none ring-primary/40 focus:ring-2"
+                >
+                  <option value="all">{locale === 'tr' ? 'Tümünü Seç' : 'All Contacts'}</option>
+                  {selectableContacts.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
 
