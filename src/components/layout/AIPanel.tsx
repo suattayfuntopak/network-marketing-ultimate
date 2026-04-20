@@ -26,13 +26,14 @@ import {
   TrendingUp,
   Users,
   ShoppingBag,
-  GraduationCap,
+  CakeSlice,
   Target,
   ChevronRight,
-  Lightbulb,
   MessageSquare,
+  Clock3,
+  UserCog,
 } from 'lucide-react'
-import { buildInsights, type InsightCard } from './aiPanelInsights'
+import { deriveCoachInsights, type CoachInsight } from '@/lib/coach'
 
 type ChatMsg = { role: 'user' | 'ai'; content: string }
 
@@ -83,20 +84,34 @@ export function AIPanel() {
   })
 
   const quickPrompts = [
-    { label: t.ai.capabilities.nextBestAction, icon: Users },
-    { label: t.dashboard.weeklyActivity, icon: TrendingUp },
-    { label: t.ai.capabilities.messageDrafting, icon: MessageSquare },
-    { label: t.ai.capabilities.courseRecommendations, icon: GraduationCap },
+    {
+      label: t.ai.shortcuts.self,
+      icon: Target,
+      prompt:
+        locale === 'tr'
+          ? 'Bugun icin net bir aksiyon plani cikar: en sicak 3 kisi, gecikmis takipler ve gunluk ritim.'
+          : 'Give me a clear action plan for today: top 3 hot contacts, overdue follow-ups, and the daily rhythm.',
+    },
+    {
+      label: t.ai.shortcuts.outreach,
+      icon: MessageSquare,
+      prompt:
+        locale === 'tr'
+          ? 'Takibi gelmis bir potansiyele gonderebilecegim kisa ve samimi bir mesaj taslağı yaz.'
+          : 'Draft a short, friendly message I can send to a prospect whose follow-up is due.',
+    },
+    {
+      label: t.ai.shortcuts.team,
+      icon: Users,
+      prompt:
+        locale === 'tr'
+          ? 'Ivmesi dusen bir ekip uyesi icin motive edici, sicak ve net bir kontrol mesaji uret.'
+          : 'Create a warm, motivating check-in message for a team member whose momentum has dropped.',
+    },
   ]
 
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([
-    {
-      role: 'ai',
-      content:
-        locale === 'tr'
-          ? 'Merhaba! Ben NMU AI Koçun. Ustteki akilli icgoruleri dogrudan eyleme cevirebilir, kisi ve musteri bazli net bir sonraki adimi birlikte cikarabiliriz.'
-          : 'Hello! I am your NMU AI Coach. You can turn the smart insights above into action and we can work out the clearest next step for each contact or customer.',
-    },
+    { role: 'ai', content: t.ai.welcome },
   ])
 
   useEffect(() => {
@@ -202,9 +217,9 @@ export function AIPanel() {
     }
   }
 
-  const insights = buildInsights({ contacts, orders, tasks, locale })
+  const insights = deriveCoachInsights(contacts, tasks, orders, locale)
 
-  async function handleInsightAction(insight: InsightCard) {
+  async function handleInsightAction(insight: CoachInsight) {
     const currentRoute = `${pathname}${searchString ? `?${searchString}` : ''}`
 
     if (insight.route === currentRoute) {
@@ -258,7 +273,7 @@ export function AIPanel() {
             <div className="p-4 border-b border-border shrink-0">
               <p className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wider mb-3">{t.common.smartInsights}</p>
               <div className="space-y-2">
-                {insights.slice(0, 3).map((insight, index) => (
+                {insights.slice(0, 4).map((insight, index) => (
                   <motion.button
                     key={insight.id}
                     type="button"
@@ -277,12 +292,16 @@ export function AIPanel() {
                         insight.type === 'reorder_alert' && 'bg-success/15 text-success',
                         insight.type === 'coaching_tip' && 'bg-primary/15 text-primary',
                         insight.type === 'lead_heat' && 'bg-warning/15 text-warning',
+                        insight.type === 'birthday_soon' && 'bg-secondary/15 text-secondary',
+                        insight.type === 'dormant_reconnect' && 'bg-accent/15 text-accent',
                       )}
                     >
                       {insight.type === 'next_action' && <Target className="w-3.5 h-3.5" />}
                       {insight.type === 'reorder_alert' && <ShoppingBag className="w-3.5 h-3.5" />}
-                      {insight.type === 'coaching_tip' && <Lightbulb className="w-3.5 h-3.5" />}
+                      {insight.type === 'coaching_tip' && <UserCog className="w-3.5 h-3.5" />}
                       {insight.type === 'lead_heat' && <TrendingUp className="w-3.5 h-3.5" />}
+                      {insight.type === 'birthday_soon' && <CakeSlice className="w-3.5 h-3.5" />}
+                      {insight.type === 'dormant_reconnect' && <Clock3 className="w-3.5 h-3.5" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-text-primary">{insight.title}</p>
@@ -343,18 +362,18 @@ export function AIPanel() {
 
             <div className="px-4 pb-2 shrink-0">
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-                {quickPrompts.map((prompt, index) => {
-                  const Icon = prompt.icon
+                {quickPrompts.map((shortcut, index) => {
+                  const Icon = shortcut.icon
                   return (
                     <button
                       key={index}
                       onClick={() => {
-                        void handleSend(prompt.label)
+                        void handleSend(shortcut.prompt)
                       }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface border border-border-subtle text-[11px] text-text-secondary hover:text-text-primary hover:border-border whitespace-nowrap transition-colors"
                     >
                       <Icon className="w-3 h-3" />
-                      {prompt.label}
+                      {shortcut.label}
                     </button>
                   )
                 })}

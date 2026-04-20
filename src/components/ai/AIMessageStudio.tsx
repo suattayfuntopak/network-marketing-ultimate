@@ -18,11 +18,16 @@ import {
   MessagesSquare,
   Send,
   Sparkles,
+  UserCheck,
+  Users,
+  UserCog,
   WandSparkles,
   type LucideIcon,
 } from 'lucide-react'
 
-type CategoryKey =
+export type AudienceKey = 'prospect' | 'customer' | 'team'
+
+export type CategoryKey =
   | 'first_contact'
   | 'relationship'
   | 'value_share'
@@ -34,10 +39,21 @@ type CategoryKey =
   | 'birthday'
   | 'anniversary'
   | 'thank_you'
+  | 'reorder'
   | 'onboarding'
+  | 'motivation'
+  | 'check_in'
+  | 'goal_setting'
+  | 'milestone'
 
 type ChannelKey = 'whatsapp' | 'telegram' | 'sms' | 'email' | 'instagram_dm'
 type ToneKey = 'friendly' | 'professional' | 'curious' | 'empathetic' | 'confident' | 'warm'
+
+const AUDIENCE_META: Record<AudienceKey, { tr: string; en: string; icon: LucideIcon }> = {
+  prospect: { tr: 'Aday', en: 'Prospect', icon: UserCheck },
+  customer: { tr: 'Müşteri', en: 'Customer', icon: Users },
+  team: { tr: 'Ekip üyesi', en: 'Team member', icon: UserCog },
+}
 
 const CATEGORY_META: Record<CategoryKey, { tr: string; en: string }> = {
   first_contact: { tr: 'İlk Temas', en: 'First Contact' },
@@ -51,7 +67,35 @@ const CATEGORY_META: Record<CategoryKey, { tr: string; en: string }> = {
   birthday: { tr: 'Doğum Günü', en: 'Birthday' },
   anniversary: { tr: 'Evlilik Yıldönümü', en: 'Wedding Anniversary' },
   thank_you: { tr: 'Teşekkür', en: 'Thank You' },
+  reorder: { tr: 'Yeniden Sipariş', en: 'Reorder' },
   onboarding: { tr: 'Yeni Üye Karşılama', en: 'New Member Welcome' },
+  motivation: { tr: 'Motivasyon', en: 'Motivation' },
+  check_in: { tr: 'Kontrol / Nabız', en: 'Check-in' },
+  goal_setting: { tr: 'Hedef Belirleme', en: 'Goal Setting' },
+  milestone: { tr: 'Kilometre Taşı', en: 'Milestone' },
+}
+
+const AUDIENCE_CATEGORIES: Record<AudienceKey, CategoryKey[]> = {
+  prospect: [
+    'first_contact',
+    'relationship',
+    'value_share',
+    'invitation',
+    'follow_up',
+    'objection_handling',
+    'decision',
+    'reactivation',
+    'birthday',
+    'anniversary',
+  ],
+  customer: ['thank_you', 'reorder', 'value_share', 'reactivation', 'birthday', 'anniversary'],
+  team: ['onboarding', 'motivation', 'check_in', 'goal_setting', 'milestone', 'birthday'],
+}
+
+const AUDIENCE_DEFAULT_CATEGORY: Record<AudienceKey, CategoryKey> = {
+  prospect: 'follow_up',
+  customer: 'thank_you',
+  team: 'check_in',
 }
 
 const CHANNEL_META: Record<ChannelKey, { tr: string; en: string; icon: LucideIcon }> = {
@@ -79,8 +123,27 @@ function getLocalizedLabel<T extends string>(
   return dictionary[key][locale]
 }
 
+function filterContactsByAudience(contacts: ContactRow[], audience: AudienceKey): ContactRow[] {
+  if (audience === 'customer') {
+    return contacts.filter((contact) => contact.pipeline_stage === 'became_customer')
+  }
+  if (audience === 'team') {
+    return contacts.filter((contact) => contact.pipeline_stage === 'became_member')
+  }
+  return contacts.filter(
+    (contact) => !['became_customer', 'became_member', 'lost'].includes(contact.pipeline_stage),
+  )
+}
+
+function audienceDescriptor(audience: AudienceKey, locale: 'tr' | 'en') {
+  if (audience === 'customer') return locale === 'tr' ? 'müşteri' : 'customer'
+  if (audience === 'team') return locale === 'tr' ? 'ekip üyesi' : 'team member'
+  return locale === 'tr' ? 'aday' : 'prospect'
+}
+
 function buildFallbackMessage(options: {
   locale: 'tr' | 'en'
+  audience: AudienceKey
   fullName?: string
   category: CategoryKey
   channel: ChannelKey
@@ -91,6 +154,7 @@ function buildFallbackMessage(options: {
   const name = options.fullName?.split(' ')[0] ?? (options.locale === 'tr' ? 'merhaba' : 'hello')
   const categoryLabel = getLocalizedLabel(CATEGORY_META, options.locale, options.category)
   const toneLabel = getLocalizedLabel(TONE_META, options.locale, options.tone)
+  const audienceLabel = audienceDescriptor(options.audience, options.locale)
 
   const opening =
     options.locale === 'tr'
@@ -99,8 +163,8 @@ function buildFallbackMessage(options: {
 
   const categoryLine =
     options.locale === 'tr'
-      ? `${categoryLabel.toLowerCase()} için sana kısa bir not bırakmak istedim.`
-      : `I wanted to send you a quick note for ${categoryLabel.toLowerCase()}.`
+      ? `Sana ${audienceLabel} olarak ${categoryLabel.toLowerCase()} için kısa bir not bırakmak istedim.`
+      : `As a ${audienceLabel}, I wanted to drop you a quick note for ${categoryLabel.toLowerCase()}.`
 
   const toneLine =
     options.locale === 'tr'
@@ -110,7 +174,7 @@ function buildFallbackMessage(options: {
   const contextLine = options.context
     ? (options.locale === 'tr'
       ? `${options.context.trim()} Bu yüzden doğru zamanda yeniden temas etmek istedim.`
-      : `${options.context.trim()} That felt like the right reason to reconnect now.`)
+      : `${options.context.trim()} That felt like the right reason to reach out now.`)
     : (options.locale === 'tr'
       ? 'Müsait olduğunda kısa bir dönüşünü duymak isterim.'
       : 'I would love to hear back when you have a moment.')
@@ -139,11 +203,28 @@ function splitVariants(text: string) {
     .slice(0, 2)
 }
 
-export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
+type AIMessageStudioProps = {
+  contacts: ContactRow[]
+  initialAudience?: AudienceKey
+  initialContactId?: string
+  initialCategory?: CategoryKey
+}
+
+export function AIMessageStudio({
+  contacts,
+  initialAudience,
+  initialContactId,
+  initialCategory,
+}: AIMessageStudioProps) {
   const { locale } = useLanguage()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
-  const [contactId, setContactId] = useState<string>(contacts[0]?.id ?? '')
-  const [category, setCategory] = useState<CategoryKey>('follow_up')
+  const [audience, setAudience] = useState<AudienceKey>(initialAudience ?? 'prospect')
+  const [contactId, setContactId] = useState<string>(initialContactId ?? '')
+  const [category, setCategory] = useState<CategoryKey>(
+    initialCategory && AUDIENCE_CATEGORIES[initialAudience ?? 'prospect'].includes(initialCategory)
+      ? initialCategory
+      : AUDIENCE_DEFAULT_CATEGORY[initialAudience ?? 'prospect'],
+  )
   const [channel, setChannel] = useState<ChannelKey>('whatsapp')
   const [tone, setTone] = useState<ToneKey>('friendly')
   const [extraContext, setExtraContext] = useState('')
@@ -153,43 +234,73 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [variants, setVariants] = useState<string[]>([])
 
+  const audienceContacts = useMemo(
+    () => filterContactsByAudience(contacts, audience),
+    [contacts, audience],
+  )
+
+  const availableCategories = AUDIENCE_CATEGORIES[audience]
+
   useEffect(() => {
-    if (!contactId && contacts[0]?.id) {
-      setContactId(contacts[0].id)
+    if (!availableCategories.includes(category)) {
+      setCategory(AUDIENCE_DEFAULT_CATEGORY[audience])
     }
-  }, [contactId, contacts])
+  }, [audience, availableCategories, category])
+
+  useEffect(() => {
+    if (contactId && !audienceContacts.some((contact) => contact.id === contactId)) {
+      setContactId('')
+    }
+  }, [audienceContacts, contactId])
 
   const selectedContact = useMemo(
-    () => contacts.find((contact) => contact.id === contactId) ?? null,
-    [contactId, contacts]
+    () => audienceContacts.find((contact) => contact.id === contactId) ?? null,
+    [contactId, audienceContacts],
   )
 
   const counts = useMemo(
     () => ({
-      contacts: contacts.length,
-      categories: Object.keys(CATEGORY_META).length,
+      contacts: audienceContacts.length,
+      categories: availableCategories.length,
       channels: Object.keys(CHANNEL_META).length,
     }),
-    [contacts.length]
+    [audienceContacts.length, availableCategories.length],
   )
 
   async function handleGenerate() {
     setLoading(true)
     setError('')
 
+    const audienceLabel = getLocalizedLabel(AUDIENCE_META, currentLocale, audience)
+    const categoryLabel = getLocalizedLabel(CATEGORY_META, currentLocale, category)
+    const channelLabel = getLocalizedLabel(CHANNEL_META, currentLocale, channel)
+    const toneLabel = getLocalizedLabel(TONE_META, currentLocale, tone)
+
+    const systemLine =
+      audience === 'team'
+        ? currentLocale === 'tr'
+          ? 'Network marketing ekip liderisin. Ekip uyesine kisa, destekleyici, net adım iceren mesajlar yaz.'
+          : 'You are a network marketing team leader. Write short, supportive messages with a clear next step for a team member.'
+        : audience === 'customer'
+          ? currentLocale === 'tr'
+            ? 'Network marketing mesaj koçusun. Mevcut bir musteri icin dogal, iltifat etmeyen, sicak ve kisa mesajlar yaz.'
+            : 'You are a message coach. Write natural, non-flattering, warm and short messages to an existing customer.'
+          : currentLocale === 'tr'
+            ? 'Network marketing mesaj koçusun. Aday icin dogal, baski kurmayan, kisa mesajlar yaz.'
+            : 'You are a message coach. Write natural, non-pressuring, short messages for a prospect.'
+
     const prompt = [
-      currentLocale === 'tr'
-        ? 'Network marketing için doğal ve kısa mesajlar yazan bir mesaj koçusun.'
-        : 'You are a message coach who writes short and natural network marketing messages.',
+      systemLine,
       currentLocale === 'tr'
         ? 'Tam olarak 2 kısa mesaj varyasyonu üret. Varyasyonları sadece --- ile ayır.'
         : 'Generate exactly 2 short message variants. Separate the variants only with ---.',
       currentLocale === 'tr'
         ? 'Açıklama, madde, başlık ekleme. Sadece gönderilebilir mesaj metni üret.'
         : 'Do not add explanations, bullets, or headings. Output only send-ready message copy.',
-      `${currentLocale === 'tr' ? 'Kategori' : 'Category'}: ${getLocalizedLabel(CATEGORY_META, currentLocale, category)}`,
-      `${currentLocale === 'tr' ? 'Kanal' : 'Channel'}: ${getLocalizedLabel(CHANNEL_META, currentLocale, channel)}`,
-      `${currentLocale === 'tr' ? 'Ton' : 'Tone'}: ${getLocalizedLabel(TONE_META, currentLocale, tone)}`,
+      `${currentLocale === 'tr' ? 'Hedef kitle' : 'Audience'}: ${audienceLabel}`,
+      `${currentLocale === 'tr' ? 'Kategori' : 'Category'}: ${categoryLabel}`,
+      `${currentLocale === 'tr' ? 'Kanal' : 'Channel'}: ${channelLabel}`,
+      `${currentLocale === 'tr' ? 'Ton' : 'Tone'}: ${toneLabel}`,
       selectedContact
         ? `${currentLocale === 'tr' ? 'Kişi' : 'Contact'}: ${selectedContact.full_name}, ${selectedContact.profession ?? ''}, ${selectedContact.location ?? ''}`
         : '',
@@ -225,6 +336,7 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
     } catch {
       const primary = buildFallbackMessage({
         locale: currentLocale,
+        audience,
         fullName: selectedContact?.full_name,
         category,
         channel,
@@ -235,6 +347,7 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
 
       const secondary = buildFallbackMessage({
         locale: currentLocale,
+        audience,
         fullName: selectedContact?.full_name,
         category,
         channel,
@@ -247,7 +360,7 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
       setError(
         currentLocale === 'tr'
           ? 'Canlı AI servisi yerine akıllı taslak üretildi.'
-          : 'A smart local draft was generated instead of the live AI service.'
+          : 'A smart local draft was generated instead of the live AI service.',
       )
     } finally {
       setLoading(false)
@@ -259,6 +372,8 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
     setCopiedIndex(index)
     window.setTimeout(() => setCopiedIndex(null), 1600)
   }
+
+  const audienceKeys = Object.keys(AUDIENCE_META) as AudienceKey[]
 
   return (
     <Card className="overflow-hidden" glow="primary">
@@ -272,8 +387,8 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
               </CardTitle>
               <CardDescription className="mt-1">
                 {currentLocale === 'tr'
-                  ? 'YZ Koçu içine gömülü, kişiye göre hızlı mesaj üretim alanı.'
-                  : 'A fast contact-aware message studio embedded into AI Coach.'}
+                  ? 'Aday, müşteri ve ekip üyesi için hedef kitleye göre hızlı mesaj üretir.'
+                  : 'Audience-aware drafts for prospects, customers, and team members.'}
               </CardDescription>
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -300,6 +415,33 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
 
           <div className="space-y-5">
             <div>
+              <p className="mb-2 text-xs font-medium text-text-secondary">
+                {currentLocale === 'tr' ? 'Hedef kitle' : 'Audience'}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {audienceKeys.map((key) => {
+                  const Icon = AUDIENCE_META[key].icon
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setAudience(key)}
+                      className={cn(
+                        'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors',
+                        audience === key
+                          ? 'border-secondary bg-secondary/10 text-text-primary'
+                          : 'border-border text-text-secondary hover:border-secondary/40 hover:text-text-primary',
+                      )}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {getLocalizedLabel(AUDIENCE_META, currentLocale, key)}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div>
               <label className="block text-xs font-medium text-text-secondary mb-2">
                 {currentLocale === 'tr' ? 'Kişi seç' : 'Choose contact'}
               </label>
@@ -308,13 +450,22 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
                 onChange={(event) => setContactId(event.target.value)}
                 className="w-full h-11 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
               >
-                <option value="">{currentLocale === 'tr' ? 'Kişi seçmeden genel taslak üret' : 'Generate a general draft'}</option>
-                {contacts.map((contact) => (
+                <option value="">
+                  {currentLocale === 'tr' ? 'Kişi seçmeden genel taslak üret' : 'Generate a general draft'}
+                </option>
+                {audienceContacts.map((contact) => (
                   <option key={contact.id} value={contact.id}>
                     {contact.full_name}
                   </option>
                 ))}
               </select>
+              {audienceContacts.length === 0 && (
+                <p className="mt-2 text-[11px] text-text-tertiary">
+                  {currentLocale === 'tr'
+                    ? 'Bu hedef kitlede kayıtlı kişi yok — yine de genel taslak üretebilirsin.'
+                    : 'No contacts for this audience yet — you can still generate a general draft.'}
+                </p>
+              )}
             </div>
 
             {selectedContact && (
@@ -347,7 +498,7 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
                 {currentLocale === 'tr' ? 'Kategori seç' : 'Select category'}
               </p>
               <div className="flex flex-wrap gap-2">
-                {(Object.keys(CATEGORY_META) as CategoryKey[]).map((key) => (
+                {availableCategories.map((key) => (
                   <button
                     key={key}
                     type="button"
@@ -356,7 +507,7 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
                       'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                       category === key
                         ? 'border-primary bg-primary text-obsidian'
-                        : 'border-border text-text-secondary hover:border-primary/40 hover:text-text-primary'
+                        : 'border-border text-text-secondary hover:border-primary/40 hover:text-text-primary',
                     )}
                   >
                     {getLocalizedLabel(CATEGORY_META, currentLocale, key)}
@@ -382,7 +533,7 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
                           'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                           channel === key
                             ? 'border-primary bg-primary text-obsidian'
-                            : 'border-border text-text-secondary hover:border-primary/40 hover:text-text-primary'
+                            : 'border-border text-text-secondary hover:border-primary/40 hover:text-text-primary',
                         )}
                       >
                         <Icon className="w-3 h-3" />
@@ -407,7 +558,7 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
                         'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                         tone === key
                           ? 'border-secondary bg-secondary text-white'
-                          : 'border-border text-text-secondary hover:border-secondary/40 hover:text-text-primary'
+                          : 'border-border text-text-secondary hover:border-secondary/40 hover:text-text-primary',
                       )}
                     >
                       {getLocalizedLabel(TONE_META, currentLocale, key)}
@@ -417,7 +568,7 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
               </div>
             </div>
 
-            {(category === 'birthday' || category === 'anniversary') && (
+            {(category === 'birthday' || category === 'anniversary' || category === 'milestone') && (
               <Input
                 type="date"
                 label={currentLocale === 'tr' ? 'Özel tarih' : 'Occasion date'}
@@ -433,9 +584,17 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
               value={extraContext}
               onChange={(event) => setExtraContext(event.target.value)}
               placeholder={
-                currentLocale === 'tr'
-                  ? 'Örn: geçen hafta sunuma katıldı, bugün daha sıcak görünüyor.'
-                  : 'Ex: attended the presentation last week and feels warmer today.'
+                audience === 'team'
+                  ? currentLocale === 'tr'
+                    ? 'Örn: bu hafta 2 sunum yapmış ama henüz dönüş alamamış, moralini yüksek tutmak istiyorum.'
+                    : 'Ex: delivered 2 presentations this week with no replies yet — want to keep morale high.'
+                  : audience === 'customer'
+                    ? currentLocale === 'tr'
+                      ? 'Örn: son paketi 2 ay önce aldı, stoğu bitmek üzere olabilir.'
+                      : 'Ex: last bundle was 2 months ago, they may be running low.'
+                    : currentLocale === 'tr'
+                      ? 'Örn: geçen hafta sunuma katıldı, bugün daha sıcak görünüyor.'
+                      : 'Ex: attended the presentation last week and feels warmer today.'
               }
             />
 
@@ -485,8 +644,8 @@ export function AIMessageStudio({ contacts }: { contacts: ContactRow[] }) {
                 </p>
                 <p className="mt-2 text-sm text-text-secondary">
                   {currentLocale === 'tr'
-                    ? 'Kişi, kategori ve tonu seç. Sonuçlar burada tek tıkla kopyalanabilir şekilde görünecek.'
-                    : 'Choose a contact, category, and tone. Your copy-ready drafts will appear here.'}
+                    ? 'Hedef kitle, kişi, kategori ve tonu seç. Taslaklar burada tek tıkla kopyalanabilir şekilde görünecek.'
+                    : 'Pick an audience, contact, category, and tone. Your copy-ready drafts will appear here.'}
                 </p>
               </div>
             </div>

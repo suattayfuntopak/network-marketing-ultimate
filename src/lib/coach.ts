@@ -3,7 +3,13 @@
 import type { Notification, User } from '@/types'
 import type { ContactRow, OrderRow, TaskRow } from '@/lib/queries'
 
-export type CoachInsightType = 'next_action' | 'reorder_alert' | 'coaching_tip' | 'lead_heat'
+export type CoachInsightType =
+  | 'next_action'
+  | 'reorder_alert'
+  | 'coaching_tip'
+  | 'lead_heat'
+  | 'birthday_soon'
+  | 'dormant_reconnect'
 
 export type CoachInsight = {
   id: string
@@ -16,6 +22,9 @@ export type CoachInsight = {
 }
 
 const ACTIVE_TASK_STATUSES: TaskRow['status'][] = ['pending', 'in_progress', 'overdue']
+const MAX_INSIGHTS = 5
+const DORMANT_THRESHOLD_DAYS = 21
+const BIRTHDAY_WINDOW_DAYS = 7
 
 const STAGE_LABELS = {
   tr: {
@@ -56,13 +65,13 @@ const STAGE_LABELS = {
   },
 } as const
 
-function startOfToday() {
+export function startOfToday() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return today
 }
 
-function dateOnly(date: string | null | undefined) {
+export function dateOnly(date: string | null | undefined) {
   if (!date) return null
   const value = new Date(date)
   if (Number.isNaN(value.getTime())) return null
@@ -70,14 +79,14 @@ function dateOnly(date: string | null | undefined) {
   return value
 }
 
-function daysFromToday(date: string | null | undefined) {
+export function daysFromToday(date: string | null | undefined) {
   const target = dateOnly(date)
   if (!target) return null
   const diff = target.getTime() - startOfToday().getTime()
   return Math.round(diff / 86_400_000)
 }
 
-function formatShortDate(date: string | null | undefined, locale: 'tr' | 'en') {
+export function formatShortDate(date: string | null | undefined, locale: 'tr' | 'en') {
   if (!date) return locale === 'tr' ? 'belirsiz' : 'unscheduled'
   const value = new Date(date)
   if (Number.isNaN(value.getTime())) return locale === 'tr' ? 'belirsiz' : 'unscheduled'
@@ -87,7 +96,7 @@ function formatShortDate(date: string | null | undefined, locale: 'tr' | 'en') {
   })
 }
 
-function formatCurrency(amount: number, locale: 'tr' | 'en') {
+export function formatCurrency(amount: number, locale: 'tr' | 'en') {
   return new Intl.NumberFormat(locale === 'tr' ? 'tr-TR' : 'en-US', {
     style: 'currency',
     currency: 'TRY',
@@ -95,12 +104,12 @@ function formatCurrency(amount: number, locale: 'tr' | 'en') {
   }).format(amount)
 }
 
-function getStageLabel(stage: string, locale: 'tr' | 'en') {
+export function getStageLabel(stage: string, locale: 'tr' | 'en') {
   const labels = STAGE_LABELS[locale]
   return stage in labels ? labels[stage as keyof typeof labels] : stage
 }
 
-function isPipelineCandidate(stage: ContactRow['pipeline_stage']) {
+export function isPipelineCandidate(stage: ContactRow['pipeline_stage']) {
   return [
     'interested',
     'invited',
@@ -113,15 +122,48 @@ function isPipelineCandidate(stage: ContactRow['pipeline_stage']) {
   ].includes(stage)
 }
 
-export function deriveCoachInsights(
-  contacts: ContactRow[],
-  tasks: TaskRow[],
-  orders: OrderRow[],
-  locale: 'tr' | 'en',
-): CoachInsight[] {
-  const contactsById = new Map(contacts.map((contact) => [contact.id, contact]))
+function daysUntilBirthday(birthday: string | null | undefined) {
+  if (!birthday) return null
+  const parsed = new Date(birthday)
+  if (Number.isNaN(parsed.getTime())) return null
 
-  const hotLead = [...contacts]
+  const today = startOfToday()
+  const next = new Date(today.getFullYear(), parsed.getMonth(), parsed.getDate())
+  next.setHours(0, 0, 0, 0)
+  if (next.getTime() < today.getTime()) {
+    next.setFullYear(next.getFullYear() + 1)
+  }
+  return Math.round((next.getTime() - today.getTime()) / 86_400_000)
+}
+
+function daysSinceContact(date: string | null | undefined) {
+  const target = dateOnly(date)
+  if (!target) return null
+  const diff = startOfToday().getTime() - target.getTime()
+  return Math.round(diff / 86_400_000)
+}
+
+type DeriveInput = {
+  contacts: ContactRow[]
+  tasks: TaskRow[]
+  orders: OrderRow[]
+  locale: 'tr' | 'en'
+}
+
+export function deriveCoachInsights(
+  contactsOrInput: ContactRow[] | DeriveInput,
+  tasks?: TaskRow[],
+  orders?: OrderRow[],
+  locale?: 'tr' | 'en',
+): CoachInsight[] {
+  const input: DeriveInput = Array.isArray(contactsOrInput)
+    ? { contacts: contactsOrInput, tasks: tasks ?? [], orders: orders ?? [], locale: locale ?? 'tr' }
+    : contactsOrInput
+
+  const contactsById = new Map(input.contacts.map((contact) => [contact.id, contact]))
+  const insights: CoachInsight[] = []
+
+  const hotLead = [...input.contacts]
     .filter((contact) => !['lost', 'dormant', 'became_customer', 'became_member'].includes(contact.pipeline_stage))
     .filter((contact) => {
       const followUpDelta = daysFromToday(contact.next_follow_up_date)
@@ -143,7 +185,39 @@ export function deriveCoachInsights(
       return (leftFollowUp ?? 999) - (rightFollowUp ?? 999)
     })[0]
 
-  const reorderOpportunity = [...orders]
+  if (hotLead) {
+    const dueDelta = daysFromToday(hotLead.next_follow_up_date)
+    const followUpText =
+      dueDelta === null
+        ? input.locale === 'tr'
+          ? `${getStageLabel(hotLead.pipeline_stage, input.locale)} asamasinda ilerliyor.`
+          : `Currently in the ${getStageLabel(hotLead.pipeline_stage, input.locale)} stage.`
+        : dueDelta <= 0
+          ? input.locale === 'tr'
+            ? `Takip tarihi ${formatShortDate(hotLead.next_follow_up_date, input.locale)}, gecikme riski var.`
+            : `Follow-up due ${formatShortDate(hotLead.next_follow_up_date, input.locale)} and needs attention now.`
+          : input.locale === 'tr'
+            ? `Siradaki takip ${formatShortDate(hotLead.next_follow_up_date, input.locale)} icin planli.`
+            : `Next follow-up scheduled for ${formatShortDate(hotLead.next_follow_up_date, input.locale)}.`
+
+    insights.push({
+      id: `hot-${hotLead.id}`,
+      type: 'lead_heat',
+      title: input.locale === 'tr' ? `${hotLead.full_name} ile bugun ilerle` : `Move ${hotLead.full_name} forward today`,
+      description:
+        input.locale === 'tr'
+          ? `${followUpText} Kisi detayini acip hazir bir konusma planiyla ilerleyebilirsin.`
+          : `${followUpText} Open the contact workspace and move forward with a ready-made plan.`,
+      actionLabel: input.locale === 'tr' ? 'Kisi planini ac' : 'Open contact plan',
+      prompt:
+        input.locale === 'tr'
+          ? `${hotLead.full_name} icin bugunun en iyi aksiyonunu cikar. Asama ${getStageLabel(hotLead.pipeline_stage, input.locale)}, sicaklik ${hotLead.temperature}. Kisa acilis, olasi itiraz ve net kapanis oner.`
+          : `Work out the best next action for ${hotLead.full_name} today. Stage: ${getStageLabel(hotLead.pipeline_stage, input.locale)}, temperature: ${hotLead.temperature}. Give me an opener, likely objection, and a clean close.`,
+      route: `/contacts?contact=${hotLead.id}`,
+    })
+  }
+
+  const reorderOpportunity = [...input.orders]
     .filter((order) => order.status !== 'cancelled' && Boolean(order.next_reorder_date) && contactsById.has(order.contact_id))
     .sort((left, right) => {
       const leftDate = dateOnly(left.next_reorder_date)?.getTime() ?? Number.MAX_SAFE_INTEGER
@@ -151,7 +225,32 @@ export function deriveCoachInsights(
       return leftDate - rightDate
     })[0]
 
-  const coachingTask = [...tasks]
+  if (reorderOpportunity) {
+    const reorderContact = contactsById.get(reorderOpportunity.contact_id)
+
+    if (reorderContact) {
+      insights.push({
+        id: `reorder-${reorderOpportunity.id}`,
+        type: 'reorder_alert',
+        title:
+          input.locale === 'tr'
+            ? `${reorderContact.full_name} icin yeniden siparis firsati`
+            : `Reorder opportunity for ${reorderContact.full_name}`,
+        description:
+          input.locale === 'tr'
+            ? `${formatShortDate(reorderOpportunity.next_reorder_date, input.locale)} tarihli yeniden siparis penceresi acik. Son siparis toplami ${formatCurrency(reorderOpportunity.total_try, input.locale)}.`
+            : `Reorder window opens ${formatShortDate(reorderOpportunity.next_reorder_date, input.locale)}. Last order value: ${formatCurrency(reorderOpportunity.total_try, input.locale)}.`,
+        actionLabel: input.locale === 'tr' ? 'Musteri akisini ac' : 'Open customer flow',
+        prompt:
+          input.locale === 'tr'
+            ? `${reorderContact.full_name} icin yeniden siparis gorusme plani hazirla. Son siparis toplami ${formatCurrency(reorderOpportunity.total_try, input.locale)} ve sonraki siparis tarihi ${formatShortDate(reorderOpportunity.next_reorder_date, input.locale)}.`
+            : `Prepare a reorder conversation plan for ${reorderContact.full_name}. Their last order was ${formatCurrency(reorderOpportunity.total_try, input.locale)} and the next reorder date is ${formatShortDate(reorderOpportunity.next_reorder_date, input.locale)}.`,
+        route: '/customers',
+      })
+    }
+  }
+
+  const coachingTask = [...input.tasks]
     .filter((task) => ACTIVE_TASK_STATUSES.includes(task.status))
     .filter((task) => Boolean(task.contact_id))
     .filter((task) => {
@@ -165,65 +264,6 @@ export function deriveCoachInsights(
       return new Date(left.due_date).getTime() - new Date(right.due_date).getTime()
     })[0]
 
-  const insights: CoachInsight[] = []
-
-  if (hotLead) {
-    const dueDelta = daysFromToday(hotLead.next_follow_up_date)
-    const followUpText =
-      dueDelta === null
-        ? locale === 'tr'
-          ? `${getStageLabel(hotLead.pipeline_stage, locale)} asamasinda ilerliyor.`
-          : `They are currently in the ${getStageLabel(hotLead.pipeline_stage, locale)} stage.`
-        : dueDelta <= 0
-          ? locale === 'tr'
-            ? `Takip tarihi ${formatShortDate(hotLead.next_follow_up_date, locale)} ve gecikme riski var.`
-            : `The follow-up is due on ${formatShortDate(hotLead.next_follow_up_date, locale)} and needs attention now.`
-          : locale === 'tr'
-            ? `Siradaki takip ${formatShortDate(hotLead.next_follow_up_date, locale)} icin planli.`
-            : `The next follow-up is scheduled for ${formatShortDate(hotLead.next_follow_up_date, locale)}.`
-
-    insights.push({
-      id: `hot-${hotLead.id}`,
-      type: 'lead_heat',
-      title: locale === 'tr' ? `${hotLead.full_name} ile bugun ilerle` : `Move ${hotLead.full_name} forward today`,
-      description:
-        locale === 'tr'
-          ? `${followUpText} Kisi detayini acip hazir bir konusma planiyla ilerleyebilirsin.`
-          : `${followUpText} Open the contact workspace and move forward with a ready-made conversation plan.`,
-      actionLabel: locale === 'tr' ? 'Kisi planini ac' : 'Open contact plan',
-      prompt:
-        locale === 'tr'
-          ? `${hotLead.full_name} icin bugunun en iyi aksiyonunu cikar. Asama ${getStageLabel(hotLead.pipeline_stage, locale)}, sicaklik ${hotLead.temperature}. Kisa acilis, olasi itiraz ve net kapanis oner.`
-          : `Work out the best next action for ${hotLead.full_name} today. Stage: ${getStageLabel(hotLead.pipeline_stage, locale)}, temperature: ${hotLead.temperature}. Give me an opener, likely objection, and a clean close.`,
-      route: `/contacts?contact=${hotLead.id}`,
-    })
-  }
-
-  if (reorderOpportunity) {
-    const reorderContact = contactsById.get(reorderOpportunity.contact_id)
-
-    if (reorderContact) {
-      insights.push({
-        id: `reorder-${reorderOpportunity.id}`,
-        type: 'reorder_alert',
-        title:
-          locale === 'tr'
-            ? `${reorderContact.full_name} icin yeniden siparis firsati`
-            : `Reorder opportunity for ${reorderContact.full_name}`,
-        description:
-          locale === 'tr'
-            ? `${formatShortDate(reorderOpportunity.next_reorder_date, locale)} tarihli yeniden siparis penceresi acik. Son siparis toplami ${formatCurrency(reorderOpportunity.total_try, locale)}.`
-            : `The reorder window is open for ${formatShortDate(reorderOpportunity.next_reorder_date, locale)}. Last order value: ${formatCurrency(reorderOpportunity.total_try, locale)}.`,
-        actionLabel: locale === 'tr' ? 'Musteri akisini ac' : 'Open customer flow',
-        prompt:
-          locale === 'tr'
-            ? `${reorderContact.full_name} icin yeniden siparis gorusme plani hazirla. Son siparis toplami ${formatCurrency(reorderOpportunity.total_try, locale)} ve sonraki siparis tarihi ${formatShortDate(reorderOpportunity.next_reorder_date, locale)}.`
-            : `Prepare a reorder conversation plan for ${reorderContact.full_name}. Their last order was ${formatCurrency(reorderOpportunity.total_try, locale)} and the next reorder date is ${formatShortDate(reorderOpportunity.next_reorder_date, locale)}.`,
-        route: '/customers',
-      })
-    }
-  }
-
   if (coachingTask?.contact_id) {
     const member = contactsById.get(coachingTask.contact_id)
 
@@ -232,16 +272,16 @@ export function deriveCoachInsights(
         id: `coach-${coachingTask.id}`,
         type: 'coaching_tip',
         title:
-          locale === 'tr'
+          input.locale === 'tr'
             ? `${member.full_name} icin koçluk dokunusu`
             : `Coaching touchpoint for ${member.full_name}`,
         description:
-          locale === 'tr'
-            ? `${coachingTask.title} gorevi ${formatShortDate(coachingTask.due_date, locale)} icin planli. ${coachingTask.status === 'overdue' ? 'Gecikme var, kisa bir destek dokunusu faydali olur.' : 'Bugun tamamlanmasi ivmeyi korur.'}`
-            : `${coachingTask.title} is due ${formatShortDate(coachingTask.due_date, locale)}. ${coachingTask.status === 'overdue' ? 'It is overdue, so a short coaching touch would help.' : 'Completing it today will protect momentum.'}`,
-        actionLabel: locale === 'tr' ? 'Koçluk calisma alanini ac' : 'Open coaching workspace',
+          input.locale === 'tr'
+            ? `${coachingTask.title} gorevi ${formatShortDate(coachingTask.due_date, input.locale)} icin planli. ${coachingTask.status === 'overdue' ? 'Gecikme var, kisa bir destek dokunusu faydali olur.' : 'Bugun tamamlanmasi ivmeyi korur.'}`
+            : `${coachingTask.title} is due ${formatShortDate(coachingTask.due_date, input.locale)}. ${coachingTask.status === 'overdue' ? 'It is overdue, so a short coaching touch would help.' : 'Completing it today will protect momentum.'}`,
+        actionLabel: input.locale === 'tr' ? 'Koçluk calisma alanini ac' : 'Open coaching workspace',
         prompt:
-          locale === 'tr'
+          input.locale === 'tr'
             ? `${member.full_name} ekip uyesi icin hizli bir koçluk plani olustur. Gorev: ${coachingTask.title}. Durum: ${coachingTask.status}. Bugun atmam gereken 3 net adimi yaz.`
             : `Create a quick coaching plan for team member ${member.full_name}. Task: ${coachingTask.title}. Status: ${coachingTask.status}. Give me the three clearest actions for today.`,
         route: `/contacts?contact=${member.id}`,
@@ -249,18 +289,81 @@ export function deriveCoachInsights(
     }
   }
 
+  const birthdayContact = [...input.contacts]
+    .filter((contact) => !['lost'].includes(contact.pipeline_stage))
+    .map((contact) => ({ contact, delta: daysUntilBirthday(contact.birthday) }))
+    .filter((entry): entry is { contact: ContactRow; delta: number } => entry.delta !== null && entry.delta >= 0 && entry.delta <= BIRTHDAY_WINDOW_DAYS)
+    .sort((left, right) => left.delta - right.delta)[0]
+
+  if (birthdayContact) {
+    const { contact, delta } = birthdayContact
+    const dayLabel =
+      delta === 0
+        ? input.locale === 'tr' ? 'bugun' : 'today'
+        : delta === 1
+          ? input.locale === 'tr' ? 'yarin' : 'tomorrow'
+          : input.locale === 'tr' ? `${delta} gun sonra` : `in ${delta} days`
+
+    insights.push({
+      id: `birthday-${contact.id}`,
+      type: 'birthday_soon',
+      title:
+        input.locale === 'tr'
+          ? `${contact.full_name} icin dogum gunu fırsatı`
+          : `Birthday opportunity for ${contact.full_name}`,
+      description:
+        input.locale === 'tr'
+          ? `Dogum gunu ${dayLabel}. Sicak bir dokunus, iliskinizi tazeler.`
+          : `Birthday is ${dayLabel}. A warm touch refreshes the relationship.`,
+      actionLabel: input.locale === 'tr' ? 'Kutlama mesaji uret' : 'Generate birthday message',
+      prompt:
+        input.locale === 'tr'
+          ? `${contact.full_name} icin sicak ve kisa bir dogum gunu mesaji uret. Ek satis veya davet icerigi ekleme, sadece icten bir kutlama olsun.`
+          : `Draft a warm and short birthday message for ${contact.full_name}. No upsell or invitation — just a genuine greeting.`,
+      route: `/ai?audience=${contact.pipeline_stage === 'became_member' ? 'team' : contact.pipeline_stage === 'became_customer' ? 'customer' : 'prospect'}&contact=${contact.id}&category=birthday`,
+    })
+  }
+
+  const dormantContact = [...input.contacts]
+    .filter((contact) => ['interested', 'invited', 'presentation_sent', 'presentation_done', 'followup_pending', 'nurture_later'].includes(contact.pipeline_stage))
+    .map((contact) => ({ contact, since: daysSinceContact(contact.last_contact_date) }))
+    .filter((entry): entry is { contact: ContactRow; since: number } => entry.since !== null && entry.since >= DORMANT_THRESHOLD_DAYS)
+    .sort((left, right) => right.since - left.since)[0]
+
+  if (dormantContact) {
+    const { contact, since } = dormantContact
+    insights.push({
+      id: `dormant-${contact.id}`,
+      type: 'dormant_reconnect',
+      title:
+        input.locale === 'tr'
+          ? `${contact.full_name} ile bag yeniden kurulmali`
+          : `Reconnect with ${contact.full_name}`,
+      description:
+        input.locale === 'tr'
+          ? `Son temas ${since} gun once. Kisa bir tekrar-temas ile huniye geri cekilebilir.`
+          : `Last contact ${since} days ago. A short reconnect message can pull them back into the funnel.`,
+      actionLabel: input.locale === 'tr' ? 'Yeniden baglan mesaji uret' : 'Draft reconnect message',
+      prompt:
+        input.locale === 'tr'
+          ? `${contact.full_name} ile ${since} gundur konusulmamis. Baski kurmadan, sicak ve kisa bir yeniden-baglanma mesaji hazirla. Asama: ${getStageLabel(contact.pipeline_stage, input.locale)}.`
+          : `It has been ${since} days since ${contact.full_name} was contacted. Draft a warm, low-pressure reconnect message. Stage: ${getStageLabel(contact.pipeline_stage, input.locale)}.`,
+      route: `/ai?audience=prospect&contact=${contact.id}&category=reactivation`,
+    })
+  }
+
   const fallbackInsights: CoachInsight[] = [
     {
       id: 'pipeline-focus',
       type: 'next_action',
-      title: locale === 'tr' ? 'Huniyi bugun hizlandir' : 'Accelerate the pipeline today',
+      title: input.locale === 'tr' ? 'Huniyi bugun hizlandir' : 'Accelerate the pipeline today',
       description:
-        locale === 'tr'
+        input.locale === 'tr'
           ? 'Takip bekleyen ve sunum gonderilen asamalari tarayip gunluk oncelik listesini cikar.'
           : 'Scan follow-up and presentation stages and extract the strongest priorities for today.',
-      actionLabel: locale === 'tr' ? 'Huniyi ac' : 'Open pipeline',
+      actionLabel: input.locale === 'tr' ? 'Huniyi ac' : 'Open pipeline',
       prompt:
-        locale === 'tr'
+        input.locale === 'tr'
           ? 'Mevcut huniye gore bugun odaklanmam gereken 3 potansiyeli ve nedenlerini yaz.'
           : 'Based on the current pipeline, tell me the top three prospects I should focus on today and why.',
       route: '/pipeline',
@@ -268,14 +371,14 @@ export function deriveCoachInsights(
     {
       id: 'task-focus',
       type: 'next_action',
-      title: locale === 'tr' ? 'Bugunun gorev ritmini kur' : 'Set today’s task rhythm',
+      title: input.locale === 'tr' ? 'Bugunun gorev ritmini kur' : 'Set today’s task rhythm',
       description:
-        locale === 'tr'
+        input.locale === 'tr'
           ? 'Gecikmis ve oncelikli takipleri tek ekranda gorup net bir uygulama sirasi cikar.'
           : 'Review overdue and high-priority follow-ups in one place and create a practical execution order.',
-      actionLabel: locale === 'tr' ? 'Gorevleri ac' : 'Open tasks',
+      actionLabel: input.locale === 'tr' ? 'Gorevleri ac' : 'Open tasks',
       prompt:
-        locale === 'tr'
+        input.locale === 'tr'
           ? 'Bugunku gorevlerimi onceliklendir. En yuksek etkiyi yaratacak sira ve odagi oner.'
           : 'Prioritize my tasks for today. Suggest the execution order that will create the most impact.',
       route: '/tasks',
@@ -283,14 +386,14 @@ export function deriveCoachInsights(
     {
       id: 'new-growth',
       type: 'next_action',
-      title: locale === 'tr' ? 'Yeni potansiyel akisini besle' : 'Feed the new prospect flow',
+      title: input.locale === 'tr' ? 'Yeni potansiyel akisini besle' : 'Feed the new prospect flow',
       description:
-        locale === 'tr'
+        input.locale === 'tr'
           ? 'Bugun huniye taze giris eklemek icin hizli bir potansiyel yakalama ve mesaj plani kur.'
           : 'Set up a quick prospect-capture and outreach plan to add fresh opportunities to the funnel today.',
-      actionLabel: locale === 'tr' ? 'Potansiyel ekle' : 'Add prospect',
+      actionLabel: input.locale === 'tr' ? 'Potansiyel ekle' : 'Add prospect',
       prompt:
-        locale === 'tr'
+        input.locale === 'tr'
           ? 'Bugun yeni potansiyel kazanmak icin kullanabilecegim kisa bir mesaj ve aksiyon plani hazirla.'
           : 'Prepare a short message and action plan I can use to win new prospects today.',
       route: '/contacts?segment=prospects&new=1',
@@ -298,13 +401,13 @@ export function deriveCoachInsights(
   ]
 
   for (const fallback of fallbackInsights) {
-    if (insights.length >= 3) break
+    if (insights.length >= MAX_INSIGHTS) break
     if (!insights.some((item) => item.id === fallback.id)) {
       insights.push(fallback)
     }
   }
 
-  return insights.slice(0, 3)
+  return insights.slice(0, MAX_INSIGHTS)
 }
 
 export function deriveNotifications(
