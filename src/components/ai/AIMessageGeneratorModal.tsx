@@ -641,7 +641,7 @@ function AIMessageGeneratorModalContent({
           </div>
           <div>
             <p className="text-sm font-semibold text-text-primary">
-              {locale === 'tr' ? 'Hazır Varyasyonlar' : 'Ready Variants'}
+              {locale === 'tr' ? 'Hazır Varyasyon(lar)' : 'Ready Variation(s)'}
             </p>
             <p className="text-xs text-text-tertiary">
               {locale === 'tr'
@@ -669,25 +669,7 @@ function AIMessageGeneratorModalContent({
               const selectedSendChannel = sendChannelsByVariant[index] ?? defaultSendChannel
               return (
                 <div key={`${index}-${variant.slice(0, 20)}`} className="rounded-2xl border border-border-subtle bg-surface/35 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <Badge variant="secondary">{locale === 'tr' ? `Varyasyon ${index + 1}` : `Variant ${index + 1}`}</Badge>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface-hover hover:text-text-primary"
-                        onClick={() => handleCopy(variant, index)}
-                      >
-                        {variantState.copiedIndex === index ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface-hover hover:text-warning"
-                        onClick={() => handleSaveTemplate(variant, index)}
-                      >
-                        {variantState.savedIndex === index ? <Check className="h-4 w-4 text-success" /> : <Sparkles className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
+                  <Badge variant="secondary">{locale === 'tr' ? `Varyasyon ${index + 1}` : `Variant ${index + 1}`}</Badge>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-text-secondary">{variant}</p>
                   <div className="mt-4 flex flex-nowrap items-center gap-2">
                     <Button
