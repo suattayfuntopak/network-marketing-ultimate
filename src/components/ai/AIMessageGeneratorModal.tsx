@@ -98,6 +98,7 @@ type VariantState = {
 }
 
 const SEND_CHANNEL_ORDER: MessageChannel[] = ['whatsapp', 'telegram', 'email', 'sms', 'instagram_dm']
+const VARIANT_COUNT_OPTIONS = [1, 2, 3] as const
 
 const CATEGORY_META: Record<MessageCategory, { tr: string; en: string }> = {
   first_contact: { tr: 'İlk Temas', en: 'First Contact' },
@@ -142,12 +143,12 @@ function getLabel<T extends string>(
   return dictionary[key][locale]
 }
 
-function splitVariants(text: string) {
+function splitVariants(text: string, maxVariants: number) {
   return text
     .split(/\n?---+\n?/g)
     .map((chunk) => chunk.trim())
     .filter(Boolean)
-    .slice(0, 3)
+    .slice(0, maxVariants)
 }
 
 function buildFallbackVariant(options: {
@@ -256,6 +257,7 @@ function AIMessageGeneratorModalContent({
   const [defaultSendChannel] = useState<MessageChannel>(initialChannel)
   const [tone, setTone] = useState<MessageTone>(initialTone)
   const [extraContext, setExtraContext] = useState(initialExtraContext)
+  const [variantCount, setVariantCount] = useState<(typeof VARIANT_COUNT_OPTIONS)[number]>(3)
   const [variants, setVariants] = useState<string[]>([])
   const [sendChannelsByVariant, setSendChannelsByVariant] = useState<Record<number, MessageChannel>>({})
   const [openSendMenuIndex, setOpenSendMenuIndex] = useState<number | null>(null)
@@ -280,8 +282,8 @@ function AIMessageGeneratorModalContent({
         ? 'Sen Network Marketing Ultimate için çalışan üst düzey bir mesaj stratejistisin.'
         : 'You are a senior message strategist working for Network Marketing Ultimate.',
       locale === 'tr'
-        ? 'Tam olarak 3 farklı mesaj varyasyonu yaz. Varyasyonları sadece --- ile ayır.'
-        : 'Write exactly 3 distinct message variants. Separate the variants only with ---.',
+        ? `Tam olarak ${variantCount} farklı mesaj varyasyonu yaz. Varyasyonları sadece --- ile ayır.`
+        : `Write exactly ${variantCount} distinct message variants. Separate the variants only with ---.`,
       locale === 'tr'
         ? 'Başlık, açıklama, numara, emoji, markdown veya not ekleme. Sadece gönderilebilir mesaj metni ver.'
         : 'Do not add headings, explanations, numbering, emojis, markdown, or notes. Output only send-ready message copy.',
@@ -325,7 +327,7 @@ function AIMessageGeneratorModalContent({
       }
 
       const text = await response.text()
-      const parsedVariants = splitVariants(text)
+      const parsedVariants = splitVariants(text, variantCount)
 
       if (parsedVariants.length === 0) {
         throw new Error('empty-response')
@@ -349,7 +351,7 @@ function AIMessageGeneratorModalContent({
         createdAt: new Date().toISOString(),
       })
     } catch {
-      const fallback = [0, 1, 2].map((variant) =>
+      const fallback = Array.from({ length: variantCount }, (_, variant) =>
         buildFallbackVariant({
           locale,
           contact,
@@ -540,6 +542,29 @@ function AIMessageGeneratorModalContent({
               : 'Example: They joined the presentation last week and I want to follow up gently.'
           }
         />
+
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
+            {locale === 'tr' ? 'Varyasyon Sayısı' : 'Variant Count'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {VARIANT_COUNT_OPTIONS.map((count) => (
+              <button
+                key={count}
+                type="button"
+                onClick={() => setVariantCount(count)}
+                className={cn(
+                  'rounded-full border px-3 py-1.5 text-sm transition-colors',
+                  variantCount === count
+                    ? 'border-primary/30 bg-primary text-obsidian'
+                    : 'border-border bg-surface/40 text-text-secondary hover:border-border-strong hover:text-text-primary',
+                )}
+              >
+                {locale === 'tr' ? `${count} Mesaj` : `${count} Variants`}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <Button
           type="button"
