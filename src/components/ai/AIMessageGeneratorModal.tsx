@@ -473,9 +473,9 @@ function AIMessageGeneratorModalContent({
   }
 
   return (
-    <div className="grid max-h-[72vh] gap-0 overflow-hidden lg:grid-cols-[1.08fr_0.92fr]">
+    <div className="grid min-h-0 grid-cols-1 gap-0 overflow-hidden lg:h-[min(36rem,calc(90dvh-11rem))] lg:grid-cols-[1.08fr_0.92fr]">
       <div className="flex min-h-0 flex-col border-b border-border lg:border-b-0 lg:border-r">
-        <div className="space-y-4 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <div className="space-y-3">
           {selectedContact ? (
             <div className="rounded-2xl border border-border-subtle bg-surface/40 p-4">
@@ -616,7 +616,7 @@ function AIMessageGeneratorModalContent({
         </div>
 
         </div>
-        <div className="relative border-t border-border-subtle bg-card/95 px-4 pb-3 pt-3">
+        <div className="relative shrink-0 border-t border-border-subtle bg-card/95 px-4 pb-3 pt-3">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
           <Button
             type="button"
@@ -632,7 +632,7 @@ function AIMessageGeneratorModalContent({
         </div>
       </div>
 
-      <div className="space-y-4 overflow-y-auto p-4">
+      <div className="min-h-0 space-y-4 overflow-y-auto p-4">
         <div className="flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-warning/10 text-warning">
             <WandSparkles className="h-5 w-5" />
