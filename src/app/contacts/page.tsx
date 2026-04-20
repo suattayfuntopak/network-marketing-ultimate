@@ -1,6 +1,7 @@
 'use client'
 
 import { type FormEvent, useMemo, useRef, useState } from 'react'
+import { endOfWeek, isWithinInterval, startOfWeek } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -46,6 +47,7 @@ import {
   ArrowLeft,
   CalendarClock,
   CalendarDays,
+  CalendarRange,
   CheckCircle2,
   ChevronRight,
   Clock,
@@ -118,6 +120,14 @@ function formatDateTime(value: string, locale: 'tr' | 'en') {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+/** Local calendar YYYY-MM-DD (for “bugün / bu ay” counts). */
+function localCalendarYmd(date: Date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function buildContactsHref(segment: SegmentKey, options?: { contactId?: string; newModal?: boolean }) {
@@ -359,19 +369,106 @@ export default function ContactsPage() {
   })
 
   const todayKey = new Date().toISOString().slice(0, 10)
-  const monthKey = todayKey.slice(0, 7)
 
-  const contactStats = useMemo(() => ({
-    total: contacts.length,
-    prospects: contacts.filter((contact) => isProspectStage(contact.pipeline_stage)).length,
-    customers: contacts.filter((contact) => contact.pipeline_stage === 'became_customer').length,
-    team: contacts.filter((contact) => contact.pipeline_stage === 'became_member').length,
-    followUpDue: contacts.filter((contact) => isFollowUpDue(contact, todayKey)).length,
-    monthAdded: contacts.filter((contact) => contact.created_at.slice(0, 7) === monthKey).length,
-    hot: contacts.filter((contact) => contact.temperature === 'hot').length,
-    warm: contacts.filter((contact) => contact.temperature === 'warm').length,
-    cold: contacts.filter((contact) => contact.temperature === 'cold').length,
-  }), [contacts, monthKey, todayKey])
+  const contactStats = useMemo(() => {
+    const now = new Date()
+    const todayLocal = localCalendarYmd(now)
+    const monthLocal = todayLocal.slice(0, 7)
+    const weekStart = startOfWeek(now, { weekStartsOn: 1 })
+    const weekEnd = endOfWeek(now, { weekStartsOn: 1 })
+
+    const createdLocalDay = (contact: ContactRow) => localCalendarYmd(new Date(contact.created_at))
+
+    return {
+      total: contacts.length,
+      prospects: contacts.filter((contact) => isProspectStage(contact.pipeline_stage)).length,
+      customers: contacts.filter((contact) => contact.pipeline_stage === 'became_customer').length,
+      team: contacts.filter((contact) => contact.pipeline_stage === 'became_member').length,
+      followUpDue: contacts.filter((contact) => isFollowUpDue(contact, todayKey)).length,
+      monthAdded: contacts.filter((contact) => createdLocalDay(contact).slice(0, 7) === monthLocal).length,
+      weekAdded: contacts.filter((contact) =>
+        isWithinInterval(new Date(contact.created_at), { start: weekStart, end: weekEnd }),
+      ).length,
+      todayAdded: contacts.filter((contact) => createdLocalDay(contact) === todayLocal).length,
+      hot: contacts.filter((contact) => contact.temperature === 'hot').length,
+      warm: contacts.filter((contact) => contact.temperature === 'warm').length,
+      cold: contacts.filter((contact) => contact.temperature === 'cold').length,
+    }
+  }, [contacts, todayKey])
+
+  const contactKpiRows = useMemo(() => {
+    const tr = currentLocale === 'tr'
+    return {
+      top: [
+        {
+          key: 'total',
+          label: tr ? 'Toplam Kontak Sayısı' : 'Total contacts',
+          value: contactStats.total,
+          icon: Users,
+          glow: 'primary' as const,
+          segment: 'all' as SegmentKey | null,
+        },
+        {
+          key: 'month',
+          label: tr ? 'Bu Ay Eklenenler' : 'Added this month',
+          value: contactStats.monthAdded,
+          icon: CalendarClock,
+          glow: 'primary' as const,
+          segment: null,
+        },
+        {
+          key: 'week',
+          label: tr ? 'Bu Hafta Eklenenler' : 'Added this week',
+          value: contactStats.weekAdded,
+          icon: CalendarRange,
+          glow: 'warning' as const,
+          segment: null,
+        },
+        {
+          key: 'today',
+          label: tr ? 'Bugün Eklenenler' : 'Added today',
+          value: contactStats.todayAdded,
+          icon: CalendarDays,
+          glow: 'success' as const,
+          segment: null,
+        },
+      ],
+      bottom: [
+        {
+          key: 'prospects',
+          label: tr ? 'Potansiyeller' : 'Prospects',
+          value: contactStats.prospects,
+          icon: UserPlus,
+          glow: 'warning' as const,
+          segment: 'prospects' as SegmentKey | null,
+        },
+        {
+          key: 'customers',
+          label: tr ? 'Müşteriler' : 'Customers',
+          value: contactStats.customers,
+          icon: ShoppingBag,
+          glow: 'success' as const,
+          segment: 'customers' as SegmentKey | null,
+        },
+        {
+          key: 'team',
+          label: tr ? 'Ekip' : 'Team',
+          value: contactStats.team,
+          icon: Contact,
+          glow: 'primary' as const,
+          segment: 'team' as SegmentKey | null,
+        },
+        {
+          key: 'follow',
+          label: tr ? 'Takip Gereken' : 'Follow-up due',
+          value: contactStats.followUpDue,
+          icon: ListChecks,
+          glow: 'error' as const,
+          segment: 'follow_up' as SegmentKey | null,
+        },
+      ],
+    }
+  }, [contactStats, currentLocale])
 
   const filteredContacts = useMemo(() => {
     return contacts.filter((contact) => {
@@ -947,35 +1044,55 @@ export default function ContactsPage() {
           </motion.div>
         )}
 
-        <motion.div variants={item} className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-          {[
-            { label: currentLocale === 'tr' ? 'Toplam Kontak' : 'Total Contacts', value: contactStats.total, icon: Users, glow: 'primary' as const, segment: 'all' as SegmentKey },
-            { label: currentLocale === 'tr' ? 'Potansiyeller' : 'Prospects', value: contactStats.prospects, icon: UserPlus, glow: 'warning' as const, segment: 'prospects' as SegmentKey },
-            { label: currentLocale === 'tr' ? 'Müşteriler' : 'Customers', value: contactStats.customers, icon: ShoppingBag, glow: 'success' as const, segment: 'customers' as SegmentKey },
-            { label: currentLocale === 'tr' ? 'Ekip' : 'Team', value: contactStats.team, icon: Contact, glow: 'primary' as const, segment: 'team' as SegmentKey },
-            { label: currentLocale === 'tr' ? 'Takip Gereken' : 'Follow-up Due', value: contactStats.followUpDue, icon: ListChecks, glow: 'error' as const, segment: 'follow_up' as SegmentKey },
-            { label: currentLocale === 'tr' ? 'Bu Ay Eklenen' : 'Added This Month', value: contactStats.monthAdded, icon: CalendarClock, glow: 'primary' as const, segment: 'all' as SegmentKey },
-          ].map((stat) => {
-            const Icon = stat.icon
-            const isActive = activeSegment === stat.segment
-            return (
-              <Card
-                key={stat.label}
-                hover
-                glow={stat.glow}
-                className={cn('min-h-[108px]', isActive && 'ring-1 ring-primary/25')}
-                onClick={() => updateSegment(stat.segment)}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-surface-hover flex items-center justify-center">
-                    <Icon className="w-4 h-4 text-primary" />
+        <motion.div variants={item} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {contactKpiRows.top.map((stat) => {
+              const Icon = stat.icon
+              const clickable = stat.segment !== null
+              const isActive = clickable && activeSegment === stat.segment
+              return (
+                <Card
+                  key={stat.key}
+                  hover={clickable}
+                  glow={stat.glow}
+                  className={cn('min-h-[108px]', isActive && 'ring-1 ring-primary/25')}
+                  onClick={clickable ? () => updateSegment(stat.segment!) : undefined}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-hover">
+                      <Icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <p className="text-3xl font-bold text-text-primary kpi-number">{stat.value}</p>
                   </div>
-                  <p className="text-3xl font-bold text-text-primary kpi-number">{stat.value}</p>
-                </div>
-                <p className="mt-4 text-sm text-text-secondary font-medium">{stat.label}</p>
-              </Card>
-            )
-          })}
+                  <p className="mt-4 text-sm font-medium text-text-secondary leading-snug">{stat.label}</p>
+                </Card>
+              )
+            })}
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {contactKpiRows.bottom.map((stat) => {
+              const Icon = stat.icon
+              const clickable = stat.segment !== null
+              const isActive = clickable && activeSegment === stat.segment
+              return (
+                <Card
+                  key={stat.key}
+                  hover={clickable}
+                  glow={stat.glow}
+                  className={cn('min-h-[108px]', isActive && 'ring-1 ring-primary/25')}
+                  onClick={clickable ? () => updateSegment(stat.segment!) : undefined}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-hover">
+                      <Icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <p className="text-3xl font-bold text-text-primary kpi-number">{stat.value}</p>
+                  </div>
+                  <p className="mt-4 text-sm font-medium text-text-secondary leading-snug">{stat.label}</p>
+                </Card>
+              )
+            })}
+          </div>
         </motion.div>
 
         <motion.div variants={item} className="grid grid-cols-3 gap-3">
