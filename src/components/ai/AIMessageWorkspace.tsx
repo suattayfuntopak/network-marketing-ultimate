@@ -4,10 +4,8 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
 import { Avatar } from '@/components/ui/Avatar'
-import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
-import { Input, Textarea } from '@/components/ui/Input'
+import { Input } from '@/components/ui/Input'
 import { stageMeta } from '@/components/contacts/contactLabels'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { usePersistentState } from '@/hooks/usePersistentState'
@@ -18,53 +16,13 @@ import { useAppStore } from '@/store/appStore'
 import {
   AIMessageGeneratorModal,
   type MessageCategory,
-  type MessageChannel,
   type MessageHistoryRecord,
   type MessageTemplateRecord,
-  type MessageTone,
   type QueuedMessageDraftPreset,
 } from './AIMessageGeneratorModal'
-import {
-  ArrowUpRight,
-  Check,
-  Clock3,
-  Compass,
-  Copy,
-  FileText,
-  Flame,
-  History,
-  Pencil,
-  Search,
-  Sparkles,
-  Trash2,
-  Users,
-} from 'lucide-react'
+import { Search, Sparkles, Users, UserCheck, HandCoins } from 'lucide-react'
 
-type TabKey = 'ai' | 'templates' | 'bulk' | 'history'
-
-type Playbook = {
-  key: 'reconnect' | 'invite' | 'decision'
-  count: number
-  contact: ContactRow | null
-  category: MessageCategory
-  tone: MessageTone
-  channel: MessageChannel
-  icon: typeof Clock3
-}
-
-type TemplateDraft = {
-  id: string | null
-  name: string
-  content: string
-  category: MessageCategory
-  channel: MessageChannel
-  tone: MessageTone
-}
-
-type HistoryDraft = {
-  id: string | null
-  content: string
-}
+type SegmentKey = 'all' | 'team' | 'customers'
 
 const MESSAGE_CATEGORIES: MessageCategory[] = [
   'first_contact',
@@ -86,109 +44,39 @@ function isMessageCategory(value: string | null): value is MessageCategory {
   return MESSAGE_CATEGORIES.includes(value as MessageCategory)
 }
 
-function getCategoryLabel(locale: 'tr' | 'en', category: MessageCategory) {
-  const labels: Record<MessageCategory, { tr: string; en: string }> = {
-    first_contact: { tr: 'İlk Temas', en: 'First Contact' },
-    warm_up: { tr: 'Bağ Kurma', en: 'Warm Up' },
-    value_share: { tr: 'Değer Paylaşımı', en: 'Value Share' },
-    invitation: { tr: 'Davet', en: 'Invitation' },
-    follow_up: { tr: 'Takip', en: 'Follow Up' },
-    objection_handling: { tr: 'İtiraz Yönetimi', en: 'Objection Handling' },
-    decision: { tr: 'Karar Aşaması', en: 'Decision Stage' },
-    after_no: { tr: 'Hayır Sonrası', en: 'After No' },
-    reactivation: { tr: 'Yeniden Bağ', en: 'Reactivation' },
-    birthday: { tr: 'Doğum Günü', en: 'Birthday' },
-    thank_you: { tr: 'Teşekkür', en: 'Thank You' },
-    onboarding: { tr: 'Yeni Üye Karşılama', en: 'Onboarding' },
+function isTeamContact(contact: ContactRow) {
+  return contact.pipeline_stage === 'became_member'
+}
+
+function isCustomerContact(contact: ContactRow) {
+  return contact.pipeline_stage === 'became_customer'
+}
+
+function getSegmentLabel(locale: 'tr' | 'en', segment: SegmentKey) {
+  const labels: Record<SegmentKey, { tr: string; en: string }> = {
+    all: { tr: 'Toplam Kontak Sayısı', en: 'Total Contacts' },
+    team: { tr: 'Ekip Sayısı', en: 'Team Members' },
+    customers: { tr: 'Müşteri Sayısı', en: 'Customers' },
   }
-
-  return labels[category][locale]
+  return labels[segment][locale]
 }
 
-function sortContactsByPriority(contacts: ContactRow[]) {
-  return [...contacts].sort((left, right) => {
-    if ((right.temperature_score ?? 0) !== (left.temperature_score ?? 0)) {
-      return (right.temperature_score ?? 0) - (left.temperature_score ?? 0)
-    }
-
-    const rightFollowUp = right.next_follow_up_date ? new Date(right.next_follow_up_date).getTime() : Number.MAX_SAFE_INTEGER
-    const leftFollowUp = left.next_follow_up_date ? new Date(left.next_follow_up_date).getTime() : Number.MAX_SAFE_INTEGER
-    return leftFollowUp - rightFollowUp
-  })
-}
-
-function isDue(value: string | null) {
-  if (!value) return false
-  return new Date(value).getTime() <= Date.now()
-}
-
-function formatDate(value: string, locale: 'tr' | 'en') {
-  return new Date(value).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-function getPlaybooks(contacts: ContactRow[]): Playbook[] {
-  const sorted = sortContactsByPriority(contacts)
-  const reconnectPool = sorted.filter((contact) => isDue(contact.next_follow_up_date) || !contact.last_contact_date)
-  const invitePool = sorted.filter((contact) => ['new', 'contact_planned', 'first_contact', 'invited'].includes(contact.pipeline_stage))
-  const decisionPool = sorted.filter((contact) =>
-    ['interested', 'presentation_sent', 'presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy'].includes(contact.pipeline_stage),
-  )
-
-  return [
-    {
-      key: 'reconnect',
-      count: reconnectPool.length,
-      contact: reconnectPool[0] ?? null,
-      category: 'follow_up',
-      tone: 'empathetic',
-      channel: 'whatsapp',
-      icon: Clock3,
+function getSegmentDescription(locale: 'tr' | 'en', segment: SegmentKey) {
+  const descriptions: Record<SegmentKey, { tr: string; en: string }> = {
+    all: {
+      tr: 'Tüm kontakları gör ve kişi bazlı mesaj üret.',
+      en: 'See all contacts and generate person-specific messages.',
     },
-    {
-      key: 'invite',
-      count: invitePool.length,
-      contact: invitePool[0] ?? null,
-      category: 'invitation',
-      tone: 'curious',
-      channel: 'whatsapp',
-      icon: Compass,
+    team: {
+      tr: 'Ekip üyelerine özel koçluk/onboarding mesajı üret.',
+      en: 'Generate coaching/onboarding messages for team members.',
     },
-    {
-      key: 'decision',
-      count: decisionPool.length,
-      contact: decisionPool[0] ?? null,
-      category: 'decision',
-      tone: 'confident',
-      channel: 'whatsapp',
-      icon: Flame,
-    },
-  ]
-}
-
-function getPlaybookCopy(locale: 'tr' | 'en', playbook: Playbook['key']) {
-  const copy = {
-    reconnect: {
-      title: { tr: 'Sessiz konuşmayı geri aç', en: 'Reopen the quiet conversation' },
-      label: { tr: 'Öne çıkan kişi', en: 'Best lead' },
-    },
-    invite: {
-      title: { tr: 'İlk teması davete taşı', en: 'Move first touch to invitation' },
-      label: { tr: 'Öne çıkan kişi', en: 'Best lead' },
-    },
-    decision: {
-      title: { tr: 'Kararsız kişiyi ilerlet', en: 'Move the undecided lead forward' },
-      label: { tr: 'Öne çıkan kişi', en: 'Best lead' },
+    customers: {
+      tr: 'Müşterilere özel takip ve yeniden sipariş mesajı üret.',
+      en: 'Generate follow-up and reorder messages for customers.',
     },
   }
-
-  return {
-    title: copy[playbook].title[locale],
-    label: copy[playbook].label[locale],
-  }
+  return descriptions[segment][locale]
 }
 
 export function AIMessageWorkspace() {
@@ -196,6 +84,7 @@ export function AIMessageWorkspace() {
   const { locale } = useLanguage()
   const currentLocale: 'tr' | 'en' = locale === 'tr' ? 'tr' : 'en'
   const currentUser = useAppStore((state) => state.currentUser)
+
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
     queryFn: fetchContacts,
@@ -226,65 +115,47 @@ export function AIMessageWorkspace() {
       contactId: contactIdParam ?? undefined,
     }
   }, [searchParams])
-  const [tab, setTab] = useState<TabKey>('ai')
+
   const [bootPreset] = useState<QueuedMessageDraftPreset | null>(() => consumeAIMessageDraftPreset())
   const [showAIModal, setShowAIModal] = useState(Boolean(bootPreset ?? queryPreset))
   const [activeContact, setActiveContact] = useState<ContactRow | null>(null)
   const [aiPreset, setAIPreset] = useState<QueuedMessageDraftPreset | null>(bootPreset ?? queryPreset)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [templateSearch, setTemplateSearch] = useState('')
-  const [bulkSearch, setBulkSearch] = useState('')
-  const [bulkSelected, setBulkSelected] = useState<string[]>([])
-  const [templateDraft, setTemplateDraft] = useState<TemplateDraft | null>(null)
-  const [historyDraft, setHistoryDraft] = useState<HistoryDraft | null>(null)
-  const [templates, setTemplates] = usePersistentState<MessageTemplateRecord[]>(`nmu-message-templates-${userKey}`, [], { version: 1 })
-  const [historyItems, setHistoryItems] = usePersistentState<MessageHistoryRecord[]>(`nmu-message-history-${userKey}`, [], { version: 1 })
+  const [segment, setSegment] = useState<SegmentKey>('all')
+  const [searchValue, setSearchValue] = useState('')
 
-  const playbooks = useMemo(() => getPlaybooks(contacts), [contacts])
-  const modalContact = activeContact ?? (aiPreset?.contactId ? contacts.find((contact) => contact.id === aiPreset.contactId) ?? null : null)
+  // Keep history/templates persistence alive for the generator modal actions.
+  const [, setTemplates] = usePersistentState<MessageTemplateRecord[]>(`nmu-message-templates-${userKey}`, [], { version: 1 })
+  const [, setHistoryItems] = usePersistentState<MessageHistoryRecord[]>(`nmu-message-history-${userKey}`, [], { version: 1 })
 
-  const filteredTemplates = useMemo(() => {
-    if (!templateSearch.trim()) return templates
-    const search = templateSearch.toLocaleLowerCase(currentLocale)
-    return templates.filter((template) =>
-      `${template.name} ${template.content}`.toLocaleLowerCase(currentLocale).includes(search),
-    )
-  }, [currentLocale, templateSearch, templates])
+  const stats = useMemo(() => {
+    const total = contacts.length
+    const team = contacts.filter(isTeamContact).length
+    const customers = contacts.filter(isCustomerContact).length
+    return { total, team, customers }
+  }, [contacts])
 
-  const filteredContacts = useMemo(() => {
-    if (!bulkSearch.trim()) return contacts
-    const search = bulkSearch.toLocaleLowerCase(currentLocale)
-    return contacts.filter((contact) =>
+  const visibleContacts = useMemo(() => {
+    const bySegment = contacts.filter((contact) => {
+      if (segment === 'team') return isTeamContact(contact)
+      if (segment === 'customers') return isCustomerContact(contact)
+      return true
+    })
+
+    if (!searchValue.trim()) return bySegment
+    const needle = searchValue.toLocaleLowerCase(currentLocale)
+    return bySegment.filter((contact) =>
       `${contact.full_name} ${contact.phone ?? ''} ${contact.email ?? ''} ${contact.profession ?? ''}`
         .toLocaleLowerCase(currentLocale)
-        .includes(search),
+        .includes(needle),
     )
-  }, [bulkSearch, contacts, currentLocale])
+  }, [contacts, currentLocale, searchValue, segment])
 
-  function openGenerator(options?: {
-    contact?: ContactRow | null
-    preset?: QueuedMessageDraftPreset | null
-  }) {
+  const modalContact = activeContact ?? (aiPreset?.contactId ? contacts.find((contact) => contact.id === aiPreset.contactId) ?? null : null)
+
+  function openGenerator(options?: { contact?: ContactRow | null; preset?: QueuedMessageDraftPreset | null }) {
     setActiveContact(options?.contact ?? null)
     setAIPreset(options?.preset ?? null)
     setShowAIModal(true)
-  }
-
-  function handlePlaybookOpen(playbook: Playbook) {
-    const playbookCopy = getPlaybookCopy(currentLocale, playbook.key)
-    setTab('ai')
-    openGenerator({
-      contact: playbook.contact,
-      preset: {
-        category: playbook.category,
-        channel: playbook.channel,
-        tone: playbook.tone,
-        extraContext:
-          currentLocale === 'tr'
-            ? `${playbookCopy.title} akışını aç. Mesaj baskı kurmadan net bir sonraki adıma götürsün.`
-            : `Open the ${playbookCopy.title} flow. Keep the message clear without sounding pushy.`,
-      },
-    })
   }
 
   function handleGenerated(record: MessageHistoryRecord) {
@@ -303,363 +174,117 @@ export function AIMessageWorkspace() {
     ])
   }
 
-  async function handleCopy(text: string, id: string) {
-    await navigator.clipboard.writeText(text)
-    setCopiedId(id)
-    window.setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 1500)
-  }
-
-  function toggleBulkSelect(id: string) {
-    setBulkSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
-  }
-
-  function selectAllBulk() {
-    setBulkSelected(filteredContacts.map((contact) => contact.id))
-  }
-
-  function clearBulkSelection() {
-    setBulkSelected([])
-  }
-
-  function toggleFavoriteTemplate(id: string) {
-    setTemplates((current) => current.map((template) => (
-      template.id === id ? { ...template, isFavorite: !template.isFavorite } : template
-    )))
-  }
-
-  function deleteTemplate(id: string) {
-    setTemplates((current) => current.filter((template) => template.id !== id))
-  }
-
-  function saveTemplateDraft() {
-    if (!templateDraft || !templateDraft.name.trim() || !templateDraft.content.trim()) return
-    if (templateDraft.id) {
-      setTemplates((current) => current.map((template) => (
-        template.id === templateDraft.id
-          ? {
-              ...template,
-              name: templateDraft.name.trim(),
-              content: templateDraft.content.trim(),
-              category: templateDraft.category,
-              channel: templateDraft.channel,
-              tone: templateDraft.tone,
-            }
-          : template
-      )))
-    } else {
-      handleSaveTemplate({
-        name: templateDraft.name.trim(),
-        content: templateDraft.content.trim(),
-        category: templateDraft.category,
-        channel: templateDraft.channel,
-        tone: templateDraft.tone,
-      })
-    }
-    setTemplateDraft(null)
-  }
-
-  function saveHistoryDraft() {
-    if (!historyDraft || !historyDraft.id || !historyDraft.content.trim()) return
-    setHistoryItems((current) => current.map((item) => (
-      item.id === historyDraft.id
-        ? { ...item, finalContent: historyDraft.content.trim(), wasEdited: historyDraft.content.trim() !== item.generatedContent.trim() }
-        : item
-    )))
-    setHistoryDraft(null)
-  }
-
-  function deleteHistoryItem(id: string) {
-    setHistoryItems((current) => current.filter((item) => item.id !== id))
-  }
-
-  const tabs = [
-    { key: 'ai' as const, label: currentLocale === 'tr' ? 'YZ Mesaj Üretici' : 'AI Generator', icon: Sparkles },
-    { key: 'templates' as const, label: currentLocale === 'tr' ? 'Şablonlar' : 'Templates', icon: FileText },
-    { key: 'bulk' as const, label: currentLocale === 'tr' ? 'Toplu Mesaj' : 'Bulk Message', icon: Users },
-    { key: 'history' as const, label: currentLocale === 'tr' ? 'Geçmiş' : 'History', icon: History },
-  ]
-
   return (
     <>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs text-text-tertiary sm:text-sm">{new Date().toLocaleDateString(currentLocale === 'tr' ? 'tr-TR' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p className="text-xs text-text-tertiary sm:text-sm">
+              {new Date().toLocaleDateString(currentLocale === 'tr' ? 'tr-TR' : 'en-US', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </p>
             <h1 className="mt-2 text-2xl font-bold text-text-primary sm:text-[1.75rem]">
               {currentLocale === 'tr' ? 'Mesajlar' : 'Messages'}
             </h1>
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" icon={<Sparkles className="h-4 w-4" />} onClick={() => openGenerator()}>
-              {currentLocale === 'tr' ? 'YZ Mesaj Üret' : 'Generate AI Message'}
+              {currentLocale === 'tr' ? 'YZ Mesajı Üret' : 'Generate AI Message'}
             </Button>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-primary/20 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_32%),linear-gradient(135deg,rgba(4,18,28,0.96),rgba(8,20,35,0.92))] p-5 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                {currentLocale === 'tr' ? 'Mesaj Oyun Planı' : 'Message Playbook'}
-              </p>
-              <p className="mt-3 text-xs text-text-secondary sm:text-sm">
-                {currentLocale === 'tr'
-                  ? 'Bugünkü saha durumuna göre hangi mesaj yaklaşımını açman gerektiğini hızlıca seç.'
-                  : 'Quickly choose which messaging angle matters most for today.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {[
-              { label: currentLocale === 'tr' ? 'YZ Mesaj Üretici' : 'AI Generator', value: playbooks.length },
-              { label: currentLocale === 'tr' ? 'Şablonlar' : 'Templates', value: templates.length },
-              { label: currentLocale === 'tr' ? 'Geçmiş' : 'History', value: historyItems.length },
-            ].map((item) => (
-              <div key={item.label} className="rounded-3xl border border-border-subtle bg-surface/35 px-5 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">{item.label}</p>
-                <p className="mt-2 text-xl font-semibold text-text-primary sm:text-2xl">{item.value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-5 grid gap-3 xl:grid-cols-3">
-            {playbooks.map((playbook) => {
-              const Icon = playbook.icon
-              const copy = getPlaybookCopy(currentLocale, playbook.key)
-
-              return (
-                <button
-                  key={playbook.key}
-                  type="button"
-                  onClick={() => handlePlaybookOpen(playbook)}
-                  className="rounded-[26px] border border-border-subtle bg-surface/28 p-5 text-left transition-all hover:border-primary/20 hover:bg-surface/40"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <span className="text-xl font-semibold text-text-primary sm:text-2xl">{playbook.count}</span>
-                  </div>
-                  <p className="mt-5 text-base font-semibold text-text-primary sm:text-lg">{copy.title}</p>
-                  <div className="mt-5 border-t border-border-subtle pt-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">{copy.label}</p>
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <p className="text-sm text-text-secondary">{playbook.contact?.full_name ?? (currentLocale === 'tr' ? 'Henüz uygun kişi yok' : 'No lead yet')}</p>
-                      <ArrowUpRight className="h-4 w-4 text-primary" />
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="border-b border-border">
-          <div className="flex flex-wrap gap-1">
-            {tabs.map(({ key, label, icon: Icon }) => (
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            {
+              key: 'all' as const,
+              icon: Users,
+              value: stats.total,
+            },
+            {
+              key: 'team' as const,
+              icon: UserCheck,
+              value: stats.team,
+            },
+            {
+              key: 'customers' as const,
+              icon: HandCoins,
+              value: stats.customers,
+            },
+          ].map((card) => {
+            const Icon = card.icon
+            const active = segment === card.key
+            return (
               <button
-                key={key}
+                key={card.key}
                 type="button"
-                onClick={() => setTab(key)}
+                onClick={() => setSegment(card.key)}
                 className={cn(
-                  'flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors',
-                  tab === key
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-text-tertiary hover:text-text-primary',
+                  'rounded-3xl border bg-surface/30 p-5 text-left transition-all',
+                  active
+                    ? 'border-primary/30 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_36%),linear-gradient(135deg,rgba(4,18,28,0.96),rgba(8,20,35,0.92))]'
+                    : 'border-border-subtle hover:border-primary/20 hover:bg-surface/40',
                 )}
               >
-                <Icon className="h-4 w-4" />
-                {label}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-2xl font-semibold text-text-primary">{card.value}</span>
+                </div>
+                <p className="mt-4 text-base font-semibold text-text-primary">{getSegmentLabel(currentLocale, card.key)}</p>
+                <p className="mt-2 text-xs leading-5 text-text-secondary">{getSegmentDescription(currentLocale, card.key)}</p>
               </button>
-            ))}
-          </div>
+            )
+          })}
         </div>
 
-        {tab === 'ai' ? (
-          <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[28px] border border-border-subtle bg-surface/15 px-6 py-16 text-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-warning/15 text-warning">
-              <Sparkles className="h-10 w-10" />
-            </div>
-            <h2 className="mt-8 text-xl font-bold text-text-primary sm:text-2xl">
-              {currentLocale === 'tr' ? 'YZ Mesaj Üretici' : 'AI Message Generator'}
-            </h2>
-            <p className="mt-4 max-w-lg text-xs leading-6 text-text-secondary sm:text-sm">
+        <div className="space-y-4 rounded-[28px] border border-border-subtle bg-surface/20 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm text-text-secondary">
               {currentLocale === 'tr'
-                ? 'Kontağına özel, doğal ve sonuca yönelik mesajlar üret. İstersen kontak seç, istersen genel bir akış başlat.'
-                : 'Generate natural, outcome-focused message drafts for a contact, or start with a general scenario.'}
+                ? `${getSegmentLabel(currentLocale, segment)} filtresi aktif.`
+                : `${getSegmentLabel(currentLocale, segment)} filter is active.`}
             </p>
-            <Button className="mt-8" size="lg" icon={<Sparkles className="h-4 w-4" />} onClick={() => openGenerator()}>
-              {currentLocale === 'tr' ? 'Üret' : 'Generate'}
-            </Button>
+            <p className="text-xs text-text-muted">
+              {currentLocale === 'tr'
+                ? `${visibleContacts.length} kişi listeleniyor`
+                : `${visibleContacts.length} contacts listed`}
+            </p>
           </div>
-        ) : null}
 
-        {tab === 'templates' ? (
-          <div className="space-y-4">
-            <Input
-              value={templateSearch}
-              onChange={(event) => setTemplateSearch(event.target.value)}
-              placeholder={currentLocale === 'tr' ? 'Şablonlarda ara...' : 'Search templates...'}
-              icon={<Search className="h-4 w-4" />}
-            />
+          <Input
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            placeholder={currentLocale === 'tr' ? 'Ad, telefon, email ara...' : 'Search by name, phone, email...'}
+            icon={<Search className="h-4 w-4" />}
+          />
 
-            {filteredTemplates.length === 0 ? (
-              <Card className="p-8 text-center">
-                <FileText className="mx-auto h-10 w-10 text-text-muted" />
-                <p className="mt-4 text-lg font-semibold text-text-primary">
-                  {currentLocale === 'tr' ? 'Henüz şablon yok' : 'No templates yet'}
-                </p>
-                <p className="mt-2 text-sm text-text-secondary">
-                  {currentLocale === 'tr'
-                    ? 'Ürettiğin mesajlardan birini şablona kaydettiğinde burada birikecek.'
-                    : 'Saved message templates will appear here once you store one.'}
-                </p>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {filteredTemplates.map((template) => (
-                  <Card key={template.id} className="space-y-4 p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <p className="text-lg font-semibold text-text-primary">{template.name}</p>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="primary">{template.category}</Badge>
-                          <Badge variant="default">{template.channel}</Badge>
-                          <Badge variant="default">{template.tone}</Badge>
-                          {template.isFavorite ? <Badge variant="warning">{currentLocale === 'tr' ? 'Favori' : 'Favorite'}</Badge> : null}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => toggleFavoriteTemplate(template.id)}
-                          className="rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface-hover hover:text-warning"
-                        >
-                          <Sparkles className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTemplateDraft({
-                            id: template.id,
-                            name: template.name,
-                            content: template.content,
-                            category: template.category,
-                            channel: template.channel,
-                            tone: template.tone,
-                          })}
-                          className="rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface-hover hover:text-text-primary"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteTemplate(template.id)}
-                          className="rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface-hover hover:text-error"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <p className="whitespace-pre-wrap text-sm leading-7 text-text-secondary">{template.content}</p>
-
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        icon={copiedId === template.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        onClick={() => handleCopy(template.content, template.id)}
-                      >
-                        {currentLocale === 'tr' ? 'Kopyala' : 'Copy'}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        icon={<Sparkles className="h-3.5 w-3.5" />}
-                        onClick={() => openGenerator({
-                          preset: {
-                            category: template.category,
-                            channel: template.channel,
-                            tone: template.tone,
-                            extraContext: template.content,
-                          },
-                        })}
-                      >
-                        {currentLocale === 'tr' ? 'Yeniden Üret' : 'Regenerate'}
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : null}
-
-        {tab === 'bulk' ? (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-text-secondary">
-                {currentLocale === 'tr'
-                  ? 'Kontakları seç, her biri için YZ mesaj üret.'
-                  : 'Select contacts and generate AI messages for each.'}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {bulkSelected.length > 0 ? (
-                  <>
-                    <Button size="sm" variant="outline" onClick={clearBulkSelection}>
-                      {currentLocale === 'tr' ? 'Seçimi Temizle' : 'Clear Selection'} ({bulkSelected.length})
-                    </Button>
-                    <Button
-                      size="sm"
-                      icon={<Sparkles className="h-3.5 w-3.5" />}
-                      onClick={() => {
-                        const selected = contacts.find((contact) => contact.id === bulkSelected[0]) ?? null
-                        openGenerator({ contact: selected })
-                      }}
-                    >
-                      {currentLocale === 'tr' ? 'YZ Mesaj Üret' : 'Generate AI Message'}
-                    </Button>
-                  </>
-                ) : null}
-              </div>
-            </div>
-
-            <Input
-              value={bulkSearch}
-              onChange={(event) => setBulkSearch(event.target.value)}
-              placeholder={currentLocale === 'tr' ? 'Ad, telefon, email ara...' : 'Search by name, phone, email...'}
-              icon={<Search className="h-4 w-4" />}
-            />
-
-            <div className="overflow-hidden rounded-[28px] border border-border-subtle bg-surface/20">
-              <div className="flex items-center gap-3 border-b border-border-subtle px-4 py-3 text-sm text-text-secondary">
-                <input
-                  type="checkbox"
-                  checked={filteredContacts.length > 0 && bulkSelected.length === filteredContacts.length}
-                  onChange={(event) => (event.target.checked ? selectAllBulk() : clearBulkSelection())}
-                  className="accent-primary"
-                />
-                <span>
-                  {currentLocale === 'tr' ? `${filteredContacts.length} kontak` : `${filteredContacts.length} contacts`}
-                </span>
-              </div>
-              <div className="max-h-[560px] divide-y divide-border-subtle overflow-y-auto">
-                {filteredContacts.map((contact) => {
-                  const active = bulkSelected.includes(contact.id)
+          <div className="overflow-hidden rounded-2xl border border-border-subtle bg-surface/25">
+            <div className="max-h-[620px] divide-y divide-border-subtle overflow-y-auto">
+              {visibleContacts.length === 0 ? (
+                <div className="px-4 py-10 text-center">
+                  <p className="text-sm text-text-secondary">
+                    {currentLocale === 'tr'
+                      ? 'Bu filtrede kişi bulunamadı.'
+                      : 'No contacts found for this filter.'}
+                  </p>
+                </div>
+              ) : (
+                visibleContacts.map((contact) => {
                   const stage = stageMeta(contact.pipeline_stage)
                   return (
                     <div key={contact.id} className="flex items-center gap-3 px-4 py-4">
-                      <input
-                        type="checkbox"
-                        checked={active}
-                        onChange={() => toggleBulkSelect(contact.id)}
-                        className="accent-primary"
-                      />
                       <Avatar name={contact.full_name} size="sm" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-base font-semibold text-text-primary">{contact.full_name}</p>
-                        <p className="truncate text-sm text-text-tertiary">{contact.profession ?? (currentLocale === 'tr' ? 'Meslek yok' : 'No profession')}</p>
+                        <p className="truncate text-sm text-text-tertiary">
+                          {contact.profession ?? (currentLocale === 'tr' ? 'Meslek yok' : 'No profession')}
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={cn('hidden rounded-full border px-2 py-1 text-xs font-semibold md:inline-flex', stage.className)}>
@@ -671,94 +296,16 @@ export function AIMessageWorkspace() {
                           icon={<Sparkles className="h-3.5 w-3.5" />}
                           onClick={() => openGenerator({ contact })}
                         >
-                          {currentLocale === 'tr' ? 'YZ Mesaj Üret' : 'Generate'}
+                          {currentLocale === 'tr' ? 'YZ Mesajı Üret' : 'Generate AI Message'}
                         </Button>
                       </div>
                     </div>
                   )
-                })}
-              </div>
+                })
+              )}
             </div>
           </div>
-        ) : null}
-
-        {tab === 'history' ? (
-          <div className="space-y-3">
-            {historyItems.length === 0 ? (
-              <Card className="p-8 text-center">
-                <History className="mx-auto h-10 w-10 text-text-muted" />
-                <p className="mt-4 text-lg font-semibold text-text-primary">
-                  {currentLocale === 'tr' ? 'Henüz mesaj geçmişi yok' : 'No message history yet'}
-                </p>
-              </Card>
-            ) : (
-              historyItems.map((item) => {
-                const content = item.finalContent?.trim() || item.variants[0] || item.generatedContent
-                return (
-                  <Card key={item.id} className="space-y-4 p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="primary">{item.category}</Badge>
-                          <Badge variant="default">{item.channel}</Badge>
-                          {item.wasEdited ? <Badge variant="warning">{currentLocale === 'tr' ? 'Düzenlendi' : 'Edited'}</Badge> : null}
-                        </div>
-                        <p className="text-sm text-text-tertiary">
-                          {item.contactName ?? (currentLocale === 'tr' ? 'Genel mesaj' : 'General message')} • {formatDate(item.createdAt, currentLocale)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setHistoryDraft({ id: item.id, content })}
-                          className="rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface-hover hover:text-text-primary"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteHistoryItem(item.id)}
-                          className="rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface-hover hover:text-error"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <p className="whitespace-pre-wrap text-sm leading-7 text-text-secondary">{content}</p>
-
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        icon={copiedId === item.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        onClick={() => handleCopy(content, item.id)}
-                      >
-                        {currentLocale === 'tr' ? 'Kopyala' : 'Copy'}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        icon={<Sparkles className="h-3.5 w-3.5" />}
-                        onClick={() => openGenerator({
-                          contact: item.contactId ? contacts.find((contact) => contact.id === item.contactId) ?? null : null,
-                          preset: {
-                            category: item.category,
-                            channel: item.channel,
-                            tone: item.tone,
-                            extraContext: item.prompt,
-                          },
-                        })}
-                      >
-                        {currentLocale === 'tr' ? 'Benzerini Üret' : 'Generate Similar'}
-                      </Button>
-                    </div>
-                  </Card>
-                )
-              })
-            )}
-          </div>
-        ) : null}
+        </div>
       </div>
 
       <AIMessageGeneratorModal
@@ -770,79 +317,11 @@ export function AIMessageWorkspace() {
         initialChannel={aiPreset?.channel}
         initialTone={aiPreset?.tone}
         initialExtraContext={aiPreset?.extraContext}
-        presetLabel={
-          aiPreset?.category
-            ? currentLocale === 'tr'
-              ? `Hazır akış: ${getCategoryLabel(currentLocale, aiPreset.category)}`
-              : `Preset: ${getCategoryLabel(currentLocale, aiPreset.category)}`
-            : null
-        }
+        presetLabel={null}
         presetReason={aiPreset?.extraContext ?? null}
         onGenerated={handleGenerated}
         onSaveTemplate={handleSaveTemplate}
       />
-
-      {templateDraft ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-[28px] border border-border bg-card p-5">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-xl font-semibold text-text-primary">
-                {currentLocale === 'tr' ? 'Şablonu Düzenle' : 'Edit Template'}
-              </h3>
-              <Button size="sm" variant="ghost" onClick={() => setTemplateDraft(null)}>
-                {currentLocale === 'tr' ? 'Kapat' : 'Close'}
-              </Button>
-            </div>
-            <div className="mt-5 space-y-4">
-              <Input
-                label={currentLocale === 'tr' ? 'Şablon Adı' : 'Template Name'}
-                value={templateDraft.name}
-                onChange={(event) => setTemplateDraft((current) => current ? { ...current, name: event.target.value } : current)}
-              />
-              <Textarea
-                label={currentLocale === 'tr' ? 'İçerik' : 'Content'}
-                rows={8}
-                value={templateDraft.content}
-                onChange={(event) => setTemplateDraft((current) => current ? { ...current, content: event.target.value } : current)}
-              />
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setTemplateDraft(null)}>
-                  {currentLocale === 'tr' ? 'Vazgeç' : 'Cancel'}
-                </Button>
-                <Button onClick={saveTemplateDraft}>{currentLocale === 'tr' ? 'Kaydet' : 'Save'}</Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {historyDraft ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-[28px] border border-border bg-card p-5">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-xl font-semibold text-text-primary">
-                {currentLocale === 'tr' ? 'Mesajı Düzenle' : 'Edit Message'}
-              </h3>
-              <Button size="sm" variant="ghost" onClick={() => setHistoryDraft(null)}>
-                {currentLocale === 'tr' ? 'Kapat' : 'Close'}
-              </Button>
-            </div>
-            <div className="mt-5 space-y-4">
-              <Textarea
-                rows={9}
-                value={historyDraft.content}
-                onChange={(event) => setHistoryDraft((current) => current ? { ...current, content: event.target.value } : current)}
-              />
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setHistoryDraft(null)}>
-                  {currentLocale === 'tr' ? 'Vazgeç' : 'Cancel'}
-                </Button>
-                <Button onClick={saveHistoryDraft}>{currentLocale === 'tr' ? 'Kaydet' : 'Save'}</Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </>
   )
 }
