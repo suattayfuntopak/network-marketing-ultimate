@@ -61,6 +61,10 @@ const MESSAGE_CATEGORIES: MessageCategory[] = [
   'reactivation',
   'birthday',
   'anniversary',
+  'order_thank_you',
+  'reorder_invite',
+  'reorder_thank_you',
+  'customer_team_invite',
   'thank_you',
   'onboarding',
 ]

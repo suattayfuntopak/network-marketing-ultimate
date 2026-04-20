@@ -36,6 +36,10 @@ export type MessageCategory =
   | 'reactivation'
   | 'birthday'
   | 'anniversary'
+  | 'order_thank_you'
+  | 'reorder_invite'
+  | 'reorder_thank_you'
+  | 'customer_team_invite'
   | 'thank_you'
   | 'onboarding'
 
@@ -112,6 +116,10 @@ const CATEGORY_META: Record<MessageCategory, { tr: string; en: string }> = {
   reactivation: { tr: 'Yeniden Bağ', en: 'Reactivation' },
   birthday: { tr: 'Doğum Günü', en: 'Birthday' },
   anniversary: { tr: 'Evlilik Yıldönümü', en: 'Wedding Anniversary' },
+  order_thank_you: { tr: 'Sipariş Teşekkürü', en: 'Order Thank You' },
+  reorder_invite: { tr: 'Yeniden Sipariş Daveti', en: 'Reorder Invitation' },
+  reorder_thank_you: { tr: 'Yeniden Sipariş Teşekkürü', en: 'Reorder Thank You' },
+  customer_team_invite: { tr: 'Müşteriyi Ekibe Davet', en: 'Invite Customer to Team' },
   thank_you: { tr: 'Teşekkür', en: 'Thank You' },
   onboarding: { tr: 'Yeni Üye Karşılama', en: 'Onboarding' },
 }
@@ -461,7 +469,6 @@ function AIMessageGeneratorModalContent({
                         {contactStage[locale]}
                       </span>
                     ) : null}
-                    <Badge variant="default">{contact.temperature_score ?? 0}</Badge>
                   </div>
                 </div>
               </div>
