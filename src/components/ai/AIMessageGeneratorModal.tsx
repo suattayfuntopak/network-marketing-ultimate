@@ -13,7 +13,7 @@ import type { ContactRow } from '@/lib/queries'
 import {
   Check,
   Copy,
-  Instagram,
+  Camera,
   Mail,
   MessageCircle,
   MessageSquare,
@@ -431,7 +431,7 @@ function AIMessageGeneratorModalContent({
     if (channel === 'telegram') return <Send className="h-3.5 w-3.5" />
     if (channel === 'email') return <Mail className="h-3.5 w-3.5" />
     if (channel === 'sms') return <MessageSquare className="h-3.5 w-3.5" />
-    return <Instagram className="h-3.5 w-3.5" />
+    return <Camera className="h-3.5 w-3.5" />
   }
 
   function handleSendChannel(index: number, channel: MessageChannel, message: string) {
