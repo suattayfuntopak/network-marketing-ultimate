@@ -20,11 +20,6 @@ interface AppState {
   toggleMobileSidebar: () => void
   setSidebarMobileOpen: (open: boolean) => void
 
-  // AI Panel
-  aiPanelOpen: boolean
-  toggleAIPanel: () => void
-  setAIPanelOpen: (open: boolean) => void
-
   // Search
   searchOpen: boolean
   searchQuery: string
@@ -63,10 +58,6 @@ export const useAppStore = create<AppState>((set) => ({
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   toggleMobileSidebar: () => set((s) => ({ sidebarMobileOpen: !s.sidebarMobileOpen })),
   setSidebarMobileOpen: (open) => set({ sidebarMobileOpen: open }),
-
-  aiPanelOpen: false,
-  toggleAIPanel: () => set((s) => ({ aiPanelOpen: !s.aiPanelOpen })),
-  setAIPanelOpen: (open) => set({ aiPanelOpen: open }),
 
   searchOpen: false,
   searchQuery: '',

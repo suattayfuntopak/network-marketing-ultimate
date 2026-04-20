@@ -15,7 +15,6 @@ import { useLanguage } from '@/components/common/LanguageProvider'
 import { syncAuthSessionCookie } from '@/lib/auth'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
-import { AIPanel } from './AIPanel'
 
 const EMPTY_CONTACTS = [] as Awaited<ReturnType<typeof fetchContacts>>
 const EMPTY_TASKS = [] as Awaited<ReturnType<typeof fetchTasks>>
@@ -198,7 +197,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
-      <AIPanel />
     </div>
   )
 }

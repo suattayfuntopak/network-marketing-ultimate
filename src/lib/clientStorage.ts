@@ -1,6 +1,8 @@
 'use client'
 
-const AI_PENDING_PROMPT_KEY = 'nmu-ai-pending-prompt'
+import type { QueuedMessageDraftPreset } from '@/components/ai/AIMessageGeneratorModal'
+
+const AI_MESSAGE_DRAFT_PRESET_KEY = 'nmu-ai-message-draft-preset'
 const NOTIFICATION_READ_IDS_KEY = 'nmu-notification-read-ids'
 
 export function readStoredValue<T>(key: string, fallback: T): T {
@@ -24,25 +26,25 @@ export function writeStoredValue<T>(key: string, value: T) {
   }
 }
 
-export function queueCoachPrompt(prompt: string) {
+export function queueAIMessageDraftPreset(preset: QueuedMessageDraftPreset) {
   if (typeof window === 'undefined') return
 
   try {
-    window.sessionStorage.setItem(AI_PENDING_PROMPT_KEY, prompt)
+    window.sessionStorage.setItem(AI_MESSAGE_DRAFT_PRESET_KEY, JSON.stringify(preset))
   } catch {
     // Ignore unavailable session storage.
   }
 }
 
-export function consumeCoachPrompt() {
+export function consumeAIMessageDraftPreset() {
   if (typeof window === 'undefined') return null
 
   try {
-    const prompt = window.sessionStorage.getItem(AI_PENDING_PROMPT_KEY)
-    if (prompt) {
-      window.sessionStorage.removeItem(AI_PENDING_PROMPT_KEY)
+    const preset = window.sessionStorage.getItem(AI_MESSAGE_DRAFT_PRESET_KEY)
+    if (preset) {
+      window.sessionStorage.removeItem(AI_MESSAGE_DRAFT_PRESET_KEY)
     }
-    return prompt
+    return preset ? (JSON.parse(preset) as QueuedMessageDraftPreset) : null
   } catch {
     return null
   }

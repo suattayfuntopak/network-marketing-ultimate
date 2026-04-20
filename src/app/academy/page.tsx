@@ -29,7 +29,7 @@ import {
   type AcademyObjectionCategory,
   type AcademyObjectionGuide,
 } from '@/data/academyLibrary'
-import { queueCoachPrompt } from '@/lib/clientStorage'
+import { queueAIMessageDraftPreset } from '@/lib/clientStorage'
 import { cn, generateId } from '@/lib/utils'
 import {
   Clock,
@@ -380,7 +380,11 @@ export default function AcademyPage() {
   }
 
   function openCoach(prompt: string) {
-    queueCoachPrompt(prompt)
+    queueAIMessageDraftPreset({
+      extraContext: prompt,
+      category: 'value_share',
+      tone: 'empathetic',
+    })
     router.push('/ai')
   }
 

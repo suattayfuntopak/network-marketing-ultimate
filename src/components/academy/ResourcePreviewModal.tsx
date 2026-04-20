@@ -133,7 +133,7 @@ export function ResourcePreviewModal({
               icon={<Sparkles className="w-3.5 h-3.5" />}
               onClick={() => onOpenCoach(selectedLibraryResource.coachPrompt)}
             >
-              {currentLocale === 'tr' ? 'YZ Koçu ile geliştir' : 'Refine with AI Coach'}
+              {currentLocale === 'tr' ? 'YZ Koçu ile mesaj hazırla' : 'Create a message with AI Coach'}
             </Button>
           </div>
         </div>
@@ -198,7 +198,7 @@ export function ResourcePreviewModal({
               icon={<Sparkles className="w-3.5 h-3.5" />}
               onClick={() => onOpenCoach(selectedObjectionResource.coachPrompt)}
             >
-              {currentLocale === 'tr' ? 'YZ Koçu ile yeniden yaz' : 'Rewrite with AI Coach'}
+              {currentLocale === 'tr' ? 'YZ Koçu ile mesaj yaz' : 'Write a message with AI Coach'}
             </Button>
           </div>
         </div>
