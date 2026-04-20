@@ -11,15 +11,13 @@ import { stageMeta } from '@/components/contacts/contactLabels'
 import { cn } from '@/lib/utils'
 import { postAiChat } from '@/lib/aiClient'
 import { fetchContacts, type ContactRow } from '@/lib/queries'
+import { FaInstagram, FaTelegramPlane, FaWhatsapp } from 'react-icons/fa'
 import {
   Check,
   Copy,
-  Camera,
   Mail,
-  MessageCircle,
   MessageSquare,
   Save,
-  Send,
   SendHorizontal,
   Sparkles,
   WandSparkles,
@@ -459,11 +457,11 @@ function AIMessageGeneratorModalContent({
   }
 
   function getChannelIcon(channel: MessageChannel) {
-    if (channel === 'whatsapp') return <MessageCircle className="h-3.5 w-3.5" />
-    if (channel === 'telegram') return <Send className="h-3.5 w-3.5" />
+    if (channel === 'whatsapp') return <FaWhatsapp className="h-3.5 w-3.5" />
+    if (channel === 'telegram') return <FaTelegramPlane className="h-3.5 w-3.5" />
     if (channel === 'email') return <Mail className="h-3.5 w-3.5" />
     if (channel === 'sms') return <MessageSquare className="h-3.5 w-3.5" />
-    return <Camera className="h-3.5 w-3.5" />
+    return <FaInstagram className="h-3.5 w-3.5" />
   }
 
   function handleSendChannel(index: number, channel: MessageChannel, message: string) {
@@ -475,8 +473,8 @@ function AIMessageGeneratorModalContent({
   }
 
   return (
-    <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-      <div className="space-y-5 border-b border-border p-5 lg:border-b-0 lg:border-r">
+    <div className="grid max-h-[72vh] gap-0 overflow-hidden lg:grid-cols-[1.08fr_0.92fr]">
+      <div className="space-y-4 overflow-y-auto border-b border-border p-4 lg:border-b-0 lg:border-r">
         <div className="space-y-3">
           {selectedContact ? (
             <div className="rounded-2xl border border-border-subtle bg-surface/40 p-4">
@@ -484,10 +482,10 @@ function AIMessageGeneratorModalContent({
                 <Avatar name={selectedContact.full_name} size="md" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-text-primary">{selectedContact.full_name}</p>
-                  <p className="text-xs text-text-tertiary">
-                    {[selectedContact.profession, selectedContact.location].filter(Boolean).join(' • ') || (locale === 'tr' ? 'Genel kontak' : 'General contact')}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-text-tertiary">
+                    <span>
+                      {[selectedContact.profession, selectedContact.location].filter(Boolean).join(' • ') || (locale === 'tr' ? 'Genel kontak' : 'General contact')}
+                    </span>
                     {contactStage ? (
                       <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold', contactStage.className)}>
                         {contactStage[locale]}
@@ -539,7 +537,7 @@ function AIMessageGeneratorModalContent({
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
             {locale === 'tr' ? 'Kategori seç' : 'Choose category'}
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {categoryOptions.map((item) => (
               <button
                 key={item}
@@ -562,7 +560,7 @@ function AIMessageGeneratorModalContent({
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
             {locale === 'tr' ? 'Ton seç' : 'Choose tone'}
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {toneOptions.map((item) => (
               <button
                 key={item}
@@ -583,7 +581,7 @@ function AIMessageGeneratorModalContent({
 
         <Textarea
           label={locale === 'tr' ? 'Ek Bağlam' : 'Extra Context'}
-          rows={4}
+          rows={3}
           value={extraContext}
           onChange={(event) => setExtraContext(event.target.value)}
           placeholder={
@@ -597,7 +595,7 @@ function AIMessageGeneratorModalContent({
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
             {locale === 'tr' ? 'Varyasyon Sayısı' : 'Variant Count'}
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {VARIANT_COUNT_OPTIONS.map((count) => (
               <button
                 key={count}
@@ -629,7 +627,7 @@ function AIMessageGeneratorModalContent({
         {error ? <p className="text-xs text-warning">{error}</p> : null}
       </div>
 
-      <div className="space-y-4 p-5">
+      <div className="space-y-4 overflow-y-auto p-4">
         <div className="flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-warning/10 text-warning">
             <WandSparkles className="h-5 w-5" />
