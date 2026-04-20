@@ -83,7 +83,8 @@ export function periodLabel(range: RangeOption, locale: Locale) {
 
 export function rangeButtonLabel(range: RangeOption, locale: Locale) {
   if (range === 'all') return locale === 'tr' ? 'Tümü' : 'All'
-  return range.toUpperCase()
+  const number = range.replace('d', '')
+  return locale === 'tr' ? `${number}G` : `${number}D`
 }
 
 export function formatTRY(value: number, locale: Locale) {
