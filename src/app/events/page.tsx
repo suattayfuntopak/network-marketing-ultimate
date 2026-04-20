@@ -190,7 +190,9 @@ export default function EventsPage() {
 
   const eventTypeLabel = (type: string) => {
     const key = EVENT_TYPE_KEY[type]
-    return key ? (t.events.types as Record<string, string>)[key] ?? type.replace(/_/g, ' ') : type.replace(/_/g, ' ')
+    const mapped = key ? (t.events.types as Record<string, string>)[key] : null
+    if (mapped) return mapped
+    return type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
   }
 
   const eventStatusLabel = (status: Event['status']) => {

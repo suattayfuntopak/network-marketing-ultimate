@@ -35,8 +35,11 @@ const formatDate = (d: string) =>
   new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })
 
 // ─── MÜŞTERİ DETAY VIEW ──────────────────────────────────────
-const ORDER_STATUS_LABELS: Record<string, string> = {
-  pending: 'Bekliyor', processing: 'İşlemde', delivered: 'Teslim Edildi', cancelled: 'İptal'
+const ORDER_STATUS_LABELS: Record<string, { tr: string; en: string }> = {
+  pending: { tr: 'Bekliyor', en: 'Pending' },
+  processing: { tr: 'İşlemde', en: 'Processing' },
+  delivered: { tr: 'Teslim Edildi', en: 'Delivered' },
+  cancelled: { tr: 'İptal', en: 'Cancelled' },
 }
 const ORDER_STATUS_VARIANTS: Record<string, string> = {
   pending: 'warning', processing: 'primary', delivered: 'success', cancelled: 'error'
@@ -46,6 +49,8 @@ function CustomerDetail({ customer, products, userId, onBack }: {
   customer: ContactRow; products: ProductRow[]; userId: string; onBack: () => void
 }) {
   const qc = useQueryClient()
+  const { locale } = useLanguage()
+  const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const [showAddOrder, setShowAddOrder] = useState(false)
 
   const { data: orders = [], isLoading } = useQuery<OrderRow[]>({
@@ -145,7 +150,7 @@ function CustomerDetail({ customer, products, userId, onBack }: {
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-text-primary">{formatTRY(order.total_try)}</span>
                           <Badge variant={ORDER_STATUS_VARIANTS[order.status] as 'success' | 'warning' | 'primary' | 'error'} size="sm">
-                            {ORDER_STATUS_LABELS[order.status]}
+                            {ORDER_STATUS_LABELS[order.status]?.[currentLocale]}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-1 mt-0.5 text-[10px] text-text-tertiary">

@@ -101,6 +101,29 @@ export const OUTCOME_LABELS: Record<NonNullable<InteractionRow['outcome']>, { tr
   no_response: { tr: 'Dönüş Yok', en: 'No Response' },
 }
 
+export const INTERACTION_CHANNEL_LABELS: Record<string, { tr: string; en: string }> = {
+  whatsapp: { tr: 'WhatsApp', en: 'WhatsApp' },
+  telegram: { tr: 'Telegram', en: 'Telegram' },
+  sms: { tr: 'SMS', en: 'SMS' },
+  email: { tr: 'E-posta', en: 'Email' },
+  instagram: { tr: 'Instagram', en: 'Instagram' },
+  instagram_dm: { tr: 'Instagram DM', en: 'Instagram DM' },
+  facebook: { tr: 'Facebook', en: 'Facebook' },
+  linkedin: { tr: 'LinkedIn', en: 'LinkedIn' },
+  phone: { tr: 'Telefon', en: 'Phone' },
+  in_person: { tr: 'Yüz Yüze', en: 'In Person' },
+  video: { tr: 'Video Görüşmesi', en: 'Video Call' },
+  zoom: { tr: 'Zoom', en: 'Zoom' },
+  other: { tr: 'Diğer', en: 'Other' },
+}
+
+export function channelLabel(channel: string | null | undefined, locale: 'tr' | 'en') {
+  if (!channel) return ''
+  const entry = INTERACTION_CHANNEL_LABELS[channel]
+  if (entry) return entry[locale]
+  return channel.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 export function stageMeta(stage: string) {
   const labels: Record<string, { tr: string; en: string; className: string }> = {
     new: { tr: 'Yeni Potansiyel', en: 'New Lead', className: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20' },

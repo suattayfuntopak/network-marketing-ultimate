@@ -21,6 +21,7 @@ import {
   TASK_PRIORITY_LABELS,
   TASK_PRIORITY_VARIANTS,
   TASK_TYPE_LABELS,
+  channelLabel,
   stageMeta,
   type AddContactForm,
   type ContactTaskFormValues,
@@ -697,7 +698,7 @@ export default function ContactsPage() {
                                 {OUTCOME_LABELS[interaction.outcome][currentLocale]}
                               </Badge>
                             )}
-                            <Badge size="sm">{interaction.channel.replace(/_/g, ' ')}</Badge>
+                            <Badge size="sm">{channelLabel(interaction.channel, currentLocale)}</Badge>
                           </div>
                           <div className="text-xs text-text-tertiary">{formatDateTime(interaction.date, currentLocale)}</div>
                         </div>

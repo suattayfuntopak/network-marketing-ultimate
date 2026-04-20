@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
+import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input, Textarea } from '@/components/ui/Input'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import type { ContactRow } from '@/lib/queries'
 import { postAiChat } from '@/lib/aiClient'
+import { getStageLabel } from '@/lib/coach'
 import { cn } from '@/lib/utils'
 import {
   CalendarHeart,
@@ -473,12 +474,13 @@ export function AIMessageStudio({
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="primary">{selectedContact.full_name}</Badge>
                   {selectedContact.pipeline_stage && (
-                    <Badge>{selectedContact.pipeline_stage.replaceAll('_', ' ')}</Badge>
+                    <Badge className="capitalize">{getStageLabel(selectedContact.pipeline_stage, currentLocale)}</Badge>
                   )}
                   {selectedContact.temperature && (
-                    <Badge variant={selectedContact.temperature === 'hot' ? 'error' : selectedContact.temperature === 'warm' ? 'warning' : 'default'}>
-                      {selectedContact.temperature}
-                    </Badge>
+                    <TemperatureBadge
+                      temperature={selectedContact.temperature}
+                      score={selectedContact.temperature_score ?? undefined}
+                    />
                   )}
                   {selectedContact.birthday && (
                     <Badge variant="secondary" className="gap-1.5">

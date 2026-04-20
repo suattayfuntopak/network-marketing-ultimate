@@ -37,6 +37,16 @@ const PRIORITY_VARIANT: Record<string, string> = {
   low: 'default',
 }
 
+const TYPE_KEY_MAP: Record<string, keyof typeof import('@/lib/i18n').translations.en.tasks.types> = {
+  follow_up: 'followUp',
+  call: 'call',
+  meeting: 'meeting',
+  presentation: 'presentation',
+  onboarding: 'onboarding',
+  training: 'training',
+  custom: 'custom',
+}
+
 export default function TasksPage() {
   const { t } = useLanguage()
   const { currentUser } = useAppStore()
@@ -204,7 +214,7 @@ export default function TasksPage() {
                       <p className="text-xs text-text-secondary">
                         {new Date(task.due_date).toLocaleDateString('tr-TR', { month: 'short', day: 'numeric' })}
                       </p>
-                      <p className="text-[10px] text-text-tertiary capitalize">{task.type.replace(/_/g, ' ')}</p>
+                      <p className="text-[10px] text-text-tertiary">{t.tasks.types[TYPE_KEY_MAP[task.type] ?? 'custom']}</p>
                     </div>
                     <button
                       onClick={(event) => {
