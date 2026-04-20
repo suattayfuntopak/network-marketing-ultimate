@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
-  BarChart3,
   Clock3,
   Filter,
   Presentation,
@@ -346,43 +345,12 @@ export default function AnalyticsPage() {
           />
           <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-secondary/20 bg-secondary/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">
-                <BarChart3 className="h-3.5 w-3.5" />
-                {t.analytics.title}
-              </div>
-              <h1 className="mt-3 sm:mt-4 text-xl sm:text-2xl font-bold text-text-primary lg:text-4xl">{t.analytics.title}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-text-primary lg:text-4xl">{t.analytics.title}</h1>
               <p className="mt-2 sm:mt-3 text-[13px] sm:text-sm leading-6 text-text-secondary lg:text-base">
                 {locale === 'tr'
                   ? `${periodLabel(range, locale)} için gelir, süreç kalitesi, dönüşüm motoru ve ekip performansını tek ekranda gör.`
                   : `Revenue, pipeline quality, conversion engine, and team performance for ${periodLabel(range, locale).toLowerCase()} on a single screen.`}
               </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3 xl:w-[520px]">
-              {[
-                {
-                  label: locale === 'tr' ? 'En Büyük Segment' : 'Largest Segment',
-                  value: topSegment ? `${locale === 'tr' ? topSegment.labelTr : topSegment.labelEn} · ${topSegment.count}` : locale === 'tr' ? 'Veri bekleniyor' : 'Waiting for data',
-                },
-                {
-                  label: locale === 'tr' ? 'Darboğaz' : 'Bottleneck',
-                  value: currentOverdueTasks.length > 0
-                    ? locale === 'tr' ? `${currentOverdueTasks.length} geciken takip` : `${currentOverdueTasks.length} overdue follow-ups`
-                    : locale === 'tr' ? 'Takip tarafı temiz' : 'Follow-up side is clean',
-                },
-                {
-                  label: locale === 'tr' ? 'Ortalama Sepet' : 'Avg Order Value',
-                  value: new Intl.NumberFormat(locale === 'tr' ? 'tr-TR' : 'en-US', {
-                    style: 'currency',
-                    currency: 'TRY',
-                    maximumFractionDigits: 0,
-                  }).format(avgOrderValue),
-                },
-              ].map((insight) => (
-                <div key={insight.label} className="rounded-2xl border border-border-subtle bg-surface/45 px-4 py-4">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-text-muted">{insight.label}</p>
-                  <p className="mt-2 text-sm font-semibold text-text-primary">{insight.value}</p>
-                </div>
-              ))}
             </div>
           </div>
         </Card>

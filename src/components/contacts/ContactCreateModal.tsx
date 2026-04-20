@@ -49,7 +49,7 @@ export function ContactCreateModal({ currentLocale, form, setForm, error, loadin
                 </h2>
                 <p className="text-sm text-text-tertiary mt-0.5">
                   {currentLocale === 'tr'
-                    ? 'Kontak merkezine hızlıca yeni bir kisi ekle.'
+                    ? 'Kontak merkezine hızlıca yeni bir kişi ekle.'
                     : 'Create a new person inside your contact workspace.'}
                 </p>
               </div>

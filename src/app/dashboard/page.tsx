@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Flame,
   Presentation,
-  Sparkles,
   TrendingUp,
   Zap,
 } from 'lucide-react'
@@ -330,11 +329,7 @@ export default function DashboardPage() {
           />
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-                <Sparkles className="h-3.5 w-3.5" />
-                {locale === 'tr' ? 'Bugünün Komuta Merkezi' : 'Today\u2019s Command Center'}
-              </div>
-              <h1 className="mt-3 sm:mt-4 text-xl sm:text-2xl font-bold text-text-primary lg:text-4xl">
+              <h1 className="text-xl sm:text-2xl font-bold text-text-primary lg:text-4xl">
                 {t.dashboard.greeting}{fullName ? `, ${fullName}` : ''}
               </h1>
               <p className="mt-2 sm:mt-3 max-w-2xl text-[13px] sm:text-sm leading-6 text-text-secondary lg:text-base">

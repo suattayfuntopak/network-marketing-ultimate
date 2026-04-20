@@ -29,18 +29,18 @@ const BIRTHDAY_WINDOW_DAYS = 7
 const STAGE_LABELS = {
   tr: {
     new: 'yeni potansiyel',
-    contact_planned: 'iletisim planlandi',
-    first_contact: 'ilk iletisim',
+    contact_planned: 'iletişim planlandı',
+    first_contact: 'ilk iletişim',
     interested: 'ilgileniyor',
     invited: 'davet edildi',
-    presentation_sent: 'sunum gonderildi',
-    presentation_done: 'sunum yapildi',
+    presentation_sent: 'sunum gönderildi',
+    presentation_done: 'sunum yapıldı',
     followup_pending: 'takip ediliyor',
-    objection_handling: 'itiraz yonetimi',
-    ready_to_buy: 'karar asamasinda',
-    became_customer: 'musteri oldu',
-    ready_to_join: 'ekibe katilmaya hazir',
-    became_member: 'ekip uyesi',
+    objection_handling: 'itiraz yönetimi',
+    ready_to_buy: 'karar aşamasında',
+    became_customer: 'müşteri oldu',
+    ready_to_join: 'ekibe katılmaya hazır',
+    became_member: 'ekip üyesi',
     nurture_later: 'sonra ilgilen',
     dormant: 'pasif',
     lost: 'kaybedildi',
@@ -190,28 +190,28 @@ export function deriveCoachInsights(
     const followUpText =
       dueDelta === null
         ? input.locale === 'tr'
-          ? `${getStageLabel(hotLead.pipeline_stage, input.locale)} asamasinda ilerliyor.`
+          ? `${getStageLabel(hotLead.pipeline_stage, input.locale)} aşamasında ilerliyor.`
           : `Currently in the ${getStageLabel(hotLead.pipeline_stage, input.locale)} stage.`
         : dueDelta <= 0
           ? input.locale === 'tr'
             ? `Takip tarihi ${formatShortDate(hotLead.next_follow_up_date, input.locale)}, gecikme riski var.`
             : `Follow-up due ${formatShortDate(hotLead.next_follow_up_date, input.locale)} and needs attention now.`
           : input.locale === 'tr'
-            ? `Siradaki takip ${formatShortDate(hotLead.next_follow_up_date, input.locale)} icin planli.`
+            ? `Sıradaki takip ${formatShortDate(hotLead.next_follow_up_date, input.locale)} için planlı.`
             : `Next follow-up scheduled for ${formatShortDate(hotLead.next_follow_up_date, input.locale)}.`
 
     insights.push({
       id: `hot-${hotLead.id}`,
       type: 'lead_heat',
-      title: input.locale === 'tr' ? `${hotLead.full_name} ile bugun ilerle` : `Move ${hotLead.full_name} forward today`,
+      title: input.locale === 'tr' ? `${hotLead.full_name} ile bugün ilerle` : `Move ${hotLead.full_name} forward today`,
       description:
         input.locale === 'tr'
-          ? `${followUpText} Kisi detayini acip hazir bir konusma planiyla ilerleyebilirsin.`
+          ? `${followUpText} Kişi detayını açıp hazır bir konuşma planıyla ilerleyebilirsin.`
           : `${followUpText} Open the contact workspace and move forward with a ready-made plan.`,
-      actionLabel: input.locale === 'tr' ? 'Kisi planini ac' : 'Open contact plan',
+      actionLabel: input.locale === 'tr' ? 'Kişi planını aç' : 'Open contact plan',
       prompt:
         input.locale === 'tr'
-          ? `${hotLead.full_name} icin bugunun en iyi aksiyonunu cikar. Asama ${getStageLabel(hotLead.pipeline_stage, input.locale)}, sicaklik ${hotLead.temperature}. Kisa acilis, olasi itiraz ve net kapanis oner.`
+          ? `${hotLead.full_name} için bugünün en iyi aksiyonunu çıkar. Aşama ${getStageLabel(hotLead.pipeline_stage, input.locale)}, sıcaklık ${hotLead.temperature}. Kısa açılış, olası itiraz ve net kapanış öner.`
           : `Work out the best next action for ${hotLead.full_name} today. Stage: ${getStageLabel(hotLead.pipeline_stage, input.locale)}, temperature: ${hotLead.temperature}. Give me an opener, likely objection, and a clean close.`,
       route: `/contacts?contact=${hotLead.id}`,
     })
@@ -234,16 +234,16 @@ export function deriveCoachInsights(
         type: 'reorder_alert',
         title:
           input.locale === 'tr'
-            ? `${reorderContact.full_name} icin yeniden siparis firsati`
+            ? `${reorderContact.full_name} için yeniden sipariş fırsatı`
             : `Reorder opportunity for ${reorderContact.full_name}`,
         description:
           input.locale === 'tr'
-            ? `${formatShortDate(reorderOpportunity.next_reorder_date, input.locale)} tarihli yeniden siparis penceresi acik. Son siparis toplami ${formatCurrency(reorderOpportunity.total_try, input.locale)}.`
+            ? `${formatShortDate(reorderOpportunity.next_reorder_date, input.locale)} tarihli yeniden sipariş penceresi açık. Son sipariş toplamı ${formatCurrency(reorderOpportunity.total_try, input.locale)}.`
             : `Reorder window opens ${formatShortDate(reorderOpportunity.next_reorder_date, input.locale)}. Last order value: ${formatCurrency(reorderOpportunity.total_try, input.locale)}.`,
-        actionLabel: input.locale === 'tr' ? 'Musteri akisini ac' : 'Open customer flow',
+        actionLabel: input.locale === 'tr' ? 'Müşteri akışını aç' : 'Open customer flow',
         prompt:
           input.locale === 'tr'
-            ? `${reorderContact.full_name} icin yeniden siparis gorusme plani hazirla. Son siparis toplami ${formatCurrency(reorderOpportunity.total_try, input.locale)} ve sonraki siparis tarihi ${formatShortDate(reorderOpportunity.next_reorder_date, input.locale)}.`
+            ? `${reorderContact.full_name} için yeniden sipariş görüşme planı hazırla. Son sipariş toplamı ${formatCurrency(reorderOpportunity.total_try, input.locale)} ve sonraki sipariş tarihi ${formatShortDate(reorderOpportunity.next_reorder_date, input.locale)}.`
             : `Prepare a reorder conversation plan for ${reorderContact.full_name}. Their last order was ${formatCurrency(reorderOpportunity.total_try, input.locale)} and the next reorder date is ${formatShortDate(reorderOpportunity.next_reorder_date, input.locale)}.`,
         route: '/customers',
       })
@@ -273,16 +273,16 @@ export function deriveCoachInsights(
         type: 'coaching_tip',
         title:
           input.locale === 'tr'
-            ? `${member.full_name} icin koçluk dokunusu`
+            ? `${member.full_name} için koçluk dokunuşu`
             : `Coaching touchpoint for ${member.full_name}`,
         description:
           input.locale === 'tr'
-            ? `${coachingTask.title} gorevi ${formatShortDate(coachingTask.due_date, input.locale)} icin planli. ${coachingTask.status === 'overdue' ? 'Gecikme var, kisa bir destek dokunusu faydali olur.' : 'Bugun tamamlanmasi ivmeyi korur.'}`
+            ? `${coachingTask.title} görevi ${formatShortDate(coachingTask.due_date, input.locale)} için planlı. ${coachingTask.status === 'overdue' ? 'Gecikme var, kısa bir destek dokunuşu faydalı olur.' : 'Bugün tamamlanması ivmeyi korur.'}`
             : `${coachingTask.title} is due ${formatShortDate(coachingTask.due_date, input.locale)}. ${coachingTask.status === 'overdue' ? 'It is overdue, so a short coaching touch would help.' : 'Completing it today will protect momentum.'}`,
-        actionLabel: input.locale === 'tr' ? 'Koçluk calisma alanini ac' : 'Open coaching workspace',
+        actionLabel: input.locale === 'tr' ? 'Koçluk çalışma alanını aç' : 'Open coaching workspace',
         prompt:
           input.locale === 'tr'
-            ? `${member.full_name} ekip uyesi icin hizli bir koçluk plani olustur. Gorev: ${coachingTask.title}. Durum: ${coachingTask.status}. Bugun atmam gereken 3 net adimi yaz.`
+            ? `${member.full_name} ekip üyesi için hızlı bir koçluk planı oluştur. Görev: ${coachingTask.title}. Durum: ${coachingTask.status}. Bugün atmam gereken 3 net adımı yaz.`
             : `Create a quick coaching plan for team member ${member.full_name}. Task: ${coachingTask.title}. Status: ${coachingTask.status}. Give me the three clearest actions for today.`,
         route: `/contacts?contact=${member.id}`,
       })
@@ -299,26 +299,26 @@ export function deriveCoachInsights(
     const { contact, delta } = birthdayContact
     const dayLabel =
       delta === 0
-        ? input.locale === 'tr' ? 'bugun' : 'today'
+        ? input.locale === 'tr' ? 'bugün' : 'today'
         : delta === 1
-          ? input.locale === 'tr' ? 'yarin' : 'tomorrow'
-          : input.locale === 'tr' ? `${delta} gun sonra` : `in ${delta} days`
+          ? input.locale === 'tr' ? 'yarın' : 'tomorrow'
+          : input.locale === 'tr' ? `${delta} gün sonra` : `in ${delta} days`
 
     insights.push({
       id: `birthday-${contact.id}`,
       type: 'birthday_soon',
       title:
         input.locale === 'tr'
-          ? `${contact.full_name} icin dogum gunu fırsatı`
+          ? `${contact.full_name} için doğum günü fırsatı`
           : `Birthday opportunity for ${contact.full_name}`,
       description:
         input.locale === 'tr'
-          ? `Dogum gunu ${dayLabel}. Sicak bir dokunus, iliskinizi tazeler.`
+          ? `Doğum günü ${dayLabel}. Sıcak bir dokunuş, ilişkinizi tazeler.`
           : `Birthday is ${dayLabel}. A warm touch refreshes the relationship.`,
-      actionLabel: input.locale === 'tr' ? 'Kutlama mesaji uret' : 'Generate birthday message',
+      actionLabel: input.locale === 'tr' ? 'Kutlama mesajı üret' : 'Generate birthday message',
       prompt:
         input.locale === 'tr'
-          ? `${contact.full_name} icin sicak ve kisa bir dogum gunu mesaji uret. Ek satis veya davet icerigi ekleme, sadece icten bir kutlama olsun.`
+          ? `${contact.full_name} için sıcak ve kısa bir doğum günü mesajı üret. Ek satış veya davet içeriği ekleme, sadece içten bir kutlama olsun.`
           : `Draft a warm and short birthday message for ${contact.full_name}. No upsell or invitation — just a genuine greeting.`,
       route: `/ai?audience=${contact.pipeline_stage === 'became_member' ? 'team' : contact.pipeline_stage === 'became_customer' ? 'customer' : 'prospect'}&contact=${contact.id}&category=birthday`,
     })
@@ -337,16 +337,16 @@ export function deriveCoachInsights(
       type: 'dormant_reconnect',
       title:
         input.locale === 'tr'
-          ? `${contact.full_name} ile bag yeniden kurulmali`
+          ? `${contact.full_name} ile bağ yeniden kurulmalı`
           : `Reconnect with ${contact.full_name}`,
       description:
         input.locale === 'tr'
-          ? `Son temas ${since} gun once. Kisa bir tekrar-temas ile huniye geri cekilebilir.`
+          ? `Son temas ${since} gün önce. Kısa bir tekrar-temas ile huniye geri çekilebilir.`
           : `Last contact ${since} days ago. A short reconnect message can pull them back into the funnel.`,
-      actionLabel: input.locale === 'tr' ? 'Yeniden baglan mesaji uret' : 'Draft reconnect message',
+      actionLabel: input.locale === 'tr' ? 'Yeniden bağlan mesajı üret' : 'Draft reconnect message',
       prompt:
         input.locale === 'tr'
-          ? `${contact.full_name} ile ${since} gundur konusulmamis. Baski kurmadan, sicak ve kisa bir yeniden-baglanma mesaji hazirla. Asama: ${getStageLabel(contact.pipeline_stage, input.locale)}.`
+          ? `${contact.full_name} ile ${since} gündür konuşulmamış. Baskı kurmadan, sıcak ve kısa bir yeniden-bağlanma mesajı hazırla. Aşama: ${getStageLabel(contact.pipeline_stage, input.locale)}.`
           : `It has been ${since} days since ${contact.full_name} was contacted. Draft a warm, low-pressure reconnect message. Stage: ${getStageLabel(contact.pipeline_stage, input.locale)}.`,
       route: `/ai?audience=prospect&contact=${contact.id}&category=reactivation`,
     })
@@ -356,45 +356,45 @@ export function deriveCoachInsights(
     {
       id: 'pipeline-focus',
       type: 'next_action',
-      title: input.locale === 'tr' ? 'Huniyi bugun hizlandir' : 'Accelerate the pipeline today',
+      title: input.locale === 'tr' ? 'Huniyi bugün hızlandır' : 'Accelerate the pipeline today',
       description:
         input.locale === 'tr'
-          ? 'Takip bekleyen ve sunum gonderilen asamalari tarayip gunluk oncelik listesini cikar.'
+          ? 'Takip bekleyen ve sunum gönderilen aşamaları tarayıp günlük öncelik listesini çıkar.'
           : 'Scan follow-up and presentation stages and extract the strongest priorities for today.',
-      actionLabel: input.locale === 'tr' ? 'Huniyi ac' : 'Open pipeline',
+      actionLabel: input.locale === 'tr' ? 'Huniyi aç' : 'Open pipeline',
       prompt:
         input.locale === 'tr'
-          ? 'Mevcut huniye gore bugun odaklanmam gereken 3 potansiyeli ve nedenlerini yaz.'
+          ? 'Mevcut huniye göre bugün odaklanmam gereken 3 potansiyeli ve nedenlerini yaz.'
           : 'Based on the current pipeline, tell me the top three prospects I should focus on today and why.',
       route: '/pipeline',
     },
     {
       id: 'task-focus',
       type: 'next_action',
-      title: input.locale === 'tr' ? 'Bugunun gorev ritmini kur' : 'Set today’s task rhythm',
+      title: input.locale === 'tr' ? 'Bugünün görev ritmini kur' : 'Set today’s task rhythm',
       description:
         input.locale === 'tr'
-          ? 'Gecikmis ve oncelikli takipleri tek ekranda gorup net bir uygulama sirasi cikar.'
+          ? 'Gecikmiş ve öncelikli takipleri tek ekranda görüp net bir uygulama sırası çıkar.'
           : 'Review overdue and high-priority follow-ups in one place and create a practical execution order.',
-      actionLabel: input.locale === 'tr' ? 'Gorevleri ac' : 'Open tasks',
+      actionLabel: input.locale === 'tr' ? 'Görevleri aç' : 'Open tasks',
       prompt:
         input.locale === 'tr'
-          ? 'Bugunku gorevlerimi onceliklendir. En yuksek etkiyi yaratacak sira ve odagi oner.'
+          ? 'Bugünkü görevlerimi önceliklendir. En yüksek etkiyi yaratacak sıra ve odağı öner.'
           : 'Prioritize my tasks for today. Suggest the execution order that will create the most impact.',
       route: '/tasks',
     },
     {
       id: 'new-growth',
       type: 'next_action',
-      title: input.locale === 'tr' ? 'Yeni potansiyel akisini besle' : 'Feed the new prospect flow',
+      title: input.locale === 'tr' ? 'Yeni potansiyel akışını besle' : 'Feed the new prospect flow',
       description:
         input.locale === 'tr'
-          ? 'Bugun huniye taze giris eklemek icin hizli bir potansiyel yakalama ve mesaj plani kur.'
+          ? 'Bugün huniye taze giriş eklemek için hızlı bir potansiyel yakalama ve mesaj planı kur.'
           : 'Set up a quick prospect-capture and outreach plan to add fresh opportunities to the funnel today.',
       actionLabel: input.locale === 'tr' ? 'Potansiyel ekle' : 'Add prospect',
       prompt:
         input.locale === 'tr'
-          ? 'Bugun yeni potansiyel kazanmak icin kullanabilecegim kisa bir mesaj ve aksiyon plani hazirla.'
+          ? 'Bugün yeni potansiyel kazanmak için kullanabileceğim kısa bir mesaj ve aksiyon planı hazırla.'
           : 'Prepare a short message and action plan I can use to win new prospects today.',
       route: '/contacts?segment=prospects&new=1',
     },
@@ -463,7 +463,7 @@ export function deriveNotifications(
       title: locale === 'tr' ? 'Takip zamanı' : 'Follow-up due',
       message:
         locale === 'tr'
-          ? `${dueFollowUp.full_name} icin takip tarihi geldi. Huni asamasi: ${getStageLabel(dueFollowUp.pipeline_stage, locale)}.`
+          ? `${dueFollowUp.full_name} için takip tarihi geldi. Huni aşaması: ${getStageLabel(dueFollowUp.pipeline_stage, locale)}.`
           : `${dueFollowUp.full_name} is due for follow-up. Stage: ${getStageLabel(dueFollowUp.pipeline_stage, locale)}.`,
       actionUrl: `/contacts?contact=${dueFollowUp.id}`,
       isRead: false,
@@ -485,7 +485,7 @@ export function deriveNotifications(
       title: locale === 'tr' ? 'Yeniden sipariş fırsatı' : 'Reorder opportunity',
       message:
         locale === 'tr'
-          ? `${contact?.full_name ?? 'Müşteri'} icin yeniden siparis penceresi acildi.`
+          ? `${contact?.full_name ?? 'Müşteri'} için yeniden sipariş penceresi açıldı.`
           : `The reorder window is open for ${contact?.full_name ?? 'this customer'}.`,
       actionUrl: '/customers',
       isRead: false,
@@ -509,7 +509,7 @@ export function deriveNotifications(
       title: locale === 'tr' ? 'Ekip üyesi desteğe ihtiyaç duyuyor' : 'Team member needs support',
       message:
         locale === 'tr'
-          ? `${teamRisk.full_name} icin bekleyen koçluk veya takip gorevleri var.`
+          ? `${teamRisk.full_name} için bekleyen koçluk veya takip görevleri var.`
           : `${teamRisk.full_name} has pending coaching or follow-up work.`,
       actionUrl: `/contacts?contact=${teamRisk.id}`,
       isRead: false,

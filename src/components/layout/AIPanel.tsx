@@ -89,7 +89,7 @@ export function AIPanel() {
       icon: Target,
       prompt:
         locale === 'tr'
-          ? 'Bugun icin net bir aksiyon plani cikar: en sicak 3 kisi, gecikmis takipler ve gunluk ritim.'
+          ? 'Bugün için net bir aksiyon planı çıkar: en sıcak 3 kişi, gecikmiş takipler ve günlük ritim.'
           : 'Give me a clear action plan for today: top 3 hot contacts, overdue follow-ups, and the daily rhythm.',
     },
     {
@@ -97,7 +97,7 @@ export function AIPanel() {
       icon: MessageSquare,
       prompt:
         locale === 'tr'
-          ? 'Takibi gelmis bir potansiyele gonderebilecegim kisa ve samimi bir mesaj taslağı yaz.'
+          ? 'Takibi gelmiş bir potansiyele gönderebileceğim kısa ve samimi bir mesaj taslağı yaz.'
           : 'Draft a short, friendly message I can send to a prospect whose follow-up is due.',
     },
     {
@@ -105,7 +105,7 @@ export function AIPanel() {
       icon: Users,
       prompt:
         locale === 'tr'
-          ? 'Ivmesi dusen bir ekip uyesi icin motive edici, sicak ve net bir kontrol mesaji uret.'
+          ? 'İvmesi düşen bir ekip üyesi için motive edici, sıcak ve net bir kontrol mesajı üret.'
           : 'Create a warm, motivating check-in message for a team member whose momentum has dropped.',
     },
   ]

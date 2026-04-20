@@ -280,14 +280,14 @@ export function AIMessageStudio({
     const systemLine =
       audience === 'team'
         ? currentLocale === 'tr'
-          ? 'Network marketing ekip liderisin. Ekip uyesine kisa, destekleyici, net adım iceren mesajlar yaz.'
+          ? 'Network marketing ekip liderisin. Ekip üyesine kısa, destekleyici, net adım içeren mesajlar yaz.'
           : 'You are a network marketing team leader. Write short, supportive messages with a clear next step for a team member.'
         : audience === 'customer'
           ? currentLocale === 'tr'
-            ? 'Network marketing mesaj koçusun. Mevcut bir musteri icin dogal, iltifat etmeyen, sicak ve kisa mesajlar yaz.'
+            ? 'Network marketing mesaj koçusun. Mevcut bir müşteri için doğal, iltifat etmeyen, sıcak ve kısa mesajlar yaz.'
             : 'You are a message coach. Write natural, non-flattering, warm and short messages to an existing customer.'
           : currentLocale === 'tr'
-            ? 'Network marketing mesaj koçusun. Aday icin dogal, baski kurmayan, kisa mesajlar yaz.'
+            ? 'Network marketing mesaj koçusun. Aday için doğal, baskı kurmayan, kısa mesajlar yaz.'
             : 'You are a message coach. Write natural, non-pressuring, short messages for a prospect.'
 
     const prompt = [

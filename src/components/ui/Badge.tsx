@@ -52,9 +52,9 @@ export function Badge({ children, variant = 'default', size = 'sm', className, d
 export function TemperatureBadge({ temperature, score }: { temperature: string; score?: number }) {
   const { locale } = useLanguage()
   const config: Record<string, { label: { tr: string; en: string }; className: string }> = {
-    hot: { label: { tr: 'Sicak', en: 'Hot' }, className: 'bg-error/15 text-red-400 border-error/25' },
-    warm: { label: { tr: 'Ilik', en: 'Warm' }, className: 'bg-warning/15 text-amber-400 border-warning/25' },
-    cold: { label: { tr: 'Soguk', en: 'Cold' }, className: 'bg-slate-500/15 text-slate-400 border-slate-500/25' },
+    hot: { label: { tr: 'Sıcak', en: 'Hot' }, className: 'bg-error/15 text-red-400 border-error/25' },
+    warm: { label: { tr: 'Ilık', en: 'Warm' }, className: 'bg-warning/15 text-amber-400 border-warning/25' },
+    cold: { label: { tr: 'Soğuk', en: 'Cold' }, className: 'bg-slate-500/15 text-slate-400 border-slate-500/25' },
     frozen: { label: { tr: 'Donuk', en: 'Frozen' }, className: 'bg-slate-600/15 text-slate-500 border-slate-600/25' },
   }
 

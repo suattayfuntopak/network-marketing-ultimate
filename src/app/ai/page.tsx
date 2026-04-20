@@ -221,7 +221,7 @@ export default function AIPage() {
       onClick: () => {
         void handleSend(
           locale === 'tr'
-            ? 'Bugun icin net bir plan cikar: en sicak 3 aday, gecikmis takipler, yeniden siparis penceresi acilan musteri ve bugunun ritmi. Her bashk icin tek bir aksiyon oner.'
+            ? 'Bugün için net bir plan çıkar: en sıcak 3 aday, gecikmiş takipler, yeniden sipariş penceresi açılan müşteri ve bugünün ritmi. Her başlık için tek bir aksiyon öner.'
             : 'Give me a clear plan for today: top 3 prospects, overdue follow-ups, customers with an open reorder window, and the daily rhythm. Suggest one action per heading.',
         )
       },

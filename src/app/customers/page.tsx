@@ -184,7 +184,7 @@ function CustomerDetail({ customer, products, userId, onBack }: {
                     </div>
                     {order.next_reorder_date && order.status !== 'cancelled' && (
                       <div className="mt-2 pt-2 border-t border-border-subtle text-xs text-text-secondary">
-                        Sonraki yeniden siparis: <span className="font-medium text-text-primary">{formatDate(order.next_reorder_date)}</span>
+                        {locale === 'tr' ? 'Sonraki yeniden sipariş' : 'Next reorder'}: <span className="font-medium text-text-primary">{formatDate(order.next_reorder_date)}</span>
                       </div>
                     )}
                     {order.note && (
