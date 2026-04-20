@@ -634,7 +634,7 @@ function AIMessageGeneratorModalContent({
                     </div>
                   </div>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-text-secondary">{variant}</p>
-                  <div className="mt-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap">
+                  <div className="mt-4 flex flex-nowrap items-center gap-2">
                     <Button
                       type="button"
                       size="sm"
