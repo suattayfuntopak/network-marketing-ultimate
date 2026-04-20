@@ -430,7 +430,6 @@ function AIMessageGeneratorModalContent({
 
   function handleSaveTemplate(message: string, index: number) {
     onSaveTemplate({
-      name: `${getLabel(CATEGORY_META, locale, category)}${contact ? ` • ${contact.full_name}` : ''}`,
       name: `${getLabel(CATEGORY_META, locale, category)}${selectedContact ? ` • ${selectedContact.full_name}` : ''}`,
       category,
       channel: sendChannelsByVariant[index] ?? defaultSendChannel,
