@@ -49,7 +49,7 @@ export function Badge({ children, variant = 'default', size = 'sm', className, d
   )
 }
 
-export function TemperatureBadge({ temperature, score }: { temperature: string; score?: number }) {
+export function TemperatureBadge({ temperature }: { temperature: string; score?: number }) {
   const { locale } = useLanguage()
   const config: Record<string, { label: { tr: string; en: string }; className: string }> = {
     hot: { label: { tr: 'Sıcak', en: 'Hot' }, className: 'bg-error/15 text-red-400 border-error/25' },
@@ -67,7 +67,6 @@ export function TemperatureBadge({ temperature, score }: { temperature: string; 
     )}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />
       {c.label[locale]}
-      {score !== undefined && <span className="opacity-70">{score}</span>}
     </span>
   )
 }

@@ -190,6 +190,19 @@ export async function updateContactStage(id: string, stage: string): Promise<voi
   if (error) throw error
 }
 
+export async function updateContactTemperature(
+  id: string,
+  temperature: 'cold' | 'warm' | 'hot' | 'frozen'
+): Promise<void> {
+  const userId = await requireSessionUserId()
+  const { error } = await supabase
+    .from('nmu_contacts')
+    .update({ temperature })
+    .eq('id', id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
 export async function fetchAllInteractions(): Promise<InteractionRow[]> {
   const userId = await requireSessionUserId()
   const { data, error } = await supabase

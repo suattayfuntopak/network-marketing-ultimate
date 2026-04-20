@@ -38,6 +38,7 @@ import {
   completeTask,
   deleteTask,
   updateContactStage,
+  updateContactTemperature,
 } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import type { ContactRow, InteractionRow, TaskRow } from '@/lib/queries'
@@ -349,6 +350,14 @@ export default function ContactsPage() {
     },
   })
 
+  const temperatureMutation = useMutation({
+    mutationFn: ({ id, temperature }: { id: string; temperature: ContactRow['temperature'] }) =>
+      updateContactTemperature(id, temperature),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contacts'] })
+    },
+  })
+
   const todayKey = new Date().toISOString().slice(0, 10)
   const monthKey = todayKey.slice(0, 7)
 
@@ -644,6 +653,27 @@ export default function ContactsPage() {
                     {PIPELINE_STAGE_OPTIONS.map((stage) => (
                       <option key={stage} value={stage}>{stageMeta(stage)[currentLocale]}</option>
                     ))}
+                  </select>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">
+                    {currentLocale === 'tr' ? 'Sıcaklık' : 'Temperature'}
+                  </p>
+                  <select
+                    value={selected.temperature}
+                    onChange={(event) =>
+                      temperatureMutation.mutate({
+                        id: selected.id,
+                        temperature: event.target.value as ContactRow['temperature'],
+                      })}
+                    disabled={temperatureMutation.isPending}
+                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+                  >
+                    <option value="cold">{currentLocale === 'tr' ? 'Soğuk' : 'Cold'}</option>
+                    <option value="warm">{currentLocale === 'tr' ? 'Ilık' : 'Warm'}</option>
+                    <option value="hot">{currentLocale === 'tr' ? 'Sıcak' : 'Hot'}</option>
+                    <option value="frozen">{currentLocale === 'tr' ? 'Donuk' : 'Frozen'}</option>
                   </select>
                 </div>
 
