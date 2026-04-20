@@ -1,4 +1,4 @@
-import type { InteractionRow, TaskRow } from '@/lib/queries'
+import type { AddContactInput, ContactRow, InteractionRow, TaskRow } from '@/lib/queries'
 
 export const PIPELINE_STAGE_OPTIONS = [
   'new',
@@ -50,6 +50,77 @@ export function parseCommaTags(value: string) {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function normalizePipelineStage(stage: string): PipelineStage {
+  return (PIPELINE_STAGE_OPTIONS as readonly string[]).includes(stage) ? (stage as PipelineStage) : 'new'
+}
+
+/** Hydrate the add/edit form from a saved contact row. */
+export function contactRowToAddContactForm(row: ContactRow): AddContactForm {
+  const gn = row.goals_notes?.trim() ?? ''
+  let goalsComma = ''
+  let notes = ''
+  if (gn.includes('\n\n')) {
+    const parts = gn.split('\n\n')
+    goalsComma = parts[0]?.trim() ?? ''
+    notes = parts.slice(1).join('\n\n').trim()
+  } else {
+    notes = gn
+  }
+  return {
+    full_name: row.full_name,
+    nickname: row.nickname ?? '',
+    phone: row.phone ?? '',
+    whatsapp_username: row.whatsapp_username ?? '',
+    email: row.email ?? '',
+    telegram_username: row.telegram_username ?? '',
+    instagram_username: row.instagram_username ?? '',
+    location: row.location ?? '',
+    profession: row.profession ?? '',
+    relationship_type: row.relationship_type ?? '',
+    birthday: row.birthday?.slice(0, 10) ?? '',
+    family_notes: row.family_notes ?? '',
+    temperature_score: row.temperature_score ?? 50,
+    interest_type: row.interest_type,
+    source: row.source ?? '',
+    pipeline_stage: normalizePipelineStage(row.pipeline_stage),
+    interests: row.interests ?? '',
+    pain_points: row.pain_points ?? '',
+    goalsComma,
+    notes,
+    tagsComma: (row.tags ?? []).join(', '),
+  }
+}
+
+/** Map modal form values to the API payload used by add/update contact. */
+export function addContactFormToInput(values: AddContactForm): AddContactInput {
+  const goalsBlock = values.goalsComma.trim()
+  const notesBlock = values.notes.trim()
+  const goals_notes =
+    goalsBlock && notesBlock ? `${goalsBlock}\n\n${notesBlock}` : goalsBlock || notesBlock || undefined
+  return {
+    full_name: values.full_name.trim(),
+    nickname: values.nickname || undefined,
+    phone: values.phone || undefined,
+    whatsapp_username: values.whatsapp_username || undefined,
+    email: values.email || undefined,
+    telegram_username: values.telegram_username || undefined,
+    instagram_username: values.instagram_username || undefined,
+    location: values.location || undefined,
+    profession: values.profession || undefined,
+    relationship_type: values.relationship_type || undefined,
+    birthday: values.birthday || undefined,
+    family_notes: values.family_notes || undefined,
+    interests: values.interests || undefined,
+    pain_points: values.pain_points || undefined,
+    goals_notes,
+    tags: parseCommaTags(values.tagsComma),
+    temperature_score: values.temperature_score,
+    interest_type: values.interest_type,
+    source: values.source || undefined,
+    pipeline_stage: values.pipeline_stage,
+  }
 }
 
 export type InteractionFormValues = {

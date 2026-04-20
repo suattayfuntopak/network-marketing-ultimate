@@ -6,26 +6,21 @@ import { enUS, tr as trLocale } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge, TemperatureBadge } from '@/components/ui/Badge'
+import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
+import { AIMessageGeneratorModal } from '@/components/ai/AIMessageGeneratorModal'
 import { ContactChannelRow } from '@/components/contacts/ContactChannelRow'
 import { ContactCreateModal } from '@/components/contacts/ContactCreateModal'
+import { ContactDetailPersonView } from '@/components/contacts/ContactDetailPersonView'
 import { ContactWarmthBar } from '@/components/contacts/ContactWarmthBar'
 import { InteractionModal } from '@/components/contacts/InteractionModal'
 import { ContactTaskModal } from '@/components/contacts/ContactTaskModal'
 import {
-  INTERACTION_TYPE_LABELS,
-  OUTCOME_LABELS,
-  OUTCOME_VARIANTS,
   PIPELINE_STAGE_OPTIONS,
-  TASK_PRIORITY_LABELS,
-  TASK_PRIORITY_VARIANTS,
-  TASK_TYPE_LABELS,
-  channelLabel,
+  addContactFormToInput,
   parseCommaTags,
   stageMeta,
   type AddContactForm,
@@ -42,18 +37,18 @@ import {
   addTask,
   completeTask,
   deleteTask,
+  patchContact,
+  temperatureFromScore,
+  updateContactRecord,
   updateContactStage,
-  updateContactTemperature,
 } from '@/lib/queries'
+import type { MessageHistoryRecord, MessageTemplateRecord } from '@/components/ai/AIMessageGeneratorModal'
 import { cn } from '@/lib/utils'
 import type { ContactRow, InteractionRow, TaskRow } from '@/lib/queries'
 import {
-  ArrowLeft,
   CalendarClock,
   CalendarDays,
   CalendarRange,
-  CheckCircle2,
-  Clock,
   Contact,
   MoreVertical,
   Download,
@@ -61,10 +56,6 @@ import {
   LayoutGrid,
   LayoutList,
   ListChecks,
-  Mail,
-  MapPin,
-  MessageSquareText,
-  Phone,
   Plus,
   ShoppingBag,
   Upload,
@@ -261,6 +252,8 @@ export default function ContactsPage() {
   const [interactionError, setInteractionError] = useState('')
   const [taskError, setTaskError] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [editingContact, setEditingContact] = useState<ContactRow | null>(null)
+  const [aiModalOpen, setAiModalOpen] = useState(false)
 
   const { data: contacts = [], isLoading } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -283,41 +276,64 @@ export default function ContactsPage() {
     t.interest?.[value as keyof typeof t.interest] ?? value
 
   const addMutation = useMutation({
-    mutationFn: (values: AddContactForm) => {
-      const goalsBlock = values.goalsComma.trim()
-      const notesBlock = values.notes.trim()
-      const goals_notes =
-        goalsBlock && notesBlock
-          ? `${goalsBlock}\n\n${notesBlock}`
-          : goalsBlock || notesBlock || undefined
-      return addContact(currentUser!.id, {
-        full_name: values.full_name.trim(),
-        nickname: values.nickname || undefined,
-        phone: values.phone || undefined,
-        whatsapp_username: values.whatsapp_username || undefined,
-        email: values.email || undefined,
-        telegram_username: values.telegram_username || undefined,
-        instagram_username: values.instagram_username || undefined,
-        location: values.location || undefined,
-        profession: values.profession || undefined,
-        relationship_type: values.relationship_type || undefined,
-        birthday: values.birthday || undefined,
-        family_notes: values.family_notes || undefined,
-        interests: values.interests || undefined,
-        pain_points: values.pain_points || undefined,
-        goals_notes,
-        tags: parseCommaTags(values.tagsComma),
-        temperature_score: values.temperature_score,
-        interest_type: values.interest_type,
-        source: values.source || undefined,
-        pipeline_stage: values.pipeline_stage,
-      })
-    },
+    mutationFn: (values: AddContactForm) => addContact(currentUser!.id, addContactFormToInput(values)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contacts'] })
       closeAddModal()
     },
     onError: (error: Error) => setFormError(error.message),
+  })
+
+  const updateContactMutation = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: AddContactForm }) => updateContactRecord(id, addContactFormToInput(values)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contacts'] })
+      setEditingContact(null)
+      setForm(createEmptyForm(activeSegment))
+      setFormError('')
+    },
+    onError: (error: Error) => setFormError(error.message),
+  })
+
+  const quickNoteMutation = useMutation({
+    mutationFn: (text: string) =>
+      addInteraction(currentUser!.id, {
+        contact_id: selectedId!,
+        type: 'note',
+        channel: 'manual',
+        content: text,
+        date: new Date().toISOString(),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contacts'] })
+      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
+    },
+  })
+
+  const warmthPatchMutation = useMutation({
+    mutationFn: (score: number) =>
+      patchContact(selectedId!, {
+        temperature_score: score,
+        temperature: temperatureFromScore(score),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contacts'] })
+    },
+  })
+
+  const appendTagMutation = useMutation({
+    mutationFn: ({ id, tags }: { id: string; tags: string[] }) => patchContact(id, { tags }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contacts'] })
+    },
+  })
+
+  const archiveContactMutation = useMutation({
+    mutationFn: (id: string) => patchContact(id, { status: 'inactive' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contacts'] })
+      router.push(buildContactsHref(activeSegment))
+    },
   })
 
   const deleteMutation = useMutation({
@@ -378,14 +394,6 @@ export default function ContactsPage() {
 
   const stageMutation = useMutation({
     mutationFn: ({ id, stage }: { id: string; stage: string }) => updateContactStage(id, stage),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['contacts'] })
-    },
-  })
-
-  const temperatureMutation = useMutation({
-    mutationFn: ({ id, temperature }: { id: string; temperature: ContactRow['temperature'] }) =>
-      updateContactTemperature(id, temperature),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contacts'] })
     },
@@ -563,9 +571,6 @@ export default function ContactsPage() {
   }
 
   const selected = selectedId ? contacts.find((contact) => contact.id === selectedId) ?? null : null
-  const openTasks = contactTasks.filter((task) => task.status !== 'completed' && task.status !== 'skipped')
-  const completedTasks = contactTasks.filter((task) => task.status === 'completed')
-
   function openContactDetail(contactId: string) {
     router.push(buildContactsHref(activeSegment, { contactId }))
   }
@@ -576,6 +581,7 @@ export default function ContactsPage() {
 
   function closeAddModal() {
     setShowAdd(false)
+    setEditingContact(null)
     setFormError('')
     setForm(createEmptyForm(activeSegment))
     if (routeModalOpen) {
@@ -584,6 +590,7 @@ export default function ContactsPage() {
   }
 
   function openAddModal() {
+    setEditingContact(null)
     setForm(createEmptyForm(activeSegment))
     setFormError('')
     router.push(buildContactsHref(activeSegment, { newModal: true }))
@@ -746,6 +753,10 @@ export default function ContactsPage() {
       setFormError(currentLocale === 'tr' ? 'Ad soyad zorunludur.' : 'Full name is required.')
       return
     }
+    if (editingContact) {
+      updateContactMutation.mutate({ id: editingContact.id, values: form })
+      return
+    }
     addMutation.mutate(form)
   }
 
@@ -759,323 +770,79 @@ export default function ContactsPage() {
   ]
 
   if (selected) {
+    const contactFormModalOpen = showAdd || routeModalOpen || editingContact !== null
     return (
       <>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-[1360px] mx-auto">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <Button variant="ghost" size="sm" onClick={closeContactDetail} icon={<ArrowLeft className="w-3.5 h-3.5" />}>
-              {t.common.backToContacts}
-            </Button>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => { setInteractionError(''); setShowInteractionModal(true) }}
-                icon={<MessageSquareText className="w-3.5 h-3.5" />}
-                disabled={!currentUser}
-              >
-                {currentLocale === 'tr' ? 'İletişim Kaydı' : 'Log Interaction'}
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => { setTaskError(''); setShowTaskModal(true) }}
-                icon={<Plus className="w-3.5 h-3.5" />}
-                disabled={!currentUser}
-              >
-                {currentLocale === 'tr' ? 'Görev Ekle' : 'Add Task'}
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => deleteMutation.mutate(selected.id)}
-                icon={<X className="w-3.5 h-3.5" />}
-              >
-                {t.common.delete}
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <Card className="xl:col-span-1">
-              <div className="text-center mb-6">
-                <Avatar name={selected.full_name} size="xl" className="mx-auto mb-3" />
-                <h2 className="text-lg font-bold text-text-primary">{selected.full_name}</h2>
-                {selected.profession && <p className="text-sm text-text-tertiary">{selected.profession}</p>}
-                <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
-                  <TemperatureBadge temperature={selected.temperature} score={selected.temperature_score} />
-                  <Badge variant="secondary" size="sm">
-                    {interestLabel(selected.interest_type)}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {selected.phone && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Phone className="w-4 h-4 text-text-tertiary shrink-0" />
-                    <span className="text-text-primary">{selected.phone}</span>
-                  </div>
-                )}
-                {selected.email && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Mail className="w-4 h-4 text-text-tertiary shrink-0" />
-                    <span className="text-text-primary">{selected.email}</span>
-                  </div>
-                )}
-                {selected.location && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <MapPin className="w-4 h-4 text-text-tertiary shrink-0" />
-                    <span className="text-text-primary">{selected.location}</span>
-                  </div>
-                )}
-                {selected.source && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Contact className="w-4 h-4 text-text-tertiary shrink-0" />
-                    <span className="text-text-primary">{selected.source}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-5 pt-4 border-t border-border space-y-4">
-                <div>
-                  <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">{currentLocale === 'tr' ? 'Aşama' : 'Stage'}</p>
-                  <select
-                    value={selected.pipeline_stage}
-                    onChange={(event) => stageMutation.mutate({ id: selected.id, stage: event.target.value })}
-                    disabled={stageMutation.isPending}
-                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                  >
-                    {PIPELINE_STAGE_OPTIONS.map((stage) => (
-                      <option key={stage} value={stage}>{stageMeta(stage)[currentLocale]}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">
-                    {currentLocale === 'tr' ? 'Sıcaklık' : 'Temperature'}
-                  </p>
-                  <select
-                    value={selected.temperature}
-                    onChange={(event) =>
-                      temperatureMutation.mutate({
-                        id: selected.id,
-                        temperature: event.target.value as ContactRow['temperature'],
-                      })}
-                    disabled={temperatureMutation.isPending}
-                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                  >
-                    <option value="cold">{currentLocale === 'tr' ? 'Soğuk' : 'Cold'}</option>
-                    <option value="warm">{currentLocale === 'tr' ? 'Ilık' : 'Warm'}</option>
-                    <option value="hot">{currentLocale === 'tr' ? 'Sıcak' : 'Hot'}</option>
-                    <option value="frozen">{currentLocale === 'tr' ? 'Donuk' : 'Frozen'}</option>
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-text-tertiary text-xs mb-0.5">{currentLocale === 'tr' ? 'Eklenme' : 'Created'}</p>
-                    <p className="text-text-primary">{formatDate(selected.created_at, currentLocale)}</p>
-                  </div>
-                  <div>
-                    <p className="text-text-tertiary text-xs mb-0.5">{currentLocale === 'tr' ? 'Son Temas' : 'Last Touch'}</p>
-                    <p className="text-text-primary">{formatDate(selected.last_contact_date, currentLocale)}</p>
-                  </div>
-                  <div>
-                    <p className="text-text-tertiary text-xs mb-0.5">{currentLocale === 'tr' ? 'Sonraki Takip' : 'Next Follow-up'}</p>
-                    <p className="text-text-primary">{formatDate(selected.next_follow_up_date, currentLocale)}</p>
-                  </div>
-                  <div>
-                    <p className="text-text-tertiary text-xs mb-0.5">{currentLocale === 'tr' ? 'İlişki Gücü' : 'Relationship'}</p>
-                    <p className="text-text-primary">{selected.relationship_strength} / 100</p>
-                  </div>
-                </div>
-
-                {selected.tags.length > 0 && (
-                  <div>
-                    <p className="text-text-tertiary text-xs mb-2">{t.common.tags}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {selected.tags.map((tag) => (
-                        <Badge key={tag} size="sm">{tag}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            <div className="xl:col-span-2 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Card padding="sm">
-                  <p className="text-[11px] uppercase tracking-wider text-text-tertiary font-semibold">
-                    {currentLocale === 'tr' ? 'İletişim' : 'Interactions'}
-                  </p>
-                  <p className="text-2xl font-bold text-text-primary mt-2">{interactions.length}</p>
-                </Card>
-                <Card padding="sm">
-                  <p className="text-[11px] uppercase tracking-wider text-text-tertiary font-semibold">
-                    {currentLocale === 'tr' ? 'Açık Görev' : 'Open Tasks'}
-                  </p>
-                  <p className="text-2xl font-bold text-text-primary mt-2">{openTasks.length}</p>
-                </Card>
-                <Card padding="sm">
-                  <p className="text-[11px] uppercase tracking-wider text-text-tertiary font-semibold">
-                    {currentLocale === 'tr' ? 'Tamamlanan' : 'Completed'}
-                  </p>
-                  <p className="text-2xl font-bold text-text-primary mt-2">{completedTasks.length}</p>
-                </Card>
-              </div>
-
-              {(selected.goals_notes || selected.family_notes) && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {selected.goals_notes && (
-                    <Card>
-                      <CardHeader><CardTitle>{t.common.goals}</CardTitle></CardHeader>
-                      <p className="text-sm text-text-secondary whitespace-pre-wrap">{selected.goals_notes}</p>
-                    </Card>
-                  )}
-                  {selected.family_notes && (
-                    <Card>
-                      <CardHeader><CardTitle>{t.common.family}</CardTitle></CardHeader>
-                      <p className="text-sm text-text-secondary whitespace-pre-wrap">{selected.family_notes}</p>
-                    </Card>
-                  )}
-                </div>
-              )}
-
-              <Card>
-                <CardHeader className="items-start gap-3 sm:flex-row sm:items-center">
-                  <div>
-                    <CardTitle>{t.common.interactionHistory}</CardTitle>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => { setInteractionError(''); setShowInteractionModal(true) }}
-                    icon={<MessageSquareText className="w-3.5 h-3.5" />}
-                    disabled={!currentUser}
-                  >
-                    {currentLocale === 'tr' ? 'Kayıt Ekle' : 'Add Log'}
-                  </Button>
-                </CardHeader>
-
-                {interactionsLoading ? (
-                  <div className="py-10 text-center text-sm text-text-tertiary">{t.common.loading}</div>
-                ) : interactions.length === 0 ? (
-                  <div className="py-10 text-center">
-                    <p className="text-sm text-text-tertiary">{t.contacts.noInteractions}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {interactions.map((interaction) => (
-                      <div key={interaction.id} className="rounded-xl border border-border-subtle bg-surface/40 p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="primary" size="sm">{INTERACTION_TYPE_LABELS[interaction.type][currentLocale]}</Badge>
-                            {interaction.outcome && (
-                              <Badge variant={OUTCOME_VARIANTS[interaction.outcome]} size="sm">
-                                {OUTCOME_LABELS[interaction.outcome][currentLocale]}
-                              </Badge>
-                            )}
-                            <Badge size="sm">{channelLabel(interaction.channel, currentLocale)}</Badge>
-                          </div>
-                          <div className="text-xs text-text-tertiary">{formatDateTime(interaction.date, currentLocale)}</div>
-                        </div>
-                        <p className="text-sm text-text-primary mt-3 whitespace-pre-wrap">{interaction.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-
-              <Card>
-                <CardHeader className="items-start gap-3 sm:flex-row sm:items-center">
-                  <div>
-                    <CardTitle>{t.common.tasksFor} {selected.full_name}</CardTitle>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => { setTaskError(''); setShowTaskModal(true) }}
-                    icon={<Plus className="w-3.5 h-3.5" />}
-                    disabled={!currentUser}
-                  >
-                    {currentLocale === 'tr' ? 'Görev Ekle' : 'Add Task'}
-                  </Button>
-                </CardHeader>
-
-                {contactTasksLoading ? (
-                  <div className="py-10 text-center text-sm text-text-tertiary">{t.common.loading}</div>
-                ) : contactTasks.length === 0 ? (
-                  <div className="py-10 text-center">
-                    <p className="text-sm text-text-tertiary">{t.contacts.noTasks}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {contactTasks.map((task) => {
-                      const isDone = task.status === 'completed'
-                      return (
-                        <div key={task.id} className="rounded-xl border border-border-subtle bg-surface/40 p-4">
-                          <div className="flex flex-col lg:flex-row lg:items-start gap-3">
-                            <button
-                              onClick={() => !isDone && completeTaskMutation.mutate(task.id)}
-                              className={cn(
-                                'w-8 h-8 rounded-xl border shrink-0 flex items-center justify-center transition-colors',
-                                isDone
-                                  ? 'bg-success/10 border-success/20 text-success'
-                                  : 'border-border text-text-muted hover:border-primary hover:text-primary',
-                              )}
-                            >
-                              {isDone ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
-                            </button>
-
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className={cn('text-sm font-semibold', isDone ? 'text-text-muted line-through' : 'text-text-primary')}>
-                                  {task.title}
-                                </p>
-                                <Badge variant={TASK_PRIORITY_VARIANTS[task.priority]} size="sm">
-                                  {TASK_PRIORITY_LABELS[task.priority][currentLocale]}
-                                </Badge>
-                                <Badge size="sm">{TASK_TYPE_LABELS[task.type][currentLocale]}</Badge>
-                              </div>
-                              {task.description && (
-                                <p className="text-sm text-text-secondary mt-2">{task.description}</p>
-                              )}
-                              <div className="flex flex-wrap gap-3 mt-3 text-xs text-text-tertiary">
-                                <span className="inline-flex items-center gap-1.5">
-                                  <CalendarDays className="w-3.5 h-3.5" />
-                                  {t.common.due}: {formatDate(task.due_date, currentLocale)}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              {!isDone && (
-                                <Button size="sm" variant="ghost" onClick={() => completeTaskMutation.mutate(task.id)}>
-                                  {currentLocale === 'tr' ? 'Tamamla' : 'Complete'}
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => deleteTaskMutation.mutate(task.id)}
-                              >
-                                {t.common.delete}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </Card>
-            </div>
-          </div>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+          <ContactDetailPersonView
+            locale={currentLocale}
+            contact={selected}
+            interactions={interactions}
+            interactionsLoading={interactionsLoading}
+            tasks={contactTasks}
+            tasksLoading={contactTasksLoading}
+            interestLabel={interestLabel}
+            formatDate={formatDate}
+            formatDateTime={formatDateTime}
+            onBack={closeContactDetail}
+            onDelete={() => deleteMutation.mutate(selected.id)}
+            onOpenAI={() => setAiModalOpen(true)}
+            onEdit={() => {
+              setEditingContact(selected)
+              setFormError('')
+            }}
+            onArchive={() => archiveContactMutation.mutate(selected.id)}
+            onOpenInteractionModal={() => {
+              setInteractionError('')
+              setShowInteractionModal(true)
+            }}
+            onOpenTaskModal={() => {
+              setTaskError('')
+              setShowTaskModal(true)
+            }}
+            onQuickNote={(text) => quickNoteMutation.mutateAsync(text)}
+            quickNotePending={quickNoteMutation.isPending}
+            onStageChange={(stage) => stageMutation.mutate({ id: selected.id, stage })}
+            stagePending={stageMutation.isPending}
+            onWarmthChange={(score) => warmthPatchMutation.mutate(score)}
+            warmthPending={warmthPatchMutation.isPending}
+            onAddTag={(tag) => {
+              const next = [...(selected.tags ?? []), tag.trim()].filter(Boolean)
+              appendTagMutation.mutate({ id: selected.id, tags: next })
+            }}
+            tagPending={appendTagMutation.isPending}
+            onCompleteTask={(taskId) => completeTaskMutation.mutate(taskId)}
+            onDeleteTask={(taskId) => deleteTaskMutation.mutate(taskId)}
+          />
         </motion.div>
 
+        <AIMessageGeneratorModal
+          open={aiModalOpen}
+          onClose={() => setAiModalOpen(false)}
+          locale={currentLocale}
+          contact={selected}
+          initialCategory="follow_up"
+          initialChannel="whatsapp"
+          initialTone="friendly"
+          initialExtraContext={[selected.pain_points, selected.interests, selected.goals_notes].filter(Boolean).join('\n')}
+          onGenerated={(_record: MessageHistoryRecord) => undefined}
+          onSaveTemplate={(_template: Omit<MessageTemplateRecord, 'id' | 'createdAt' | 'isFavorite'>) => undefined}
+        />
+
         <AnimatePresence>
+          {contactFormModalOpen && (
+            <ContactCreateModal
+              open={contactFormModalOpen}
+              editingContact={editingContact}
+              currentLocale={currentLocale}
+              form={form}
+              setForm={setForm}
+              error={formError}
+              loading={editingContact ? updateContactMutation.isPending : addMutation.isPending}
+              onClose={closeAddModal}
+              onSubmit={handleAddContact}
+            />
+          )}
           {showInteractionModal && (
             <InteractionModal
               currentLocale={currentLocale}
@@ -1100,6 +867,7 @@ export default function ContactsPage() {
       </>
     )
   }
+
 
   return (
     <>

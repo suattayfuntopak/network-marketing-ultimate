@@ -200,7 +200,7 @@ export type AddContactInput = {
   pipeline_stage?: string | null
 }
 
-export async function addContact(userId: string, input: AddContactInput): Promise<ContactRow> {
+function contactFieldsFromAddInput(input: AddContactInput) {
   const explicitTemperature = input.temperature ?? undefined
   const hasScore = typeof input.temperature_score === 'number' && !Number.isNaN(input.temperature_score)
   const score = hasScore
@@ -210,36 +210,58 @@ export async function addContact(userId: string, input: AddContactInput): Promis
 
   const tags = input.tags?.filter(Boolean) ?? []
 
+  return {
+    full_name: input.full_name,
+    phone: input.phone?.trim() || null,
+    email: input.email?.trim() || null,
+    location: input.location?.trim() || null,
+    profession: input.profession?.trim() || null,
+    nickname: input.nickname?.trim() || null,
+    telegram_username: normalizeSocialHandle(input.telegram_username),
+    instagram_username: normalizeSocialHandle(input.instagram_username),
+    whatsapp_username: normalizeSocialHandle(input.whatsapp_username),
+    interests: input.interests?.trim() || null,
+    pain_points: input.pain_points?.trim() || null,
+    relationship_type: input.relationship_type?.trim() || null,
+    birthday: normalizeBirthday(input.birthday ?? undefined),
+    family_notes: input.family_notes?.trim() || null,
+    goals_notes: input.goals_notes?.trim() || null,
+    tags,
+    temperature,
+    temperature_score: score,
+    interest_type: input.interest_type ?? 'unknown',
+    source: (input.source?.trim() ?? '') || '',
+    pipeline_stage: input.pipeline_stage ?? 'new',
+  }
+}
+
+export async function addContact(userId: string, input: AddContactInput): Promise<ContactRow> {
   const { data, error } = await supabase
     .from('nmu_contacts')
     .insert({
       user_id: userId,
-      full_name: input.full_name,
-      phone: input.phone?.trim() || null,
-      email: input.email?.trim() || null,
-      location: input.location?.trim() || null,
-      profession: input.profession?.trim() || null,
-      nickname: input.nickname?.trim() || null,
-      telegram_username: normalizeSocialHandle(input.telegram_username),
-      instagram_username: normalizeSocialHandle(input.instagram_username),
-      whatsapp_username: normalizeSocialHandle(input.whatsapp_username),
-      interests: input.interests?.trim() || null,
-      pain_points: input.pain_points?.trim() || null,
-      relationship_type: input.relationship_type?.trim() || null,
-      birthday: normalizeBirthday(input.birthday ?? undefined),
-      family_notes: input.family_notes?.trim() || null,
-      goals_notes: input.goals_notes?.trim() || null,
-      tags,
-      temperature,
-      temperature_score: score,
-      interest_type: input.interest_type ?? 'unknown',
-      source: (input.source?.trim() ?? '') || '',
-      pipeline_stage: input.pipeline_stage ?? 'new',
+      ...contactFieldsFromAddInput(input),
     })
     .select()
     .single()
   if (error) throw error
   return data as ContactRow
+}
+
+export async function updateContactRecord(id: string, input: AddContactInput): Promise<void> {
+  const userId = await requireSessionUserId()
+  const { error } = await supabase
+    .from('nmu_contacts')
+    .update(contactFieldsFromAddInput(input))
+    .eq('id', id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function patchContact(id: string, patch: Database['public']['Tables']['nmu_contacts']['Update']): Promise<void> {
+  const userId = await requireSessionUserId()
+  const { error } = await supabase.from('nmu_contacts').update(patch).eq('id', id).eq('user_id', userId)
+  if (error) throw error
 }
 
 export async function deleteContact(id: string): Promise<void> {

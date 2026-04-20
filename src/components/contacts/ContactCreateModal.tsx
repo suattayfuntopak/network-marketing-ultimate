@@ -2,14 +2,16 @@
 
 import { type Dispatch, type FormEvent, type SetStateAction, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { AlertCircle, Save, UserPlus, X } from 'lucide-react'
+import { AlertCircle, Pencil, Save, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import {
   PIPELINE_STAGE_OPTIONS,
+  contactRowToAddContactForm,
   stageMeta,
   type AddContactForm,
   type PipelineStage,
 } from '@/components/contacts/contactLabels'
+import type { ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 
 type TabId = 'basic' | 'detail' | 'network' | 'notes'
@@ -26,6 +28,7 @@ const fieldClass =
 
 interface Props {
   open: boolean
+  editingContact?: ContactRow | null
   currentLocale: 'tr' | 'en'
   form: AddContactForm
   setForm: Dispatch<SetStateAction<AddContactForm>>
@@ -35,11 +38,27 @@ interface Props {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }
 
-export function ContactCreateModal({ open, currentLocale, form, setForm, error, loading, onClose, onSubmit }: Props) {
+export function ContactCreateModal({
+  open,
+  editingContact = null,
+  currentLocale,
+  form,
+  setForm,
+  error,
+  loading,
+  onClose,
+  onSubmit,
+}: Props) {
   const [tab, setTab] = useState<TabId>('basic')
+  const isEdit = Boolean(editingContact)
 
   useEffect(() => {
-    if (open) setTab('basic')
+    if (!open) return
+    setTab('basic')
+    if (editingContact) {
+      setForm(contactRowToAddContactForm(editingContact))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate when sheet opens; avoids reset on contacts refetch
   }, [open])
 
   const tr = currentLocale === 'tr'
@@ -63,16 +82,20 @@ export function ContactCreateModal({ open, currentLocale, form, setForm, error, 
           <div className="flex items-start justify-between gap-3 border-b border-border p-5">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-                <UserPlus className="h-5 w-5" />
+                {isEdit ? <Pencil className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-text-primary">
-                  {tr ? 'Yeni Kontak' : 'New contact'}
+                  {isEdit ? (tr ? 'Kontağı Düzenle' : 'Edit contact') : tr ? 'Yeni Kontak' : 'New contact'}
                 </h2>
                 <p className="mt-0.5 text-sm text-text-tertiary">
-                  {tr
-                    ? 'Temel bilgilerden notlara kadar tek ekranda kayıt.'
-                    : 'Capture channels, pipeline context, and notes in one flow.'}
+                  {isEdit
+                    ? tr
+                      ? 'Kayıtlı kişiyi güncelle; kaydet ile değişikliklerin uygulanır.'
+                      : 'Update this person; save to apply your changes.'
+                    : tr
+                      ? 'Temel bilgilerden notlara kadar tek ekranda kayıt.'
+                      : 'Capture channels, pipeline context, and notes in one flow.'}
                 </p>
               </div>
             </div>
