@@ -225,24 +225,26 @@ export function AIMessageGeneratorModal({
     <Modal
       open={open}
       onClose={onClose}
-      className="max-w-4xl"
+      className="flex max-h-[92dvh] min-h-0 max-w-6xl flex-col overflow-hidden"
       title={locale === 'tr' ? 'YZ Mesaj Üretici' : 'AI Message Generator'}
       description={locale === 'tr' ? 'Kişiye özel, doğal ve gönderilebilir mesajlar üret.' : 'Create natural, send-ready message drafts.'}
     >
       {open ? (
-        <AIMessageGeneratorModalContent
-          key={dialogKey}
-          locale={locale}
-          contact={contact}
-          initialCategory={initialCategory}
-          initialChannel={initialChannel}
-          initialTone={initialTone}
-          initialExtraContext={initialExtraContext}
-          presetLabel={presetLabel}
-          presetReason={presetReason}
-          onGenerated={onGenerated}
-          onSaveTemplate={onSaveTemplate}
-        />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <AIMessageGeneratorModalContent
+            key={dialogKey}
+            locale={locale}
+            contact={contact}
+            initialCategory={initialCategory}
+            initialChannel={initialChannel}
+            initialTone={initialTone}
+            initialExtraContext={initialExtraContext}
+            presetLabel={presetLabel}
+            presetReason={presetReason}
+            onGenerated={onGenerated}
+            onSaveTemplate={onSaveTemplate}
+          />
+        </div>
       ) : null}
     </Modal>
   )
@@ -473,14 +475,14 @@ function AIMessageGeneratorModalContent({
   }
 
   return (
-    <div className="grid min-h-0 grid-cols-1 gap-0 overflow-hidden lg:h-[min(36rem,calc(90dvh-11rem))] lg:grid-cols-[1.08fr_0.92fr]">
+    <div className="grid h-full min-h-0 grid-cols-1 gap-0 overflow-hidden lg:grid-cols-[1.05fr_0.95fr]">
       <div className="flex min-h-0 flex-col border-b border-border lg:border-b-0 lg:border-r">
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <div className="space-y-3">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
+        <div className="space-y-2">
           {selectedContact ? (
-            <div className="rounded-2xl border border-border-subtle bg-surface/40 p-4">
-              <div className="flex items-start gap-3">
-                <Avatar name={selectedContact.full_name} size="md" />
+            <div className="rounded-xl border border-border-subtle bg-surface/40 p-3">
+              <div className="flex items-start gap-2.5">
+                <Avatar name={selectedContact.full_name} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-text-primary">{selectedContact.full_name}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-text-tertiary">
@@ -497,7 +499,7 @@ function AIMessageGeneratorModalContent({
               </div>
             </div>
           ) : (
-            <div className="space-y-3 rounded-2xl border border-dashed border-border-subtle bg-surface/30 p-4">
+            <div className="space-y-2 rounded-xl border border-dashed border-border-subtle bg-surface/30 p-3">
               <Input
                 value={contactSearch}
                 onChange={(event) => setContactSearch(event.target.value)}
@@ -524,7 +526,7 @@ function AIMessageGeneratorModalContent({
           )}
 
           {presetLabel ? (
-            <div className="rounded-2xl border border-primary/20 bg-primary/8 p-4">
+            <div className="rounded-xl border border-primary/20 bg-primary/8 p-3">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
                 {locale === 'tr' ? 'Hazır Plan' : 'Preset'}
               </p>
@@ -535,17 +537,17 @@ function AIMessageGeneratorModalContent({
         </div>
 
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
             {locale === 'tr' ? 'Kategori seç' : 'Choose category'}
           </p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5 xl:grid-cols-3">
             {categoryOptions.map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => setCategory(item)}
                 className={cn(
-                  'rounded-full border px-3 py-1.5 text-sm transition-colors',
+                  'rounded-lg border px-2 py-1 text-left text-xs leading-snug transition-colors',
                   category === item
                     ? 'border-primary/30 bg-primary text-obsidian'
                     : 'border-border bg-surface/40 text-text-secondary hover:border-border-strong hover:text-text-primary',
@@ -558,7 +560,7 @@ function AIMessageGeneratorModalContent({
         </div>
 
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
             {locale === 'tr' ? 'Ton seç' : 'Choose tone'}
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -568,7 +570,7 @@ function AIMessageGeneratorModalContent({
                 type="button"
                 onClick={() => setTone(item)}
                 className={cn(
-                  'rounded-full border px-3 py-1.5 text-sm transition-colors',
+                  'rounded-full border px-2.5 py-1 text-xs transition-colors',
                   tone === item
                     ? 'border-primary/30 bg-primary text-obsidian'
                     : 'border-border bg-surface/40 text-text-secondary hover:border-border-strong hover:text-text-primary',
@@ -582,7 +584,7 @@ function AIMessageGeneratorModalContent({
 
         <Textarea
           label={locale === 'tr' ? 'Ek Bağlam' : 'Extra Context'}
-          rows={3}
+          rows={2}
           value={extraContext}
           onChange={(event) => setExtraContext(event.target.value)}
           placeholder={
@@ -593,7 +595,7 @@ function AIMessageGeneratorModalContent({
         />
 
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
             {locale === 'tr' ? 'Varyasyon Sayısı' : 'Variant Count'}
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -603,7 +605,7 @@ function AIMessageGeneratorModalContent({
                 type="button"
                 onClick={() => setVariantCount(count)}
                 className={cn(
-                  'rounded-full border px-3 py-1.5 text-sm transition-colors',
+                  'rounded-full border px-2.5 py-1 text-xs transition-colors',
                   variantCount === count
                     ? 'border-primary/30 bg-primary text-obsidian'
                     : 'border-border bg-surface/40 text-text-secondary hover:border-border-strong hover:text-text-primary',
@@ -616,7 +618,7 @@ function AIMessageGeneratorModalContent({
         </div>
 
         </div>
-        <div className="relative shrink-0 border-t border-border-subtle bg-card/95 px-4 pb-3 pt-3">
+        <div className="relative shrink-0 border-t border-border-subtle bg-card/95 px-3 pb-2.5 pt-2.5 sm:px-4 sm:pb-3 sm:pt-3">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
           <Button
             type="button"
@@ -632,7 +634,7 @@ function AIMessageGeneratorModalContent({
         </div>
       </div>
 
-      <div className="min-h-0 space-y-4 overflow-y-auto p-4">
+      <div className="min-h-0 space-y-3 overflow-y-auto p-3 sm:p-4">
         <div className="flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-warning/10 text-warning">
             <WandSparkles className="h-5 w-5" />
@@ -650,7 +652,7 @@ function AIMessageGeneratorModalContent({
         </div>
 
         {variants.length === 0 ? (
-          <div className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed border-border-subtle bg-surface/20 p-6 text-center">
+          <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-border-subtle bg-surface/20 p-5 text-center lg:min-h-[220px]">
             <Sparkles className="mb-3 h-8 w-8 text-warning" />
             <p className="text-lg font-semibold text-text-primary">
               {locale === 'tr' ? 'YZ Mesaj Üretici' : 'AI Message Generator'}

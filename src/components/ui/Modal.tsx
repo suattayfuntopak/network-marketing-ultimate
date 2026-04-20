@@ -50,7 +50,7 @@ export function Modal({ open, onClose, title, description, children, className }
             className={cn('w-full max-w-2xl rounded-2xl border border-border bg-card shadow-2xl max-h-[90vh] overflow-y-auto', className)}
           >
             {(title || description) && (
-              <div className="flex items-start justify-between gap-4 border-b border-border p-5">
+              <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border p-4 sm:p-5">
                 <div>
                   {title && <h2 className="text-base font-semibold text-text-primary">{title}</h2>}
                   {description && <p className="mt-1 text-sm text-text-secondary">{description}</p>}
