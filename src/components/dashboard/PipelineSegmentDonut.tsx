@@ -51,15 +51,15 @@ export function PipelineSegmentDonut({ segments, totalContacts }: PipelineSegmen
         </div>
       ) : (
         <div className="grid items-center gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
-          <div className="relative h-[220px]">
+          <div className="relative h-[180px] sm:h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={data}
                   cx="50%"
                   cy="50%"
-                  innerRadius={62}
-                  outerRadius={92}
+                  innerRadius="52%"
+                  outerRadius="80%"
                   paddingAngle={2}
                   dataKey="value"
                   stroke="none"
@@ -71,10 +71,10 @@ export function PipelineSegmentDonut({ segments, totalContacts }: PipelineSegmen
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-text-tertiary">
+              <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] text-text-tertiary">
                 {locale === 'tr' ? 'Toplam' : 'Total'}
               </p>
-              <p className="mt-1 text-3xl font-bold text-text-primary">{totalInPipeline}</p>
+              <p className="mt-1 text-2xl sm:text-3xl font-bold text-text-primary">{totalInPipeline}</p>
             </div>
           </div>
 

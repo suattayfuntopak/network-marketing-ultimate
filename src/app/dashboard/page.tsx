@@ -334,10 +334,10 @@ export default function DashboardPage() {
                 <Sparkles className="h-3.5 w-3.5" />
                 {locale === 'tr' ? 'Bugünün Komuta Merkezi' : 'Today\u2019s Command Center'}
               </div>
-              <h1 className="mt-4 text-2xl font-bold text-text-primary lg:text-4xl">
+              <h1 className="mt-3 sm:mt-4 text-xl sm:text-2xl font-bold text-text-primary lg:text-4xl">
                 {t.dashboard.greeting}{fullName ? `, ${fullName}` : ''}
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-text-secondary lg:text-base">
+              <p className="mt-2 sm:mt-3 max-w-2xl text-[13px] sm:text-sm leading-6 text-text-secondary lg:text-base">
                 {focusTasks.length > 0
                   ? locale === 'tr'
                     ? `Bugün önce ${focusTasks.length} aksiyona odaklan. ${hotLeads.length} sıcak aday ve ${upcomingSessions.length} yaklaşan oturum görünür durumda.`
@@ -364,9 +364,9 @@ export default function DashboardPage() {
         <RevenueStrip snapshot={revenueSnapshot} streak={streak} />
       </motion.div>
 
-      <motion.div variants={item} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <motion.div variants={item} className="grid grid-cols-1 gap-2.5 sm:gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {isInitialLoading && Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={`kpi-skeleton-${index}`} className="h-[148px]" />
+          <Skeleton key={`kpi-skeleton-${index}`} className="h-[128px] sm:h-[148px]" />
         ))}
         {!isInitialLoading && kpis.map((kpi) => {
           const Icon = kpi.icon
@@ -382,18 +382,18 @@ export default function DashboardPage() {
               key={kpi.label}
               variants={item}
               whileHover={{ y: -2 }}
-              className={`rounded-2xl border bg-gradient-to-br ${accentClass} p-5 text-left transition-all hover:border-border-strong`}
+              className={`rounded-2xl border bg-gradient-to-br ${accentClass} p-3.5 sm:p-5 text-left transition-all hover:border-border-strong`}
               onClick={() => router.push(kpi.route)}
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-text-tertiary">{kpi.label}</p>
-                  <p className="mt-3 text-3xl font-bold text-text-primary">{kpi.value}</p>
-                  <p className="mt-2 text-xs leading-5 text-text-secondary">{kpi.hint}</p>
+              <div className="flex items-start justify-between gap-3 sm:gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-medium text-text-tertiary line-clamp-1">{kpi.label}</p>
+                  <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-bold text-text-primary">{kpi.value}</p>
+                  <p className="mt-1.5 sm:mt-2 text-[11px] sm:text-xs leading-5 text-text-secondary line-clamp-2">{kpi.hint}</p>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className="rounded-2xl border border-white/8 bg-background/45 p-3 shadow-[0_8px_24px_rgba(2,6,23,0.18)]">
-                    <Icon className="h-5 w-5 text-text-primary" />
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <div className="rounded-xl sm:rounded-2xl border border-white/8 bg-background/45 p-2 sm:p-3 shadow-[0_8px_24px_rgba(2,6,23,0.18)]">
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-text-primary" />
                   </div>
                   <DeltaPill
                     delta={kpi.delta}

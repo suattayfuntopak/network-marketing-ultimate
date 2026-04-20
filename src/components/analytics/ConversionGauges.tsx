@@ -36,12 +36,12 @@ export function ConversionGauges({ entries }: ConversionGaugesProps) {
         </div>
       </CardHeader>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         {entries.map((entry) => {
           const data = [{ name: entry.label, value: Math.min(entry.value, 100), fill: entry.color }]
           return (
-            <div key={entry.key} className="rounded-2xl border border-border-subtle bg-surface/35 p-3">
-              <div className="relative mx-auto h-[140px] w-full max-w-[160px]">
+            <div key={entry.key} className="rounded-2xl border border-border-subtle bg-surface/35 p-2.5 sm:p-3">
+              <div className="relative mx-auto h-[110px] sm:h-[140px] w-full max-w-[160px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <RadialBarChart
                     innerRadius="72%"
@@ -55,10 +55,10 @@ export function ConversionGauges({ entries }: ConversionGaugesProps) {
                   </RadialBarChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pb-2">
-                  <p className="text-2xl font-bold text-text-primary">%{entry.value}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-text-primary">%{entry.value}</p>
                 </div>
               </div>
-              <p className="mt-1 text-center text-xs font-semibold text-text-primary">{entry.label}</p>
+              <p className="mt-1 text-center text-[11px] sm:text-xs font-semibold text-text-primary truncate">{entry.label}</p>
               <p className="mt-1 text-center text-[10px] text-text-tertiary">{entry.caption}</p>
             </div>
           )

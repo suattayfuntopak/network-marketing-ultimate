@@ -60,7 +60,7 @@ export function RevenueStrip({ snapshot, streak }: RevenueStripProps) {
               </span>
             </div>
           </div>
-          <div className="w-[96px] shrink-0">
+          <div className="hidden sm:block w-[96px] shrink-0">
             <Sparkline data={sparkData} color="#00d4ff" gradientId="revenueStripWeek" />
           </div>
         </div>

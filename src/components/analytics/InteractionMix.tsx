@@ -63,12 +63,12 @@ export function InteractionMix({ data }: InteractionMixProps) {
             : 'No interaction records for this period.'}
         </div>
       ) : (
-        <div className="h-[280px]">
+        <div className="h-[220px] sm:h-[280px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data}>
+            <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
               <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.08)" />
-              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} interval="preserveStartEnd" minTickGap={20} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} width={28} />
               <Tooltip
                 contentStyle={{
                   background: '#1e1e2e',

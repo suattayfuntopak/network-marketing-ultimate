@@ -68,7 +68,7 @@ export function TeamLeaderboard({ rows }: TeamLeaderboardProps) {
                       />
                     </div>
                   </div>
-                  <div className="w-[84px] shrink-0">
+                  <div className="hidden sm:block w-[84px] shrink-0">
                     <Sparkline
                       data={row.spark}
                       color={row.overdue > 0 ? '#f59e0b' : '#10b981'}

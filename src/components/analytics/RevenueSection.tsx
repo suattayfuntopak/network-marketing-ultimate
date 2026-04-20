@@ -62,9 +62,9 @@ export function RevenueSection({ series, topProducts, totalRevenue, avgOrderValu
           </div>
         </CardHeader>
 
-        <div className="h-[300px]">
+        <div className="h-[220px] sm:h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={series}>
+            <AreaChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
               <defs>
                 <linearGradient id="analyticsRevenue" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#10b981" stopOpacity={0.32} />
@@ -72,11 +72,12 @@ export function RevenueSection({ series, topProducts, totalRevenue, avgOrderValu
                 </linearGradient>
               </defs>
               <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.08)" />
-              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} interval="preserveStartEnd" minTickGap={20} />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#64748b', fontSize: 11 }}
+                tick={{ fill: '#64748b', fontSize: 10 }}
+                width={36}
                 tickFormatter={(value) => {
                   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
                   if (value >= 1_000) return `${Math.round(value / 1000)}k`

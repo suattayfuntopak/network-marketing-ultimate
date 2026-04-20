@@ -350,8 +350,8 @@ export default function AnalyticsPage() {
                 <BarChart3 className="h-3.5 w-3.5" />
                 {t.analytics.title}
               </div>
-              <h1 className="mt-4 text-2xl font-bold text-text-primary lg:text-4xl">{t.analytics.title}</h1>
-              <p className="mt-3 text-sm leading-6 text-text-secondary lg:text-base">
+              <h1 className="mt-3 sm:mt-4 text-xl sm:text-2xl font-bold text-text-primary lg:text-4xl">{t.analytics.title}</h1>
+              <p className="mt-2 sm:mt-3 text-[13px] sm:text-sm leading-6 text-text-secondary lg:text-base">
                 {locale === 'tr'
                   ? `${periodLabel(range, locale)} için gelir, süreç kalitesi, dönüşüm motoru ve ekip performansını tek ekranda gör.`
                   : `Revenue, pipeline quality, conversion engine, and team performance for ${periodLabel(range, locale).toLowerCase()} on a single screen.`}
@@ -409,9 +409,9 @@ export default function AnalyticsPage() {
         <Badge variant="default" className="ml-auto">{periodLabel(range, locale)}</Badge>
       </motion.div>
 
-      <motion.div variants={item} className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <motion.div variants={item} className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
         {isInitialLoading && Array.from({ length: 6 }).map((_, index) => (
-          <Skeleton key={`kpi-skeleton-${index}`} className="h-[148px]" />
+          <Skeleton key={`kpi-skeleton-${index}`} className="h-[128px] sm:h-[148px]" />
         ))}
         {!isInitialLoading && kpis.map((kpi) => {
           const Icon = kpi.icon
@@ -422,7 +422,7 @@ export default function AnalyticsPage() {
               ? 'text-success'
               : 'text-error'
           return (
-            <div key={kpi.label} className="rounded-2xl border border-border bg-card p-4">
+            <div key={kpi.label} className="rounded-2xl border border-border bg-card p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2">
                 <Icon className="h-4 w-4 text-text-tertiary" />
                 <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${trendClass}`}>
@@ -430,8 +430,8 @@ export default function AnalyticsPage() {
                   {kpi.delta.value}
                 </span>
               </div>
-              <p className="mt-3 text-2xl font-bold text-text-primary">{kpi.value}</p>
-              <p className="mt-1 text-xs text-text-tertiary">{kpi.label}</p>
+              <p className="mt-2 sm:mt-3 text-xl sm:text-2xl font-bold text-text-primary truncate">{kpi.value}</p>
+              <p className="mt-1 text-[11px] sm:text-xs text-text-tertiary line-clamp-2 leading-tight">{kpi.label}</p>
               <div className="mt-2 h-[28px]">
                 <Sparkline data={kpi.sparkData} color={kpi.sparkColor} gradientId={kpi.sparkId} height={28} />
               </div>
@@ -471,9 +471,9 @@ export default function AnalyticsPage() {
                 <Badge variant="warning" dot>{locale === 'tr' ? 'Sunum' : 'Presentations'}</Badge>
               </div>
             </CardHeader>
-            <div className="h-[320px]">
+            <div className="h-[240px] sm:h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendSeries}>
+                <AreaChart data={trendSeries} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
                   <defs>
                     <linearGradient id="analyticsContacts" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#00d4ff" stopOpacity={0.26} />
@@ -489,8 +489,8 @@ export default function AnalyticsPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.08)" />
-                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} interval="preserveStartEnd" minTickGap={20} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} width={28} />
                   <Tooltip content={CustomTooltip} />
                   <Area type="monotone" dataKey="contacts" name={locale === 'tr' ? 'Yeni aday' : 'New prospects'} stroke="#00d4ff" fill="url(#analyticsContacts)" strokeWidth={2.4} />
                   <Area type="monotone" dataKey="touches" name={locale === 'tr' ? 'Temas' : 'Touches'} stroke="#8b5cf6" fill="url(#analyticsTouches)" strokeWidth={2.2} />
@@ -632,23 +632,23 @@ export default function AnalyticsPage() {
                 return { ...step, pct, dropFromPrev }
               })
               .map((step, index) => (
-                <div key={step.stage} className="rounded-2xl border border-border-subtle bg-surface/35 p-3">
-                  <div className="flex items-center gap-4">
-                    <div className="w-28 shrink-0 text-xs font-semibold text-text-secondary">{step.stage}</div>
-                    <div className="relative h-9 flex-1 overflow-hidden rounded-2xl bg-background/70">
+                <div key={step.stage} className="rounded-2xl border border-border-subtle bg-surface/35 p-2.5 sm:p-3">
+                  <div className="flex items-center gap-2 sm:gap-4">
+                    <div className="w-20 sm:w-28 shrink-0 text-[11px] sm:text-xs font-semibold text-text-secondary line-clamp-2 leading-tight">{step.stage}</div>
+                    <div className="relative h-8 sm:h-9 flex-1 overflow-hidden rounded-xl sm:rounded-2xl bg-background/70">
                       <motion.div
-                        className="h-full rounded-2xl"
+                        className="h-full rounded-xl sm:rounded-2xl"
                         style={{ backgroundColor: step.color }}
                         initial={{ width: 0 }}
                         animate={{ width: `${Math.max(step.pct, step.value > 0 ? 8 : 0)}%` }}
                         transition={{ duration: 0.8, delay: index * 0.08 }}
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-text-primary">{step.value}</span>
+                      <span className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-[11px] sm:text-xs font-semibold text-text-primary">{step.value}</span>
                     </div>
-                    <div className="w-16 text-right text-xs font-semibold text-text-primary">%{step.pct}</div>
+                    <div className="w-10 sm:w-16 text-right text-[11px] sm:text-xs font-semibold text-text-primary">%{step.pct}</div>
                   </div>
                   {step.dropFromPrev !== null && step.dropFromPrev > 0 && (
-                    <p className="mt-2 pl-[132px] text-[10px] text-text-tertiary">
+                    <p className="mt-1.5 sm:mt-2 pl-[92px] sm:pl-[132px] text-[10px] text-text-tertiary">
                       ↓ {step.dropFromPrev} {locale === 'tr' ? 'kişi önceki aşamadan devam etmedi' : 'dropped from previous stage'}
                     </p>
                   )}

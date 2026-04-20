@@ -36,32 +36,32 @@ export function EventPerformance({ rows }: EventPerformanceProps) {
       ) : (
         <div className="space-y-3">
           {rows.map((row) => (
-            <div key={row.id} className="rounded-2xl border border-border-subtle bg-surface/35 p-4">
+            <div key={row.id} className="rounded-2xl border border-border-subtle bg-surface/35 p-3 sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-text-primary">{row.title}</p>
-                  <p className="mt-0.5 text-[11px] text-text-tertiary">
+                <div className="min-w-0 w-full sm:w-auto sm:flex-1">
+                  <p className="truncate text-[13px] sm:text-sm font-semibold text-text-primary">{row.title}</p>
+                  <p className="mt-0.5 text-[10px] sm:text-[11px] text-text-tertiary leading-snug">
                     {new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-US', {
                       day: 'numeric',
                       month: 'short',
                       year: 'numeric',
                     }).format(row.startDate)}
                     {' · '}
-                    {row.invited} {locale === 'tr' ? 'davet' : 'invited'}
+                    {row.invited} {locale === 'tr' ? 'davet' : 'inv.'}
                     {' · '}
-                    {row.confirmed} {locale === 'tr' ? 'onaylı' : 'confirmed'}
+                    {row.confirmed} {locale === 'tr' ? 'onaylı' : 'conf.'}
                     {' · '}
-                    {row.attended} {locale === 'tr' ? 'katıldı' : 'attended'}
+                    {row.attended} {locale === 'tr' ? 'katıldı' : 'att.'}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {row.fillRate !== null && <Badge variant="primary">%{row.fillRate} {locale === 'tr' ? 'doluluk' : 'fill'}</Badge>}
                   {row.showRate !== null && <Badge variant="secondary">%{row.showRate} {locale === 'tr' ? 'katılım' : 'show'}</Badge>}
-                  {row.conversionRate !== null && <Badge variant="success">%{row.conversionRate} {locale === 'tr' ? 'dönüşüm' : 'conversion'}</Badge>}
+                  {row.conversionRate !== null && <Badge variant="success">%{row.conversionRate} {locale === 'tr' ? 'dönüşüm' : 'conv.'}</Badge>}
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-1.5 text-[10px] text-text-tertiary">
+              <div className="mt-2.5 sm:mt-3 grid grid-cols-3 gap-1.5 text-[10px] text-text-tertiary">
                 {[
                   { label: locale === 'tr' ? 'Doluluk' : 'Fill', value: row.fillRate ?? 0, color: '#00d4ff' },
                   { label: locale === 'tr' ? 'Katılım' : 'Show', value: row.showRate ?? 0, color: '#8b5cf6' },

@@ -273,31 +273,31 @@ export function ActionCalendarPanel({
   ]
 
   return (
-    <Card className="overflow-hidden">
-      <div className="rounded-3xl border border-primary/10 bg-[radial-gradient(circle_at_top_left,rgba(0,212,255,0.10),transparent_30%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_26%)] p-5">
-        <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+    <Card className="overflow-hidden" padding="none">
+      <div className="rounded-3xl border border-primary/10 bg-[radial-gradient(circle_at_top_left,rgba(0,212,255,0.10),transparent_30%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_26%)] p-3 sm:p-5">
+        <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3 sm:gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">{labels.title}</p>
-            <h2 className="mt-2 text-2xl font-bold text-text-primary capitalize">{periodTitle}</h2>
-            <p className="mt-1 text-sm text-text-secondary">{labels.subtitle}</p>
+            <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">{labels.title}</p>
+            <h2 className="mt-1.5 sm:mt-2 text-xl sm:text-2xl font-bold text-text-primary capitalize">{periodTitle}</h2>
+            <p className="mt-1 text-xs sm:text-sm text-text-secondary">{labels.subtitle}</p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-start xl:justify-end gap-1.5 sm:gap-2">
             <div className="inline-flex items-center rounded-2xl border border-border bg-surface/35 p-1">
               <button
                 type="button"
                 onClick={() => setFocusDate((current) => shiftDate(current, viewMode, 'prev'))}
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="min-w-[144px] px-3 text-center text-sm font-semibold text-text-primary capitalize">
+              <span className="px-2 sm:px-3 sm:min-w-[144px] text-center text-xs sm:text-sm font-semibold text-text-primary capitalize whitespace-nowrap">
                 {periodTitle}
               </span>
               <button
                 type="button"
                 onClick={() => setFocusDate((current) => shiftDate(current, viewMode, 'next'))}
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -318,22 +318,22 @@ export function ActionCalendarPanel({
                   type="button"
                   onClick={() => setViewMode(key)}
                   className={cn(
-                    'px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5',
+                    'px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1 sm:gap-1.5',
                     viewMode === key
                       ? 'bg-primary text-obsidian'
                       : 'text-text-secondary hover:text-text-primary hover:bg-surface',
                   )}
                 >
                   <Icon className="w-3.5 h-3.5" />
-                  {label}
+                  <span className="hidden sm:inline">{label}</span>
                 </button>
               ))}
             </div>
 
-            <Button size="sm" variant="outline" onClick={onOpenEvents}>
+            <Button size="sm" variant="outline" onClick={onOpenEvents} className="hidden md:inline-flex">
               {labels.openEvents}
             </Button>
-            <Button size="sm" variant="outline" onClick={onOpenTasks}>
+            <Button size="sm" variant="outline" onClick={onOpenTasks} className="hidden md:inline-flex">
               {labels.openTasks}
             </Button>
             <Button size="sm" onClick={() => handleOpenCreateEvent(focusDate)}>
@@ -345,32 +345,33 @@ export function ActionCalendarPanel({
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="mt-4 sm:mt-5 grid grid-cols-3 gap-2 sm:gap-3">
           {[
             { label: labels.allActions, value: visibleEntries.length, Icon: Layers3 },
             { label: labels.todayEvents, value: todayEvents, Icon: CalendarClock },
             { label: labels.dueFollowUps, value: todayTasks, Icon: Bell },
           ].map(({ label, value, Icon }) => (
-            <div key={label} className="rounded-2xl border border-border bg-surface/35 px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/12 flex items-center justify-center text-primary">
-                  <Icon className="w-4 h-4" />
+            <div key={label} className="rounded-2xl border border-border bg-surface/35 px-2.5 sm:px-4 py-2.5 sm:py-3">
+              <div className="flex items-center justify-between gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/12 flex items-center justify-center text-primary shrink-0">
+                  <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
-                <p className="text-2xl font-bold text-text-primary kpi-number">{value}</p>
+                <p className="text-lg sm:text-2xl font-bold text-text-primary kpi-number">{value}</p>
               </div>
-              <p className="mt-3 text-sm text-text-secondary font-medium">{label}</p>
+              <p className="mt-2 sm:mt-3 text-[11px] sm:text-sm text-text-secondary font-medium line-clamp-2 leading-tight">{label}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="p-5">
+      <div className="p-3 sm:p-5">
         {viewMode === 'month' && (
           <div className="rounded-3xl border border-border overflow-hidden bg-surface/15">
             <div className="grid grid-cols-7 border-b border-border bg-surface/30">
               {weekdayLabels.map((label) => (
-                <div key={label} className="py-3 text-center text-xs font-semibold text-text-tertiary uppercase tracking-wide">
-                  {label}
+                <div key={label} className="py-2 sm:py-3 text-center text-[10px] sm:text-xs font-semibold text-text-tertiary uppercase tracking-wide">
+                  <span className="sm:hidden">{label.slice(0, 1)}</span>
+                  <span className="hidden sm:inline">{label}</span>
                 </div>
               ))}
             </div>
@@ -391,16 +392,16 @@ export function ActionCalendarPanel({
                     onDoubleClick={() => handleOpenCreate(day)}
                     onKeyDown={(event) => handleCellKeyDown(event, day)}
                     className={cn(
-                      'h-[178px] overflow-hidden border-r border-b border-border p-3 text-left align-top transition-colors last:border-r-0 cursor-pointer',
+                      'h-[72px] sm:h-[128px] md:h-[160px] xl:h-[178px] overflow-hidden border-r border-b border-border p-1.5 sm:p-2.5 md:p-3 text-left align-top transition-colors last:border-r-0 cursor-pointer',
                       isFocused && 'bg-primary/8 shadow-[inset_0_0_0_1px_rgba(0,212,255,0.18)]',
                       !isFocused && 'hover:bg-surface/30',
                       !isCurrentMonth && 'opacity-35',
                     )}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-1 sm:gap-2">
                       <span
                         className={cn(
-                          'w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold',
+                          'w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-semibold',
                           isToday ? 'bg-primary text-obsidian' : 'text-text-primary',
                         )}
                       >
@@ -413,30 +414,43 @@ export function ActionCalendarPanel({
                       )}
                     </div>
 
-                    <div className="mt-3 space-y-1.5 overflow-hidden">
-                      {dayEntries.slice(0, 3).map((entry) => (
-                        <button
-                          key={entry.id}
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleEntryOpen(entry)
-                          }}
-                          onDoubleClick={(event) => event.stopPropagation()}
-                          className={cn(
-                            'flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 text-[10px] font-medium text-left transition-colors hover:border-border',
-                            entryToneClasses(entry),
-                          )}
-                        >
-                          <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-80" />
-                          <span className="truncate">{entry.title}</span>
-                        </button>
-                      ))}
-                      {dayEntries.length > 3 && (
-                        <p className="text-[10px] text-text-tertiary px-1">
-                          +{dayEntries.length - 3} {labels.more}
-                        </p>
-                      )}
+                    <div className="mt-1.5 sm:mt-3 space-y-1 sm:space-y-1.5 overflow-hidden">
+                      <div className="sm:hidden flex flex-wrap gap-1">
+                        {dayEntries.slice(0, 3).map((entry) => (
+                          <span
+                            key={entry.id}
+                            className={cn(
+                              'inline-block h-1.5 w-1.5 rounded-full',
+                              entry.kind === 'event' ? 'bg-secondary' : entry.tone === 'warning' ? 'bg-warning' : 'bg-primary',
+                            )}
+                          />
+                        ))}
+                      </div>
+                      <div className="hidden sm:block space-y-1.5 overflow-hidden">
+                        {dayEntries.slice(0, 3).map((entry) => (
+                          <button
+                            key={entry.id}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleEntryOpen(entry)
+                            }}
+                            onDoubleClick={(event) => event.stopPropagation()}
+                            className={cn(
+                              'flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 text-[10px] font-medium text-left transition-colors hover:border-border',
+                              entryToneClasses(entry),
+                            )}
+                          >
+                            <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-80" />
+                            <span className="truncate">{entry.title}</span>
+                          </button>
+                        ))}
+                        {dayEntries.length > 3 && (
+                          <p className="text-[10px] text-text-tertiary px-1">
+                            +{dayEntries.length - 3} {labels.more}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )
@@ -447,161 +461,162 @@ export function ActionCalendarPanel({
 
         {viewMode === 'week' && (
           <div className="rounded-3xl border border-border overflow-hidden bg-surface/15">
-            <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b border-border bg-surface/30">
-              <div className="border-r border-border px-3 py-4 text-xs font-semibold uppercase tracking-wide text-text-tertiary">
-                {labels.time}
-              </div>
-              {weekDays.map((day) => {
-                const isToday = sameDay(day, today)
-                const isFocused = sameDay(day, focusDate)
-                const dayEntries = entriesByDay[dayKey(day)] ?? []
-
-                return (
-                  <button
-                    key={day.toISOString()}
-                    type="button"
-                    onClick={() => handleFocusDay(day)}
-                    onDoubleClick={() => handleOpenCreate(day)}
-                    className={cn(
-                      'border-r border-border px-3 py-3 text-left transition-colors last:border-r-0',
-                      isFocused ? 'bg-primary/10' : 'hover:bg-surface/35',
-                    )}
-                  >
-                    <p className="text-xs font-semibold uppercase tracking-wide text-text-tertiary">
-                      {day.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { weekday: 'short' })}
-                    </p>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className={cn(
-                        'inline-flex h-9 min-w-9 items-center justify-center rounded-full px-2 text-lg font-bold',
-                        isToday ? 'bg-primary text-obsidian' : 'text-text-primary',
-                      )}>
-                        {day.getDate()}
-                      </span>
-                      <Badge size="sm" variant="default">{dayEntries.length}</Badge>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b border-border bg-surface/10">
-              <div className="border-r border-border px-3 py-3 text-xs font-semibold uppercase tracking-wide text-text-tertiary">
-                Plan
-              </div>
-              {weekDays.map((day) => {
-                const allDayEntries = allDayEntriesForDay(day)
-
-                return (
-                  <div
-                    key={`${day.toISOString()}-all-day`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleFocusDay(day)}
-                    onDoubleClick={() => handleOpenCreate(day)}
-                    onKeyDown={(event) => handleCellKeyDown(event, day)}
-                    className="min-h-[88px] border-r border-border px-2 py-2 last:border-r-0"
-                  >
-                    <div className="space-y-1.5">
-                      {allDayEntries.slice(0, 2).map((entry) => (
-                        <button
-                          key={entry.id}
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleEntryOpen(entry)
-                          }}
-                          onDoubleClick={(event) => event.stopPropagation()}
-                          className={cn(
-                            'w-full cursor-pointer rounded-xl px-2.5 py-2 text-left text-[11px] font-medium transition-colors hover:border-border',
-                            entryToneClasses(entry),
-                          )}
-                        >
-                          <p className="truncate">{entry.title}</p>
-                        </button>
-                      ))}
-                      {allDayEntries.length > 2 && (
-                        <p className="px-1 text-[10px] text-text-tertiary">
-                          +{allDayEntries.length - 2} {labels.more}
-                        </p>
-                      )}
-                    </div>
+            <div className="overflow-x-auto">
+              <div className="min-w-[720px]">
+                <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] sm:grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b border-border bg-surface/30">
+                  <div className="border-r border-border px-2 sm:px-3 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-text-tertiary">
+                    {labels.time}
                   </div>
-                )
-              })}
-            </div>
+                  {weekDays.map((day) => {
+                    const isToday = sameDay(day, today)
+                    const isFocused = sameDay(day, focusDate)
+                    const dayEntries = entriesByDay[dayKey(day)] ?? []
 
-            <div className="flex max-h-[780px] overflow-auto">
-              <div className="w-[72px] shrink-0 border-r border-border bg-surface/20">
-                <div style={{ height: timeGridHeight }} className="relative">
-                  {CALENDAR_HOURS.map((hour) => (
-                    <div
-                      key={hour}
-                      className="absolute left-0 right-0 flex justify-end pr-3"
-                      style={{ top: (hour - CALENDAR_HOUR_START) * CALENDAR_HOUR_HEIGHT - 8 }}
-                    >
-                      <span className="text-[10px] text-text-tertiary">{formatHourLabel(hour)}</span>
-                    </div>
-                  ))}
+                    return (
+                      <button
+                        key={day.toISOString()}
+                        type="button"
+                        onClick={() => handleFocusDay(day)}
+                        onDoubleClick={() => handleOpenCreate(day)}
+                        className={cn(
+                          'border-r border-border px-2 sm:px-3 py-2 sm:py-3 text-left transition-colors last:border-r-0',
+                          isFocused ? 'bg-primary/10' : 'hover:bg-surface/35',
+                        )}
+                      >
+                        <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-text-tertiary">
+                          {day.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { weekday: 'short' })}
+                        </p>
+                        <div className="mt-1.5 sm:mt-2 flex items-center justify-between gap-1 sm:gap-2">
+                          <span className={cn(
+                            'inline-flex h-7 sm:h-9 min-w-7 sm:min-w-9 items-center justify-center rounded-full px-1.5 sm:px-2 text-sm sm:text-lg font-bold',
+                            isToday ? 'bg-primary text-obsidian' : 'text-text-primary',
+                          )}>
+                            {day.getDate()}
+                          </span>
+                          <Badge size="sm" variant="default">{dayEntries.length}</Badge>
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
-              </div>
 
-              <div className="grid min-w-[980px] flex-1 grid-cols-7">
-                {weekDays.map((day) => {
-                  const timedEntries = timedEntriesForDay(day)
-                  const isToday = sameDay(day, today)
-                  const nowTop = currentTimeIndicatorTop()
+                <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] sm:grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b border-border bg-surface/10">
+                  <div className="border-r border-border px-2 sm:px-3 py-2 sm:py-3 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-text-tertiary">
+                    Plan
+                  </div>
+                  {weekDays.map((day) => {
+                    const allDayEntries = allDayEntriesForDay(day)
 
-                  return (
-                    <div
-                      key={`${day.toISOString()}-timeline`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleFocusDay(day)}
-                      onDoubleClick={() => handleOpenCreate(day)}
-                      onKeyDown={(event) => handleCellKeyDown(event, day)}
-                      className="relative border-r border-border last:border-r-0"
-                      style={{ height: timeGridHeight }}
-                    >
+                    return (
+                      <div
+                        key={`${day.toISOString()}-all-day`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleFocusDay(day)}
+                        onDoubleClick={() => handleOpenCreate(day)}
+                        onKeyDown={(event) => handleCellKeyDown(event, day)}
+                        className="min-h-[72px] sm:min-h-[88px] border-r border-border px-1.5 sm:px-2 py-1.5 sm:py-2 last:border-r-0"
+                      >
+                        <div className="space-y-1 sm:space-y-1.5">
+                          {allDayEntries.slice(0, 2).map((entry) => (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleEntryOpen(entry)
+                              }}
+                              onDoubleClick={(event) => event.stopPropagation()}
+                              className={cn(
+                                'w-full cursor-pointer rounded-lg sm:rounded-xl px-1.5 sm:px-2.5 py-1.5 sm:py-2 text-left text-[10px] sm:text-[11px] font-medium transition-colors hover:border-border',
+                                entryToneClasses(entry),
+                              )}
+                            >
+                              <p className="truncate">{entry.title}</p>
+                            </button>
+                          ))}
+                          {allDayEntries.length > 2 && (
+                            <p className="px-1 text-[10px] text-text-tertiary">
+                              +{allDayEntries.length - 2} {labels.more}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="relative max-h-[560px] sm:max-h-[780px] overflow-y-auto">
+                  <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] sm:grid-cols-[72px_repeat(7,minmax(0,1fr))]" style={{ height: timeGridHeight }}>
+                    <div className="border-r border-border bg-surface/20 relative">
                       {CALENDAR_HOURS.map((hour) => (
                         <div
                           key={hour}
-                          className="absolute left-0 right-0 border-t border-border/50"
-                          style={{ top: (hour - CALENDAR_HOUR_START) * CALENDAR_HOUR_HEIGHT }}
-                        />
-                      ))}
-
-                      {isToday && nowTop >= 0 && nowTop <= timeGridHeight && (
-                        <div className="pointer-events-none absolute left-0 right-0 z-10 flex items-center" style={{ top: nowTop }}>
-                          <div className="h-2 w-2 shrink-0 rounded-full bg-error -ml-1" />
-                          <div className="flex-1 border-t-2 border-error" />
-                        </div>
-                      )}
-
-                      {timedEntries.map((entry) => (
-                        <button
-                          key={entry.id}
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleEntryOpen(entry)
-                          }}
-                          onDoubleClick={(event) => event.stopPropagation()}
-                          className={cn(
-                            'absolute left-2 right-2 z-20 overflow-hidden rounded-2xl border px-3 py-2 text-left shadow-[0_18px_32px_-24px_rgba(0,0,0,0.75)] cursor-pointer',
-                            entryToneClasses(entry),
-                          )}
-                          style={{
-                            top: timedEntryTop(entry),
-                            height: timedEntryHeight(entry),
-                          }}
+                          className="absolute left-0 right-0 flex justify-end pr-2 sm:pr-3"
+                          style={{ top: (hour - CALENDAR_HOUR_START) * CALENDAR_HOUR_HEIGHT - 8 }}
                         >
-                          <p className="truncate text-xs font-semibold">{entry.title}</p>
-                          <p className="mt-1 truncate text-[11px] opacity-80">{entry.meta}</p>
-                        </button>
+                          <span className="text-[10px] text-text-tertiary">{formatHourLabel(hour)}</span>
+                        </div>
                       ))}
                     </div>
-                  )
-                })}
+
+                    {weekDays.map((day) => {
+                      const timedEntries = timedEntriesForDay(day)
+                      const isToday = sameDay(day, today)
+                      const nowTop = currentTimeIndicatorTop()
+
+                      return (
+                        <div
+                          key={`${day.toISOString()}-timeline`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleFocusDay(day)}
+                          onDoubleClick={() => handleOpenCreate(day)}
+                          onKeyDown={(event) => handleCellKeyDown(event, day)}
+                          className="relative border-r border-border last:border-r-0"
+                        >
+                          {CALENDAR_HOURS.map((hour) => (
+                            <div
+                              key={hour}
+                              className="absolute left-0 right-0 border-t border-border/50"
+                              style={{ top: (hour - CALENDAR_HOUR_START) * CALENDAR_HOUR_HEIGHT }}
+                            />
+                          ))}
+
+                          {isToday && nowTop >= 0 && nowTop <= timeGridHeight && (
+                            <div className="pointer-events-none absolute left-0 right-0 z-10 flex items-center" style={{ top: nowTop }}>
+                              <div className="h-2 w-2 shrink-0 rounded-full bg-error -ml-1" />
+                              <div className="flex-1 border-t-2 border-error" />
+                            </div>
+                          )}
+
+                          {timedEntries.map((entry) => (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleEntryOpen(entry)
+                              }}
+                              onDoubleClick={(event) => event.stopPropagation()}
+                              className={cn(
+                                'absolute left-1 right-1 sm:left-2 sm:right-2 z-20 overflow-hidden rounded-xl sm:rounded-2xl border px-2 sm:px-3 py-1.5 sm:py-2 text-left shadow-[0_18px_32px_-24px_rgba(0,0,0,0.75)] cursor-pointer',
+                                entryToneClasses(entry),
+                              )}
+                              style={{
+                                top: timedEntryTop(entry),
+                                height: timedEntryHeight(entry),
+                              }}
+                            >
+                              <p className="truncate text-[11px] sm:text-xs font-semibold">{entry.title}</p>
+                              <p className="mt-0.5 sm:mt-1 truncate text-[10px] sm:text-[11px] opacity-80">{entry.meta}</p>
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -609,13 +624,13 @@ export function ActionCalendarPanel({
 
         {viewMode === 'day' && (
           <div className="rounded-3xl border border-border overflow-hidden bg-surface/15">
-            <div className="border-b border-border px-5 py-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-tertiary">
+            <div className="border-b border-border px-3 sm:px-5 py-3 sm:py-4">
+              <div className="flex items-center justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-text-tertiary">
                     {focusDate.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { weekday: 'long' })}
                   </p>
-                  <h3 className="mt-2 text-2xl font-bold text-text-primary capitalize">
+                  <h3 className="mt-1.5 sm:mt-2 text-lg sm:text-2xl font-bold text-text-primary capitalize truncate">
                     {focusDate.toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
                       day: 'numeric',
                       month: 'long',
@@ -623,7 +638,7 @@ export function ActionCalendarPanel({
                     })}
                   </h3>
                 </div>
-                <Badge size="md" variant="default">
+                <Badge size="md" variant="default" className="shrink-0">
                   {visibleEntries.length} {labels.focus}
                 </Badge>
               </div>
@@ -634,7 +649,7 @@ export function ActionCalendarPanel({
               tabIndex={0}
               onDoubleClick={() => handleOpenCreate(focusDate)}
               onKeyDown={(event) => handleCellKeyDown(event, focusDate)}
-              className="border-b border-border bg-surface/10 px-5 py-3"
+              className="border-b border-border bg-surface/10 px-3 sm:px-5 py-2.5 sm:py-3"
             >
               <div className="space-y-2">
                 {allDayEntriesForDay(focusDate).length > 0 ? (
@@ -648,14 +663,14 @@ export function ActionCalendarPanel({
                       }}
                       onDoubleClick={(event) => event.stopPropagation()}
                       className={cn(
-                        'w-full cursor-pointer rounded-2xl px-4 py-3 text-left transition-colors hover:border-border',
+                        'w-full cursor-pointer rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 text-left transition-colors hover:border-border',
                         entryToneClasses(entry),
                       )}
                     >
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center justify-between gap-2 sm:gap-3">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold">{entry.title}</p>
-                          <p className="mt-1 truncate text-xs opacity-75">{entry.meta}</p>
+                          <p className="truncate text-[13px] sm:text-sm font-semibold">{entry.title}</p>
+                          <p className="mt-0.5 sm:mt-1 truncate text-[11px] sm:text-xs opacity-75">{entry.meta}</p>
                         </div>
                         <Badge
                           variant={entry.kind === 'event' ? 'primary' : entry.tone === 'warning' ? 'warning' : 'default'}
@@ -667,20 +682,20 @@ export function ActionCalendarPanel({
                     </button>
                   ))
                 ) : (
-                  <p className="text-sm text-text-tertiary">
+                  <p className="text-xs sm:text-sm text-text-tertiary">
                     {labels.noAgenda}
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="flex max-h-[780px] overflow-auto">
-              <div className="w-[72px] shrink-0 border-r border-border bg-surface/20">
+            <div className="flex max-h-[560px] sm:max-h-[780px] overflow-auto">
+              <div className="w-[56px] sm:w-[72px] shrink-0 border-r border-border bg-surface/20">
                 <div style={{ height: timeGridHeight }} className="relative">
                   {CALENDAR_HOURS.map((hour) => (
                     <div
                       key={hour}
-                      className="absolute left-0 right-0 flex justify-end pr-3"
+                      className="absolute left-0 right-0 flex justify-end pr-2 sm:pr-3"
                       style={{ top: (hour - CALENDAR_HOUR_START) * CALENDAR_HOUR_HEIGHT - 8 }}
                     >
                       <span className="text-[10px] text-text-tertiary">{formatHourLabel(hour)}</span>
@@ -722,7 +737,7 @@ export function ActionCalendarPanel({
                     }}
                     onDoubleClick={(event) => event.stopPropagation()}
                     className={cn(
-                      'absolute left-3 right-3 z-20 overflow-hidden rounded-2xl border px-3 py-2 text-left shadow-[0_18px_32px_-24px_rgba(0,0,0,0.75)] cursor-pointer',
+                      'absolute left-2 right-2 sm:left-3 sm:right-3 z-20 overflow-hidden rounded-xl sm:rounded-2xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-left shadow-[0_18px_32px_-24px_rgba(0,0,0,0.75)] cursor-pointer',
                       entryToneClasses(entry),
                     )}
                     style={{
@@ -730,8 +745,8 @@ export function ActionCalendarPanel({
                       height: timedEntryHeight(entry),
                     }}
                   >
-                    <p className="truncate text-sm font-semibold">{entry.title}</p>
-                    <p className="mt-1 truncate text-xs opacity-80">{entry.meta}</p>
+                    <p className="truncate text-[13px] sm:text-sm font-semibold">{entry.title}</p>
+                    <p className="mt-0.5 sm:mt-1 truncate text-[11px] sm:text-xs opacity-80">{entry.meta}</p>
                   </button>
                 ))}
               </div>
