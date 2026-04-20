@@ -23,15 +23,33 @@ export type PipelineStage = (typeof PIPELINE_STAGE_OPTIONS)[number]
 
 export type AddContactForm = {
   full_name: string
+  nickname: string
   phone: string
+  whatsapp_username: string
   email: string
+  telegram_username: string
+  instagram_username: string
   location: string
   profession: string
-  temperature: 'cold' | 'warm' | 'hot' | 'frozen'
+  relationship_type: string
+  birthday: string
+  family_notes: string
+  temperature_score: number
   interest_type: 'unknown' | 'product' | 'business' | 'both'
   source: string
-  notes: string
   pipeline_stage: PipelineStage
+  interests: string
+  pain_points: string
+  goalsComma: string
+  notes: string
+  tagsComma: string
+}
+
+export function parseCommaTags(value: string) {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 export type InteractionFormValues = {

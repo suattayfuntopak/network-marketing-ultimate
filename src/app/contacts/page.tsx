@@ -1,7 +1,8 @@
 'use client'
 
 import { type FormEvent, useMemo, useRef, useState } from 'react'
-import { endOfWeek, isWithinInterval, startOfWeek } from 'date-fns'
+import { endOfWeek, formatDistanceToNow, isWithinInterval, startOfWeek } from 'date-fns'
+import { enUS, tr as trLocale } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -11,7 +12,9 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
+import { ContactChannelRow } from '@/components/contacts/ContactChannelRow'
 import { ContactCreateModal } from '@/components/contacts/ContactCreateModal'
+import { ContactWarmthBar } from '@/components/contacts/ContactWarmthBar'
 import { InteractionModal } from '@/components/contacts/InteractionModal'
 import { ContactTaskModal } from '@/components/contacts/ContactTaskModal'
 import {
@@ -23,6 +26,7 @@ import {
   TASK_PRIORITY_VARIANTS,
   TASK_TYPE_LABELS,
   channelLabel,
+  parseCommaTags,
   stageMeta,
   type AddContactForm,
   type ContactTaskFormValues,
@@ -49,9 +53,9 @@ import {
   CalendarDays,
   CalendarRange,
   CheckCircle2,
-  ChevronRight,
   Clock,
   Contact,
+  MoreVertical,
   Download,
   Flame,
   LayoutGrid,
@@ -59,7 +63,6 @@ import {
   ListChecks,
   Mail,
   MapPin,
-  MessageCircle,
   MessageSquareText,
   Phone,
   Plus,
@@ -79,19 +82,30 @@ type SegmentKey = (typeof validSegments)[number]
 function createEmptyForm(segment: SegmentKey): AddContactForm {
   return {
     full_name: '',
+    nickname: '',
     phone: '',
+    whatsapp_username: '',
     email: '',
+    telegram_username: '',
+    instagram_username: '',
     location: '',
     profession: '',
-    temperature: 'cold',
+    relationship_type: '',
+    birthday: '',
+    family_notes: '',
+    temperature_score: 50,
     interest_type: 'unknown',
     source: '',
-    notes: '',
     pipeline_stage: segment === 'customers'
       ? 'became_customer'
       : segment === 'team'
         ? 'became_member'
         : 'new',
+    interests: '',
+    pain_points: '',
+    goalsComma: '',
+    notes: '',
+    tagsComma: '',
   }
 }
 
@@ -191,39 +205,30 @@ function parseCsvRecords(text: string): string[][] {
   return rows
 }
 
-function ChannelButtons({ contact }: { contact: ContactRow }) {
-  const phoneDigits = contact.phone?.replace(/\D/g, '') ?? ''
+const TAG_PASTEL_CLASSES = [
+  'bg-fuchsia-500/[0.14] text-fuchsia-100/90 border-fuchsia-400/25',
+  'bg-cyan-500/[0.14] text-cyan-100/90 border-cyan-400/25',
+  'bg-amber-500/[0.14] text-amber-100/90 border-amber-400/25',
+  'bg-emerald-500/[0.14] text-emerald-100/90 border-emerald-400/25',
+  'bg-violet-500/[0.14] text-violet-100/90 border-violet-400/25',
+  'bg-sky-500/[0.14] text-sky-100/90 border-sky-400/25',
+  'bg-rose-500/[0.14] text-rose-100/90 border-rose-400/25',
+]
 
-  return (
-    <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
-      {contact.phone && (
-        <>
-          <a
-            href={`tel:${contact.phone}`}
-            className="w-8 h-8 rounded-lg border border-border-subtle bg-surface/50 flex items-center justify-center text-text-secondary hover:text-primary"
-          >
-            <Phone className="w-3.5 h-3.5" />
-          </a>
-          <a
-            href={`https://wa.me/${phoneDigits}`}
-            target="_blank"
-            rel="noreferrer"
-            className="w-8 h-8 rounded-lg border border-border-subtle bg-surface/50 flex items-center justify-center text-text-secondary hover:text-success"
-          >
-            <MessageCircle className="w-3.5 h-3.5" />
-          </a>
-        </>
-      )}
-      {contact.email && (
-        <a
-          href={`mailto:${contact.email}`}
-          className="w-8 h-8 rounded-lg border border-border-subtle bg-surface/50 flex items-center justify-center text-text-secondary hover:text-primary"
-        >
-          <Mail className="w-3.5 h-3.5" />
-        </a>
-      )}
-    </div>
-  )
+function tagSurfaceClass(index: number) {
+  return TAG_PASTEL_CLASSES[index % TAG_PASTEL_CLASSES.length]
+}
+
+function lastTouchLabel(iso: string | null | undefined, locale: 'tr' | 'en') {
+  if (!iso) return '—'
+  try {
+    return formatDistanceToNow(new Date(iso), {
+      addSuffix: true,
+      locale: locale === 'tr' ? trLocale : enUS,
+    })
+  } catch {
+    return '—'
+  }
 }
 
 export default function ContactsPage() {
@@ -255,6 +260,7 @@ export default function ContactsPage() {
   const [importMessage, setImportMessage] = useState('')
   const [interactionError, setInteractionError] = useState('')
   const [taskError, setTaskError] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
 
   const { data: contacts = [], isLoading } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -277,19 +283,36 @@ export default function ContactsPage() {
     t.interest?.[value as keyof typeof t.interest] ?? value
 
   const addMutation = useMutation({
-    mutationFn: (values: AddContactForm) =>
-      addContact(currentUser!.id, {
-        full_name: values.full_name,
+    mutationFn: (values: AddContactForm) => {
+      const goalsBlock = values.goalsComma.trim()
+      const notesBlock = values.notes.trim()
+      const goals_notes =
+        goalsBlock && notesBlock
+          ? `${goalsBlock}\n\n${notesBlock}`
+          : goalsBlock || notesBlock || undefined
+      return addContact(currentUser!.id, {
+        full_name: values.full_name.trim(),
+        nickname: values.nickname || undefined,
         phone: values.phone || undefined,
+        whatsapp_username: values.whatsapp_username || undefined,
         email: values.email || undefined,
+        telegram_username: values.telegram_username || undefined,
+        instagram_username: values.instagram_username || undefined,
         location: values.location || undefined,
         profession: values.profession || undefined,
-        temperature: values.temperature,
+        relationship_type: values.relationship_type || undefined,
+        birthday: values.birthday || undefined,
+        family_notes: values.family_notes || undefined,
+        interests: values.interests || undefined,
+        pain_points: values.pain_points || undefined,
+        goals_notes,
+        tags: parseCommaTags(values.tagsComma),
+        temperature_score: values.temperature_score,
         interest_type: values.interest_type,
         source: values.source || undefined,
-        notes: values.notes || undefined,
         pipeline_stage: values.pipeline_stage,
-      }),
+      })
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contacts'] })
       closeAddModal()
@@ -471,7 +494,26 @@ export default function ContactsPage() {
   }, [contactStats, currentLocale])
 
   const filteredContacts = useMemo(() => {
-    return contacts.filter((contact) => {
+    const needle = search.trim().toLowerCase()
+    const haystack = (contact: ContactRow) => {
+      if (!needle) return true
+      const tagsJoined = (contact.tags ?? []).join(' ').toLowerCase()
+      return (
+        contact.full_name.toLowerCase().includes(needle) ||
+        (contact.nickname?.toLowerCase().includes(needle) ?? false) ||
+        (contact.email?.toLowerCase().includes(needle) ?? false) ||
+        (contact.phone?.toLowerCase().includes(needle) ?? false) ||
+        (contact.whatsapp_username?.toLowerCase().includes(needle) ?? false) ||
+        (contact.telegram_username?.toLowerCase().includes(needle) ?? false) ||
+        (contact.instagram_username?.toLowerCase().includes(needle) ?? false) ||
+        (contact.location?.toLowerCase().includes(needle) ?? false) ||
+        (contact.profession?.toLowerCase().includes(needle) ?? false) ||
+        tagsJoined.includes(needle) ||
+        (contact.interests?.toLowerCase().includes(needle) ?? false)
+      )
+    }
+
+    const filtered = contacts.filter((contact) => {
       const matchesSegment = (() => {
         switch (activeSegment) {
           case 'prospects':
@@ -489,20 +531,36 @@ export default function ContactsPage() {
         }
       })()
 
-      const matchesSearch =
-        !search ||
-        contact.full_name.toLowerCase().includes(search.toLowerCase()) ||
-        contact.email?.toLowerCase().includes(search.toLowerCase()) ||
-        contact.phone?.includes(search) ||
-        contact.location?.toLowerCase().includes(search.toLowerCase()) ||
-        contact.profession?.toLowerCase().includes(search.toLowerCase())
-
       const matchesStage = selectedStage === 'all' || contact.pipeline_stage === selectedStage
       const matchesTemperature = selectedTemperature === 'all' || contact.temperature === selectedTemperature
 
-      return matchesSegment && matchesSearch && matchesStage && matchesTemperature
+      return matchesSegment && haystack(contact) && matchesStage && matchesTemperature
     })
+
+    return filtered.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )
   }, [activeSegment, contacts, search, selectedStage, selectedTemperature, todayKey])
+
+  const allFilteredSelected =
+    filteredContacts.length > 0 && filteredContacts.every((contact) => selectedIds.has(contact.id))
+
+  function toggleSelectAllFiltered() {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set())
+      return
+    }
+    setSelectedIds(new Set(filteredContacts.map((contact) => contact.id)))
+  }
+
+  function toggleRowSelected(contactId: string) {
+    setSelectedIds((previous) => {
+      const next = new Set(previous)
+      if (next.has(contactId)) next.delete(contactId)
+      else next.add(contactId)
+      return next
+    })
+  }
 
   const selected = selectedId ? contacts.find((contact) => contact.id === selectedId) ?? null : null
   const openTasks = contactTasks.filter((task) => task.status !== 'completed' && task.status !== 'skipped')
@@ -538,32 +596,54 @@ export default function ContactsPage() {
   function exportContacts() {
     const headers = [
       'full_name',
+      'nickname',
       'phone',
+      'whatsapp_username',
+      'telegram_username',
+      'instagram_username',
       'email',
       'profession',
       'location',
+      'relationship_type',
+      'birthday',
+      'interests',
+      'pain_points',
       'temperature',
+      'temperature_score',
       'interest_type',
       'source',
       'pipeline_stage',
+      'tags',
       'last_contact_date',
       'next_follow_up_date',
-      'notes',
+      'goals_notes',
+      'family_notes',
     ]
 
     const rows = filteredContacts.map((contact) => ([
       contact.full_name,
+      contact.nickname ?? '',
       contact.phone ?? '',
+      contact.whatsapp_username ?? '',
+      contact.telegram_username ?? '',
+      contact.instagram_username ?? '',
       contact.email ?? '',
       contact.profession ?? '',
       contact.location ?? '',
+      contact.relationship_type ?? '',
+      contact.birthday ?? '',
+      contact.interests ?? '',
+      contact.pain_points ?? '',
       contact.temperature,
+      String(contact.temperature_score ?? ''),
       contact.interest_type,
       contact.source ?? '',
       contact.pipeline_stage,
+      (contact.tags ?? []).join(', '),
       contact.last_contact_date ?? '',
       contact.next_follow_up_date ?? '',
       contact.goals_notes ?? '',
+      contact.family_notes ?? '',
     ]))
 
     const csv = [headers, ...rows]
@@ -612,16 +692,35 @@ export default function ContactsPage() {
       }
 
       for (const row of importedRows) {
+        const scoreRaw = row.temperature_score?.trim()
+        const parsedScore = scoreRaw !== undefined && scoreRaw !== '' ? Number(scoreRaw) : undefined
+        const goalsBlock = (row.goals ?? row.goals_comma ?? '').trim()
+        const notesBlock = (row.notes ?? '').trim()
+        const goals_notes =
+          goalsBlock && notesBlock
+            ? `${goalsBlock}\n\n${notesBlock}`
+            : goalsBlock || notesBlock || undefined
         await addContact(currentUser.id, {
           full_name: row.full_name.trim(),
           phone: row.phone || undefined,
           email: row.email || undefined,
           profession: row.profession || undefined,
           location: row.location || undefined,
-          temperature: (row.temperature as AddContactForm['temperature']) || 'cold',
+          nickname: row.nickname || undefined,
+          whatsapp_username: row.whatsapp_username || row.whatsapp || undefined,
+          telegram_username: row.telegram_username || row.telegram || undefined,
+          instagram_username: row.instagram_username || row.instagram || undefined,
+          relationship_type: row.relationship_type || undefined,
+          birthday: row.birthday || undefined,
+          family_notes: row.family_notes || undefined,
+          interests: row.interests || undefined,
+          pain_points: row.pain_points || undefined,
+          goals_notes,
+          tags: row.tags ? parseCommaTags(row.tags) : undefined,
+          temperature: (row.temperature as ContactRow['temperature']) || undefined,
+          temperature_score: Number.isFinite(parsedScore) ? parsedScore : undefined,
           interest_type: (row.interest_type as AddContactForm['interest_type']) || 'unknown',
           source: row.source || undefined,
-          notes: row.notes || undefined,
           pipeline_stage: row.pipeline_stage || undefined,
         })
       }
@@ -1145,7 +1244,11 @@ export default function ContactsPage() {
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder={currentLocale === 'tr' ? 'Ad, telefon, email, konum ara...' : 'Search name, phone, email, location...'}
+                  placeholder={
+                    currentLocale === 'tr'
+                      ? 'Ad, takma ad, telefon, kanal, etiket ara...'
+                      : 'Search name, nickname, phone, channels, tags...'
+                  }
                   className="w-full h-11 rounded-xl border border-border bg-surface pl-4 pr-4 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-primary/30"
                 />
               </div>
@@ -1205,52 +1308,111 @@ export default function ContactsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border bg-surface/40">
-                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Kontak' : 'Contact'}</th>
+                      <th className="w-10 px-2 py-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={allFilteredSelected}
+                          onChange={toggleSelectAllFiltered}
+                          onClick={(event) => event.stopPropagation()}
+                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40"
+                          aria-label={currentLocale === 'tr' ? 'Tümünü seç' : 'Select all'}
+                        />
+                      </th>
+                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'İsim' : 'Name'}</th>
                       <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Kanallar' : 'Channels'}</th>
                       <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Aşama' : 'Stage'}</th>
                       <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Sıcaklık' : 'Warmth'}</th>
-                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'İlgi' : 'Interest'}</th>
-                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Son Temas' : 'Last Touch'}</th>
-                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Sonraki Takip' : 'Next Follow-up'}</th>
-                      <th className="px-4 py-3 text-right text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Detay' : 'Open'}</th>
+                      <th className="px-4 py-3 text-left text-text-tertiary font-medium min-w-[140px]">
+                        {currentLocale === 'tr' ? 'Etiketler' : 'Tags'}
+                      </th>
+                      <th className="px-4 py-3 text-left text-text-tertiary font-medium whitespace-nowrap">
+                        {currentLocale === 'tr' ? 'Son Temas' : 'Last touch'}
+                      </th>
+                      <th className="w-12 px-2 py-3 text-right text-text-tertiary font-medium" aria-hidden />
                     </tr>
                   </thead>
                   <tbody>
                     {filteredContacts.map((contact) => {
                       const stage = stageMeta(contact.pipeline_stage)
+                      const tags = contact.tags ?? []
                       return (
                         <tr
                           key={contact.id}
                           onClick={() => openContactDetail(contact.id)}
                           className="border-b border-border last:border-0 hover:bg-surface/30 cursor-pointer transition-colors"
                         >
-                          <td className="px-4 py-4 min-w-[260px]">
+                          <td className="px-2 py-4 align-middle" onClick={(event) => event.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(contact.id)}
+                              onChange={() => toggleRowSelected(contact.id)}
+                              className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40"
+                              aria-label={currentLocale === 'tr' ? 'Satırı seç' : 'Select row'}
+                            />
+                          </td>
+                          <td className="px-4 py-4 min-w-[220px]">
                             <div className="flex items-center gap-3">
                               <Avatar name={contact.full_name} size="sm" />
-                              <div>
-                                <p className="font-semibold text-text-primary">{contact.full_name}</p>
-                                <p className="text-xs text-text-tertiary">
-                                  {[contact.profession, contact.location].filter(Boolean).join(' · ') || (currentLocale === 'tr' ? 'Kontak kaydı' : 'Contact record')}
+                              <div className="min-w-0">
+                                <p className="font-semibold text-text-primary truncate">{contact.full_name}</p>
+                                <p className="text-xs text-text-tertiary truncate">
+                                  {(() => {
+                                    const meta = [contact.profession, contact.location].filter(Boolean).join(' · ')
+                                    const nick = contact.nickname?.trim()
+                                    if (nick) return meta ? `${nick} · ${meta}` : nick
+                                    return meta || (currentLocale === 'tr' ? 'Kontak kaydı' : 'Contact record')
+                                  })()}
                                 </p>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-4"><ChannelButtons contact={contact} /></td>
-                          <td className="px-4 py-4">
-                            <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold', stage.className)}>
+                          <td className="px-4 py-4 align-middle">
+                            <ContactChannelRow contact={contact} />
+                          </td>
+                          <td className="px-4 py-4 align-middle">
+                            <span
+                              className={cn(
+                                'inline-flex max-w-[11rem] items-center rounded-full border px-2.5 py-1 text-xs font-semibold truncate',
+                                stage.className,
+                              )}
+                            >
                               {stage[currentLocale]}
                             </span>
                           </td>
-                          <td className="px-4 py-4 min-w-[170px]">
-                            <TemperatureBadge temperature={contact.temperature} score={contact.temperature_score} />
+                          <td className="px-4 py-4 align-middle">
+                            <ContactWarmthBar score={contact.temperature_score} />
                           </td>
-                          <td className="px-4 py-4 text-text-secondary">{interestLabel(contact.interest_type)}</td>
-                          <td className="px-4 py-4 text-text-secondary">{formatDate(contact.last_contact_date, currentLocale)}</td>
-                          <td className="px-4 py-4 text-text-secondary">{formatDate(contact.next_follow_up_date, currentLocale)}</td>
-                          <td className="px-4 py-4 text-right">
-                            <span className="inline-flex w-8 h-8 rounded-lg border border-border-subtle bg-surface/50 items-center justify-center text-text-secondary">
-                              <ChevronRight className="w-4 h-4" />
-                            </span>
+                          <td className="px-4 py-4 align-middle">
+                            {tags.length === 0 ? (
+                              <span className="text-xs text-text-muted">—</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {tags.map((tag, index) => (
+                                  <span
+                                    key={`${contact.id}-${tag}`}
+                                    className={cn(
+                                      'inline-flex max-w-[7rem] truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                      tagSurfaceClass(index),
+                                    )}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-xs text-text-secondary whitespace-nowrap">
+                            {lastTouchLabel(contact.last_contact_date, currentLocale)}
+                          </td>
+                          <td className="px-2 py-4 text-right align-middle" onClick={(event) => event.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => openContactDetail(contact.id)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border-subtle bg-surface/50 text-text-secondary transition-colors hover:border-primary/25 hover:bg-primary/5 hover:text-primary"
+                              aria-label={currentLocale === 'tr' ? 'Menü' : 'Menu'}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
                           </td>
                         </tr>
                       )
@@ -1280,9 +1442,9 @@ export default function ContactsPage() {
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 mb-4">
-                      <ChannelButtons contact={contact} />
-                      <TemperatureBadge temperature={contact.temperature} score={contact.temperature_score} />
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                      <ContactChannelRow contact={contact} />
+                      <ContactWarmthBar score={contact.temperature_score} className="max-w-[10rem]" />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 text-xs">
@@ -1291,10 +1453,25 @@ export default function ContactsPage() {
                         <p className="text-text-primary mt-1">{interestLabel(contact.interest_type)}</p>
                       </div>
                       <div>
-                        <p className="text-text-tertiary">{currentLocale === 'tr' ? 'Sonraki Takip' : 'Next Follow-up'}</p>
-                        <p className="text-text-primary mt-1">{formatDate(contact.next_follow_up_date, currentLocale)}</p>
+                        <p className="text-text-tertiary">{currentLocale === 'tr' ? 'Son temas' : 'Last touch'}</p>
+                        <p className="text-text-primary mt-1">{lastTouchLabel(contact.last_contact_date, currentLocale)}</p>
                       </div>
                     </div>
+                    {(contact.tags ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {(contact.tags ?? []).map((tag, index) => (
+                          <span
+                            key={`${contact.id}-card-${tag}`}
+                            className={cn(
+                              'inline-flex max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                              tagSurfaceClass(index),
+                            )}
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </Card>
                 )
               })}
@@ -1306,6 +1483,7 @@ export default function ContactsPage() {
       <AnimatePresence>
         {(showAdd || routeModalOpen) && (
           <ContactCreateModal
+            open={showAdd || routeModalOpen}
             currentLocale={currentLocale}
             form={form}
             setForm={setForm}

@@ -134,34 +134,106 @@ export async function fetchContacts(): Promise<ContactRow[]> {
   return (data ?? []) as ContactRow[]
 }
 
-export async function addContact(
-  userId: string,
-  input: {
-    full_name: string
-    phone?: string
-    email?: string
-    location?: string
-    profession?: string
-    temperature?: 'cold' | 'warm' | 'hot' | 'frozen'
-    interest_type?: 'product' | 'business' | 'both' | 'unknown'
-    source?: string
-    notes?: string
-    pipeline_stage?: string
+function clampTemperatureScore(value: number) {
+  if (Number.isNaN(value)) return 50
+  return Math.min(100, Math.max(0, Math.round(value)))
+}
+
+function temperatureToDefaultScore(temperature: ContactRow['temperature']) {
+  switch (temperature) {
+    case 'frozen':
+      return 12
+    case 'cold':
+      return 32
+    case 'warm':
+      return 56
+    case 'hot':
+      return 88
+    default:
+      return 40
   }
-): Promise<ContactRow> {
+}
+
+/** Maps 0–100 slider to legacy temperature enum for filters and badges. */
+export function temperatureFromScore(score: number): ContactRow['temperature'] {
+  const s = clampTemperatureScore(score)
+  if (s <= 20) return 'frozen'
+  if (s <= 40) return 'cold'
+  if (s <= 65) return 'warm'
+  return 'hot'
+}
+
+function normalizeSocialHandle(value: string | null | undefined) {
+  const trimmed = value?.trim()
+  if (!trimmed) return null
+  return trimmed.replace(/^@+/, '')
+}
+
+function normalizeBirthday(value: string | null | undefined) {
+  const v = value?.trim()
+  if (!v) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+  return null
+}
+
+export type AddContactInput = {
+  full_name: string
+  phone?: string | null
+  email?: string | null
+  location?: string | null
+  profession?: string | null
+  nickname?: string | null
+  telegram_username?: string | null
+  instagram_username?: string | null
+  whatsapp_username?: string | null
+  interests?: string | null
+  pain_points?: string | null
+  relationship_type?: string | null
+  birthday?: string | null
+  family_notes?: string | null
+  goals_notes?: string | null
+  tags?: string[] | null
+  temperature?: ContactRow['temperature'] | null
+  temperature_score?: number | null
+  interest_type?: ContactRow['interest_type']
+  source?: string | null
+  pipeline_stage?: string | null
+}
+
+export async function addContact(userId: string, input: AddContactInput): Promise<ContactRow> {
+  const explicitTemperature = input.temperature ?? undefined
+  const hasScore = typeof input.temperature_score === 'number' && !Number.isNaN(input.temperature_score)
+  const score = hasScore
+    ? clampTemperatureScore(input.temperature_score!)
+    : temperatureToDefaultScore((explicitTemperature ?? 'cold') as ContactRow['temperature'])
+  const temperature = explicitTemperature ?? temperatureFromScore(score)
+
+  const tags = input.tags?.filter(Boolean) ?? []
+
   const { data, error } = await supabase
     .from('nmu_contacts')
     .insert({
       user_id: userId,
       full_name: input.full_name,
-      phone: input.phone ?? null,
-      email: input.email ?? null,
-      location: input.location ?? null,
-      profession: input.profession ?? null,
-      temperature: input.temperature ?? 'cold',
+      phone: input.phone?.trim() || null,
+      email: input.email?.trim() || null,
+      location: input.location?.trim() || null,
+      profession: input.profession?.trim() || null,
+      nickname: input.nickname?.trim() || null,
+      telegram_username: normalizeSocialHandle(input.telegram_username),
+      instagram_username: normalizeSocialHandle(input.instagram_username),
+      whatsapp_username: normalizeSocialHandle(input.whatsapp_username),
+      interests: input.interests?.trim() || null,
+      pain_points: input.pain_points?.trim() || null,
+      relationship_type: input.relationship_type?.trim() || null,
+      birthday: normalizeBirthday(input.birthday ?? undefined),
+      family_notes: input.family_notes?.trim() || null,
+      goals_notes: input.goals_notes?.trim() || null,
+      tags,
+      temperature,
+      temperature_score: score,
       interest_type: input.interest_type ?? 'unknown',
-      source: input.source ?? '',
-      goals_notes: input.notes ?? null,
+      source: (input.source?.trim() ?? '') || '',
       pipeline_stage: input.pipeline_stage ?? 'new',
     })
     .select()

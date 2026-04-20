@@ -103,6 +103,13 @@ export interface Database {
           referred_by: string | null
           birthday: string | null
           profession: string | null
+          nickname: string | null
+          telegram_username: string | null
+          instagram_username: string | null
+          whatsapp_username: string | null
+          interests: string | null
+          pain_points: string | null
+          relationship_type: string | null
           family_notes: string | null
           goals_notes: string | null
           objection_tags: string[]
@@ -132,6 +139,13 @@ export interface Database {
           referred_by?: string | null
           birthday?: string | null
           profession?: string | null
+          nickname?: string | null
+          telegram_username?: string | null
+          instagram_username?: string | null
+          whatsapp_username?: string | null
+          interests?: string | null
+          pain_points?: string | null
+          relationship_type?: string | null
           family_notes?: string | null
           goals_notes?: string | null
           objection_tags?: string[]
