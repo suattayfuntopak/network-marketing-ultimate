@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Modal } from '@/components/ui/Modal'
 import { stageMeta } from '@/components/contacts/contactLabels'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { usePersistentState } from '@/hooks/usePersistentState'
@@ -20,9 +21,10 @@ import {
   type MessageTemplateRecord,
   type QueuedMessageDraftPreset,
 } from './AIMessageGeneratorModal'
-import { Search, Sparkles, Users, UserCheck, HandCoins } from 'lucide-react'
+import { Search, Sparkles, Users, UserCheck, HandCoins, AlarmClockCheck, Flame, TimerOff, Save, Copy } from 'lucide-react'
 
-type SegmentKey = 'all' | 'team' | 'customers'
+type SegmentKey = 'all' | 'team' | 'customers' | 'follow_due' | 'hot' | 'dormant'
+const DORMANT_DAYS_THRESHOLD = 21
 
 const MESSAGE_CATEGORIES: MessageCategory[] = [
   'first_contact',
@@ -35,6 +37,7 @@ const MESSAGE_CATEGORIES: MessageCategory[] = [
   'after_no',
   'reactivation',
   'birthday',
+  'anniversary',
   'thank_you',
   'onboarding',
 ]
@@ -57,6 +60,9 @@ function getSegmentLabel(locale: 'tr' | 'en', segment: SegmentKey) {
     all: { tr: 'Toplam Kontak Sayısı', en: 'Total Contacts' },
     team: { tr: 'Ekip Sayısı', en: 'Team Members' },
     customers: { tr: 'Müşteri Sayısı', en: 'Customers' },
+    follow_due: { tr: 'Takip Gerekenler', en: 'Follow-up Due' },
+    hot: { tr: 'Sıcak Kontaklar', en: 'Hot Contacts' },
+    dormant: { tr: 'Pasif Kalanlar', en: 'Dormant Contacts' },
   }
   return labels[segment][locale]
 }
@@ -75,8 +81,30 @@ function getSegmentDescription(locale: 'tr' | 'en', segment: SegmentKey) {
       tr: 'Müşterilere özel takip ve yeniden sipariş mesajı üret.',
       en: 'Generate follow-up and reorder messages for customers.',
     },
+    follow_due: {
+      tr: 'Takip tarihi bugün/geçmiş olan kişileri hızla aksiyona al.',
+      en: 'Prioritize contacts with follow-up due today or earlier.',
+    },
+    hot: {
+      tr: 'Sıcak ve ılık kontaklara odaklanıp dönüşümü artır.',
+      en: 'Focus on hot and warm contacts to increase conversion.',
+    },
+    dormant: {
+      tr: `Son ${DORMANT_DAYS_THRESHOLD}+ gündür temassız kalanları yeniden ısıt.`,
+      en: `Reconnect with contacts inactive for ${DORMANT_DAYS_THRESHOLD}+ days.`,
+    },
   }
   return descriptions[segment][locale]
+}
+
+function daysSince(dateValue: string | null | undefined) {
+  if (!dateValue) return null
+  const value = new Date(dateValue)
+  if (Number.isNaN(value.getTime())) return null
+  value.setHours(0, 0, 0, 0)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.round((today.getTime() - value.getTime()) / 86_400_000)
 }
 
 export function AIMessageWorkspace() {
@@ -122,22 +150,37 @@ export function AIMessageWorkspace() {
   const [aiPreset, setAIPreset] = useState<QueuedMessageDraftPreset | null>(bootPreset ?? queryPreset)
   const [segment, setSegment] = useState<SegmentKey>('all')
   const [searchValue, setSearchValue] = useState('')
+  const [showSavedMessages, setShowSavedMessages] = useState(false)
+  const [copiedTemplateId, setCopiedTemplateId] = useState<string | null>(null)
 
-  // Keep history/templates persistence alive for the generator modal actions.
-  const [, setTemplates] = usePersistentState<MessageTemplateRecord[]>(`nmu-message-templates-${userKey}`, [], { version: 1 })
+  const [templates, setTemplates] = usePersistentState<MessageTemplateRecord[]>(`nmu-message-templates-${userKey}`, [], { version: 1 })
   const [, setHistoryItems] = usePersistentState<MessageHistoryRecord[]>(`nmu-message-history-${userKey}`, [], { version: 1 })
 
   const stats = useMemo(() => {
+    const todayKey = new Date().toISOString().slice(0, 10)
     const total = contacts.length
     const team = contacts.filter(isTeamContact).length
     const customers = contacts.filter(isCustomerContact).length
-    return { total, team, customers }
+    const followDue = contacts.filter((contact) => Boolean(contact.next_follow_up_date) && contact.next_follow_up_date! <= todayKey).length
+    const hot = contacts.filter((contact) => contact.temperature === 'hot' || contact.temperature === 'warm').length
+    const dormant = contacts.filter((contact) => {
+      const inactiveDays = daysSince(contact.last_contact_date)
+      return inactiveDays !== null && inactiveDays >= DORMANT_DAYS_THRESHOLD
+    }).length
+    return { total, team, customers, followDue, hot, dormant }
   }, [contacts])
 
   const visibleContacts = useMemo(() => {
+    const todayKey = new Date().toISOString().slice(0, 10)
     const bySegment = contacts.filter((contact) => {
       if (segment === 'team') return isTeamContact(contact)
       if (segment === 'customers') return isCustomerContact(contact)
+      if (segment === 'follow_due') return Boolean(contact.next_follow_up_date) && contact.next_follow_up_date! <= todayKey
+      if (segment === 'hot') return contact.temperature === 'hot' || contact.temperature === 'warm'
+      if (segment === 'dormant') {
+        const inactiveDays = daysSince(contact.last_contact_date)
+        return inactiveDays !== null && inactiveDays >= DORMANT_DAYS_THRESHOLD
+      }
       return true
     })
 
@@ -174,6 +217,14 @@ export function AIMessageWorkspace() {
     ])
   }
 
+  async function handleCopyTemplate(content: string, id: string) {
+    await navigator.clipboard.writeText(content)
+    setCopiedTemplateId(id)
+    window.setTimeout(() => {
+      setCopiedTemplateId((current) => (current === id ? null : current))
+    }, 1400)
+  }
+
   return (
     <>
       <div className="space-y-6">
@@ -192,6 +243,14 @@ export function AIMessageWorkspace() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              icon={<Save className="h-4 w-4" />}
+              onClick={() => setShowSavedMessages(true)}
+            >
+              {currentLocale === 'tr' ? 'Kaydedilen Mesajlar' : 'Saved Messages'}
+            </Button>
             <Button size="sm" icon={<Sparkles className="h-4 w-4" />} onClick={() => openGenerator()}>
               {currentLocale === 'tr' ? 'YZ Mesajı Üret' : 'Generate AI Message'}
             </Button>
@@ -214,6 +273,51 @@ export function AIMessageWorkspace() {
               key: 'customers' as const,
               icon: HandCoins,
               value: stats.customers,
+            },
+          ].map((card) => {
+            const Icon = card.icon
+            const active = segment === card.key
+            return (
+              <button
+                key={card.key}
+                type="button"
+                onClick={() => setSegment(card.key)}
+                className={cn(
+                  'rounded-3xl border bg-surface/30 p-5 text-left transition-all',
+                  active
+                    ? 'border-primary/30 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_36%),linear-gradient(135deg,rgba(4,18,28,0.96),rgba(8,20,35,0.92))]'
+                    : 'border-border-subtle hover:border-primary/20 hover:bg-surface/40',
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-2xl font-semibold text-text-primary">{card.value}</span>
+                </div>
+                <p className="mt-4 text-base font-semibold text-text-primary">{getSegmentLabel(currentLocale, card.key)}</p>
+                <p className="mt-2 text-xs leading-5 text-text-secondary">{getSegmentDescription(currentLocale, card.key)}</p>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            {
+              key: 'follow_due' as const,
+              icon: AlarmClockCheck,
+              value: stats.followDue,
+            },
+            {
+              key: 'hot' as const,
+              icon: Flame,
+              value: stats.hot,
+            },
+            {
+              key: 'dormant' as const,
+              icon: TimerOff,
+              value: stats.dormant,
             },
           ].map((card) => {
             const Icon = card.icon
@@ -322,6 +426,46 @@ export function AIMessageWorkspace() {
         onGenerated={handleGenerated}
         onSaveTemplate={handleSaveTemplate}
       />
+
+      <Modal
+        open={showSavedMessages}
+        onClose={() => setShowSavedMessages(false)}
+        title={currentLocale === 'tr' ? 'Kaydedilen Mesajlar' : 'Saved Messages'}
+        description={currentLocale === 'tr' ? 'Kaydettiğin mesaj şablonları burada listelenir.' : 'Your saved message templates are listed here.'}
+        className="max-w-3xl"
+      >
+        <div className="space-y-3 p-5">
+          {templates.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-border-subtle bg-surface/25 px-4 py-8 text-center text-sm text-text-secondary">
+              {currentLocale === 'tr'
+                ? 'Henüz kaydedilmiş mesaj yok.'
+                : 'No saved messages yet.'}
+            </p>
+          ) : (
+            templates.map((template) => (
+              <div key={template.id} className="space-y-3 rounded-xl border border-border-subtle bg-surface/25 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">{template.name}</p>
+                    <p className="text-xs text-text-tertiary">
+                      {new Date(template.createdAt).toLocaleDateString(currentLocale === 'tr' ? 'tr-TR' : 'en-US')}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    icon={copiedTemplateId === template.id ? <Sparkles className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    onClick={() => handleCopyTemplate(template.content, template.id)}
+                  >
+                    {currentLocale === 'tr' ? 'Kopyala' : 'Copy'}
+                  </Button>
+                </div>
+                <p className="whitespace-pre-wrap text-sm leading-6 text-text-secondary">{template.content}</p>
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
     </>
   )
 }

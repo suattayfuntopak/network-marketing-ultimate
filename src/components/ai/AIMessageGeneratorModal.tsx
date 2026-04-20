@@ -13,9 +13,13 @@ import type { ContactRow } from '@/lib/queries'
 import {
   Check,
   Copy,
+  Instagram,
   Mail,
   MessageCircle,
+  MessageSquare,
+  Save,
   Send,
+  SendHorizontal,
   Sparkles,
   WandSparkles,
 } from 'lucide-react'
@@ -31,11 +35,12 @@ export type MessageCategory =
   | 'after_no'
   | 'reactivation'
   | 'birthday'
+  | 'anniversary'
   | 'thank_you'
   | 'onboarding'
 
 export type MessageChannel = 'whatsapp' | 'telegram' | 'sms' | 'email' | 'instagram_dm'
-export type MessageTone = 'friendly' | 'professional' | 'curious' | 'empathetic' | 'confident' | 'humorous'
+export type MessageTone = 'friendly' | 'professional' | 'curious' | 'empathetic' | 'confident' | 'humorous' | 'direct' | 'motivational'
 
 export type MessageTemplateRecord = {
   id: string
@@ -92,6 +97,8 @@ type VariantState = {
   savedIndex: number | null
 }
 
+const SEND_CHANNEL_ORDER: MessageChannel[] = ['whatsapp', 'telegram', 'email', 'sms', 'instagram_dm']
+
 const CATEGORY_META: Record<MessageCategory, { tr: string; en: string }> = {
   first_contact: { tr: 'İlk Temas', en: 'First Contact' },
   warm_up: { tr: 'Bağ Kurma', en: 'Warm Up' },
@@ -103,6 +110,7 @@ const CATEGORY_META: Record<MessageCategory, { tr: string; en: string }> = {
   after_no: { tr: 'Hayır Sonrası', en: 'After No' },
   reactivation: { tr: 'Yeniden Bağ', en: 'Reactivation' },
   birthday: { tr: 'Doğum Günü', en: 'Birthday' },
+  anniversary: { tr: 'Evlilik Yıldönümü', en: 'Wedding Anniversary' },
   thank_you: { tr: 'Teşekkür', en: 'Thank You' },
   onboarding: { tr: 'Yeni Üye Karşılama', en: 'Onboarding' },
 }
@@ -122,6 +130,8 @@ const TONE_META: Record<MessageTone, { tr: string; en: string }> = {
   empathetic: { tr: 'Empatik', en: 'Empathetic' },
   confident: { tr: 'Kendinden Emin', en: 'Confident' },
   humorous: { tr: 'Esprili', en: 'Humorous' },
+  direct: { tr: 'Net', en: 'Direct' },
+  motivational: { tr: 'Motive Edici', en: 'Motivational' },
 }
 
 function getLabel<T extends string>(
@@ -243,10 +253,12 @@ function AIMessageGeneratorModalContent({
   onSaveTemplate,
 }: Omit<Props, 'open' | 'onClose'>) {
   const [category, setCategory] = useState<MessageCategory>(initialCategory)
-  const [channel, setChannel] = useState<MessageChannel>(initialChannel)
+  const [defaultSendChannel] = useState<MessageChannel>(initialChannel)
   const [tone, setTone] = useState<MessageTone>(initialTone)
   const [extraContext, setExtraContext] = useState(initialExtraContext)
   const [variants, setVariants] = useState<string[]>([])
+  const [sendChannelsByVariant, setSendChannelsByVariant] = useState<Record<number, MessageChannel>>({})
+  const [openSendMenuIndex, setOpenSendMenuIndex] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [variantState, setVariantState] = useState<VariantState>({
     loading: false,
@@ -257,7 +269,6 @@ function AIMessageGeneratorModalContent({
   const contactStage = useMemo(() => (contact ? stageMeta(contact.pipeline_stage) : null), [contact])
 
   const categoryOptions = Object.keys(CATEGORY_META) as MessageCategory[]
-  const channelOptions = Object.keys(CHANNEL_META) as MessageChannel[]
   const toneOptions = Object.keys(TONE_META) as MessageTone[]
 
   async function handleGenerate() {
@@ -278,7 +289,6 @@ function AIMessageGeneratorModalContent({
         ? 'Ton doğal, modern, ikna edici ama asla baskıcı veya yapay olmamalı.'
         : 'The tone must feel natural, modern, persuasive, but never pushy or fake.',
       `${locale === 'tr' ? 'Kategori' : 'Category'}: ${getLabel(CATEGORY_META, locale, category)}`,
-      `${locale === 'tr' ? 'Kanal' : 'Channel'}: ${getLabel(CHANNEL_META, locale, channel)}`,
       `${locale === 'tr' ? 'Ton' : 'Tone'}: ${getLabel(TONE_META, locale, tone)}`,
       contact
         ? `${locale === 'tr' ? 'Kişi' : 'Contact'}: ${contact.full_name}${contact.profession ? `, ${contact.profession}` : ''}${contact.location ? `, ${contact.location}` : ''}`
@@ -322,13 +332,15 @@ function AIMessageGeneratorModalContent({
       }
 
       setVariants(parsedVariants)
+      setSendChannelsByVariant({})
+      setOpenSendMenuIndex(null)
       onGenerated({
         id: crypto.randomUUID(),
         contactId: contact?.id ?? null,
         contactName: contact?.full_name ?? null,
         prompt,
         category,
-        channel,
+        channel: defaultSendChannel,
         tone,
         generatedContent: parsedVariants.join('\n---\n'),
         variants: parsedVariants,
@@ -348,6 +360,8 @@ function AIMessageGeneratorModalContent({
         }),
       )
       setVariants(fallback)
+      setSendChannelsByVariant({})
+      setOpenSendMenuIndex(null)
       setError(
         locale === 'tr'
           ? 'Canlı üretim yerine güçlü bir yerel taslak oluşturuldu.'
@@ -359,7 +373,7 @@ function AIMessageGeneratorModalContent({
         contactName: contact?.full_name ?? null,
         prompt,
         category,
-        channel,
+        channel: defaultSendChannel,
         tone,
         generatedContent: fallback.join('\n---\n'),
         variants: fallback,
@@ -384,7 +398,7 @@ function AIMessageGeneratorModalContent({
     onSaveTemplate({
       name: `${getLabel(CATEGORY_META, locale, category)}${contact ? ` • ${contact.full_name}` : ''}`,
       category,
-      channel,
+      channel: sendChannelsByVariant[index] ?? defaultSendChannel,
       tone,
       content: message,
     })
@@ -398,7 +412,7 @@ function AIMessageGeneratorModalContent({
     return contact?.phone?.replace(/\D/g, '') ?? ''
   }
 
-  function getSendHref(message: string) {
+  function getSendHref(message: string, channel: MessageChannel) {
     const encoded = encodeURIComponent(message)
     const phoneDigits = buildPhoneDigits()
 
@@ -408,6 +422,22 @@ function AIMessageGeneratorModalContent({
     if (channel === 'telegram') return 'https://t.me/'
     if (channel === 'instagram_dm') return 'https://instagram.com/'
     return null
+  }
+
+  function getChannelIcon(channel: MessageChannel) {
+    if (channel === 'whatsapp') return <MessageCircle className="h-3.5 w-3.5" />
+    if (channel === 'telegram') return <Send className="h-3.5 w-3.5" />
+    if (channel === 'email') return <Mail className="h-3.5 w-3.5" />
+    if (channel === 'sms') return <MessageSquare className="h-3.5 w-3.5" />
+    return <Instagram className="h-3.5 w-3.5" />
+  }
+
+  function handleSendChannel(index: number, channel: MessageChannel, message: string) {
+    const href = getSendHref(message, channel)
+    setSendChannelsByVariant((current) => ({ ...current, [index]: channel }))
+    setOpenSendMenuIndex(null)
+    if (!href) return
+    window.open(href, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -476,51 +506,26 @@ function AIMessageGeneratorModalContent({
           </div>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
-              {locale === 'tr' ? 'Kanal seç' : 'Choose channel'}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {channelOptions.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setChannel(item)}
-                  className={cn(
-                    'rounded-full border px-3 py-1.5 text-sm transition-colors',
-                    channel === item
-                      ? 'border-primary/30 bg-primary text-obsidian'
-                      : 'border-border bg-surface/40 text-text-secondary hover:border-border-strong hover:text-text-primary',
-                  )}
-                >
-                  {getLabel(CHANNEL_META, locale, item)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
-              {locale === 'tr' ? 'Ton seç' : 'Choose tone'}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {toneOptions.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setTone(item)}
-                  className={cn(
-                    'rounded-full border px-3 py-1.5 text-sm transition-colors',
-                    tone === item
-                      ? 'border-primary/30 bg-primary text-obsidian'
-                      : 'border-border bg-surface/40 text-text-secondary hover:border-border-strong hover:text-text-primary',
-                  )}
-                >
-                  {getLabel(TONE_META, locale, item)}
-                </button>
-              ))}
-            </div>
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
+            {locale === 'tr' ? 'Ton seç' : 'Choose tone'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {toneOptions.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setTone(item)}
+                className={cn(
+                  'rounded-full border px-3 py-1.5 text-sm transition-colors',
+                  tone === item
+                    ? 'border-primary/30 bg-primary text-obsidian'
+                    : 'border-border bg-surface/40 text-text-secondary hover:border-border-strong hover:text-text-primary',
+                )}
+              >
+                {getLabel(TONE_META, locale, item)}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -581,7 +586,7 @@ function AIMessageGeneratorModalContent({
         ) : (
           <div className="space-y-3">
             {variants.map((variant, index) => {
-              const sendHref = getSendHref(variant)
+              const selectedSendChannel = sendChannelsByVariant[index] ?? defaultSendChannel
               return (
                 <div key={`${index}-${variant.slice(0, 20)}`} className="rounded-2xl border border-border-subtle bg-surface/35 p-4">
                   <div className="flex items-center justify-between gap-3">
@@ -604,7 +609,7 @@ function AIMessageGeneratorModalContent({
                     </div>
                   </div>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-text-secondary">{variant}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap">
                     <Button
                       type="button"
                       size="sm"
@@ -618,29 +623,40 @@ function AIMessageGeneratorModalContent({
                       type="button"
                       size="sm"
                       variant="ghost"
-                      icon={variantState.savedIndex === index ? <Check className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      icon={variantState.savedIndex === index ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
                       onClick={() => handleSaveTemplate(variant, index)}
                     >
-                      {locale === 'tr' ? 'Şablona Kaydet' : 'Save Template'}
+                      {locale === 'tr' ? 'Kaydet' : 'Save'}
                     </Button>
-                    {sendHref ? (
-                      <a href={sendHref} target="_blank" rel="noreferrer" className="inline-flex">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          icon={
-                            channel === 'email'
-                              ? <Mail className="h-3.5 w-3.5" />
-                              : channel === 'sms'
-                                ? <Send className="h-3.5 w-3.5" />
-                              : <MessageCircle className="h-3.5 w-3.5" />
-                          }
-                        >
-                          {locale === 'tr' ? 'Gönder' : 'Send'}
-                        </Button>
-                      </a>
-                    ) : null}
+                    <div className="relative inline-flex">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        icon={<SendHorizontal className="h-3.5 w-3.5" />}
+                        onClick={() => setOpenSendMenuIndex((current) => (current === index ? null : index))}
+                      >
+                        {locale === 'tr' ? 'Gönder' : 'Send'}
+                      </Button>
+                      {openSendMenuIndex === index ? (
+                        <div className="absolute left-0 top-full z-20 mt-2 w-44 rounded-xl border border-border-subtle bg-card p-1.5 shadow-xl">
+                          {SEND_CHANNEL_ORDER.map((channel) => (
+                            <button
+                              key={channel}
+                              type="button"
+                              onClick={() => handleSendChannel(index, channel, variant)}
+                              className={cn(
+                                'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-text-primary transition-colors hover:bg-surface-hover',
+                                selectedSendChannel === channel ? 'bg-surface/50' : '',
+                              )}
+                            >
+                              {getChannelIcon(channel)}
+                              <span>{getLabel(CHANNEL_META, locale, channel)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               )
