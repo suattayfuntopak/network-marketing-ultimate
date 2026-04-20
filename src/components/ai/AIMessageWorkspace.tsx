@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
@@ -35,7 +34,6 @@ import {
   History,
   Pencil,
   Search,
-  Shield,
   Sparkles,
   Trash2,
   Users,
@@ -322,17 +320,12 @@ export function AIMessageWorkspace() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm text-text-tertiary">{new Date().toLocaleDateString(currentLocale === 'tr' ? 'tr-TR' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <h1 className="mt-4 text-3xl font-bold text-text-primary">
+            <p className="text-xs text-text-tertiary sm:text-sm">{new Date().toLocaleDateString(currentLocale === 'tr' ? 'tr-TR' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <h1 className="mt-3 text-2xl font-bold text-text-primary sm:text-[2rem]">
               {currentLocale === 'tr' ? 'Mesajlar' : 'Messages'}
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/academy?tab=objections">
-              <Button variant="outline" size="sm" icon={<Shield className="h-4 w-4" />}>
-                {currentLocale === 'tr' ? 'Itiraz Bankasi' : 'Objection Bank'}
-              </Button>
-            </Link>
             <Button size="sm" icon={<Sparkles className="h-4 w-4" />} onClick={() => openGenerator()}>
               {currentLocale === 'tr' ? 'AI Mesaj Uret' : 'Generate AI Message'}
             </Button>
@@ -361,7 +354,7 @@ export function AIMessageWorkspace() {
             ].map((item) => (
               <div key={item.label} className="rounded-3xl border border-border-subtle bg-surface/35 px-5 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">{item.label}</p>
-                <p className="mt-2 text-4xl font-semibold text-text-primary">{item.value}</p>
+                <p className="mt-2 text-3xl font-semibold text-text-primary sm:text-[2rem]">{item.value}</p>
               </div>
             ))}
           </div>
@@ -382,9 +375,9 @@ export function AIMessageWorkspace() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <span className="text-5xl font-semibold text-text-primary">{playbook.count}</span>
+                    <span className="text-3xl font-semibold text-text-primary sm:text-4xl">{playbook.count}</span>
                   </div>
-                  <p className="mt-5 text-2xl font-semibold text-text-primary">{copy.title}</p>
+                  <p className="mt-5 text-xl font-semibold text-text-primary sm:text-2xl">{copy.title}</p>
                   <div className="mt-5 border-t border-border-subtle pt-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">{copy.label}</p>
                     <div className="mt-2 flex items-center justify-between gap-3">
@@ -424,10 +417,10 @@ export function AIMessageWorkspace() {
             <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-warning/15 text-warning">
               <Sparkles className="h-10 w-10" />
             </div>
-            <h2 className="mt-8 text-4xl font-bold text-text-primary">
+            <h2 className="mt-8 text-3xl font-bold text-text-primary sm:text-[2.5rem]">
               {currentLocale === 'tr' ? 'AI Mesaj Uretici' : 'AI Message Generator'}
             </h2>
-            <p className="mt-4 max-w-lg text-base text-text-secondary">
+            <p className="mt-4 max-w-lg text-sm text-text-secondary sm:text-base">
               {currentLocale === 'tr'
                 ? 'Kontagina ozel, dogal ve sonuca yonelik mesajlar uret. Istersen kontak sec, istersen genel bir akis baslat.'
                 : 'Generate natural, outcome-focused message drafts for a contact, or start with a general scenario.'}
