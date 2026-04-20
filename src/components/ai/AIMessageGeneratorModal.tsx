@@ -614,7 +614,8 @@ function AIMessageGeneratorModalContent({
           </div>
         </div>
 
-        <div className="sticky bottom-0 z-10 -mx-4 mt-1 border-t border-border-subtle bg-card/95 px-4 pb-2 pt-3 backdrop-blur">
+        <div className="relative sticky bottom-0 z-10 -mx-4 mt-1 border-t border-border-subtle bg-card/95 px-4 pb-2 pt-3 backdrop-blur">
+          <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
           <Button
             type="button"
             size="lg"

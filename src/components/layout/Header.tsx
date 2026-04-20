@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher'
 import { useLanguage } from '@/components/common/LanguageProvider'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { syncAuthSessionCookie } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { Avatar } from '@/components/ui/Avatar'
@@ -27,7 +27,6 @@ export function Header() {
   const { t, locale } = useLanguage()
   const { theme, setTheme } = useTheme()
   const router = useRouter()
-  const pathname = usePathname()
   const [notifOpen, setNotifOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
@@ -35,7 +34,6 @@ export function Header() {
   const streak = currentUser?.streak ?? 0
   const momentum = currentUser?.momentumScore ?? 0
   const isTurkish = locale === 'tr'
-  const aiPageActive = pathname === '/ai' || pathname?.startsWith('/ai/')
   const userMenuItems = {
     profile: isTurkish ? 'Profilim' : 'My profile',
     settings: isTurkish ? 'Ayarlar' : 'Settings',
@@ -129,24 +127,6 @@ export function Header() {
                 <span className="text-[10px] text-success/70">{t.header.momentum}</span>
               </div>
             )}
-
-            {/* AI Button */}
-            {pathname !== '/dashboard' ? (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => router.push('/ai')}
-                className={cn(
-                  'flex items-center gap-2 h-9 px-2.5 sm:px-3 rounded-xl text-sm font-medium transition-all shrink-0',
-                  aiPageActive
-                    ? 'bg-secondary text-white shadow-[0_0_20px_rgba(139,92,246,0.3)]'
-                    : 'bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20'
-                )}
-              >
-                <Bot className="w-4 h-4" />
-                <span className="hidden sm:inline">{t.header.aiCoach}</span>
-              </motion.button>
-            ) : null}
 
             {/* Dark / Light Toggle */}
             <button
