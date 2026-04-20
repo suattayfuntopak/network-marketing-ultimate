@@ -486,6 +486,7 @@ export function AIMessageWorkspace() {
                         <Button
                           size="sm"
                           variant="ghost"
+                          className="text-[#ff8a2a] drop-shadow-[0_0_8px_rgba(255,138,42,0.45)] hover:text-[#ff9f4d]"
                           icon={<Sparkles className="h-3.5 w-3.5" />}
                           onClick={() => openGenerator({ contact })}
                         >
