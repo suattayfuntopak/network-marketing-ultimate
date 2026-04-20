@@ -214,6 +214,16 @@ CREATE INDEX IF NOT EXISTS nmu_orders_user_idx    ON nmu_orders(user_id);
 CREATE INDEX IF NOT EXISTS nmu_orders_contact_idx ON nmu_orders(contact_id);
 CREATE INDEX IF NOT EXISTS nmu_orders_date_idx    ON nmu_orders(order_date);
 
+-- ─── 11. AI RATE LIMIT BUCKETS ───────────────────────────────
+CREATE TABLE IF NOT EXISTS nmu_ai_rate_limits (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id    UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS nmu_ai_rate_limits_user_created_idx
+  ON nmu_ai_rate_limits(user_id, created_at DESC);
+
 -- ─── UPDATED_AT OTOMATİK GÜNCELLEME ──────────────────────────
 CREATE OR REPLACE FUNCTION nmu_set_updated_at()
 RETURNS TRIGGER AS $$
@@ -252,6 +262,7 @@ ALTER TABLE nmu_notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_campaigns     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_products      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_orders        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nmu_ai_rate_limits ENABLE ROW LEVEL SECURITY;
 
 -- nmu_user_profiles policies
 CREATE POLICY "nmu_profile_own" ON nmu_user_profiles
@@ -299,6 +310,12 @@ CREATE POLICY "nmu_products_own" ON nmu_products
 CREATE POLICY "nmu_orders_own" ON nmu_orders
   FOR ALL USING (auth.uid() = user_id);
 
+-- nmu_ai_rate_limits policies
+DROP POLICY IF EXISTS "nmu_ai_rate_limits_own" ON nmu_ai_rate_limits;
+CREATE POLICY "nmu_ai_rate_limits_own" ON nmu_ai_rate_limits
+  FOR ALL USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
 -- ─── YENİ KULLANICI KAYIT TRIGGER'I ──────────────────────────
 -- Supabase Auth'a kayıt olunca otomatik profil oluşturur
 CREATE OR REPLACE FUNCTION nmu_handle_new_user()
@@ -323,4 +340,5 @@ CREATE TRIGGER nmu_on_auth_user_created
 -- ─── TAMAMLANDI ───────────────────────────────────────────────
 -- Tablo listesi: nmu_user_profiles, nmu_contacts, nmu_tasks,
 -- nmu_interactions, nmu_events, nmu_event_attendees,
--- nmu_notifications, nmu_campaigns, nmu_products, nmu_orders
+-- nmu_notifications, nmu_campaigns, nmu_products, nmu_orders,
+-- nmu_ai_rate_limits

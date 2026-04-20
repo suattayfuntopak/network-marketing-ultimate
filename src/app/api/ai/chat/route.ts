@@ -15,10 +15,40 @@ Kullanıcı bir network marketing profesyoneli. Görevin:
 
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX = 20
+const MAX_TRACKED_USERS = 10_000
 const requestTimestamps = new Map<string, number[]>()
+let lastCleanupAt = 0
 
-function isRateLimited(userId: string): boolean {
+function cleanupRateLimitBuckets(now: number) {
+  if (now - lastCleanupAt < RATE_LIMIT_WINDOW_MS) return
+  const expirationThreshold = now - RATE_LIMIT_WINDOW_MS * 2
+
+  for (const [userId, timestamps] of requestTimestamps.entries()) {
+    const recent = timestamps.filter((ts) => ts > now - RATE_LIMIT_WINDOW_MS)
+    if (recent.length > 0 && recent[recent.length - 1] > expirationThreshold) {
+      requestTimestamps.set(userId, recent)
+      continue
+    }
+    requestTimestamps.delete(userId)
+  }
+
+  // Keep the table bounded in long-lived runtimes.
+  if (requestTimestamps.size > MAX_TRACKED_USERS) {
+    const overflow = requestTimestamps.size - MAX_TRACKED_USERS
+    const oldestBuckets = [...requestTimestamps.entries()]
+      .sort((left, right) => (left[1][left[1].length - 1] ?? 0) - (right[1][right[1].length - 1] ?? 0))
+      .slice(0, overflow)
+    for (const [userId] of oldestBuckets) {
+      requestTimestamps.delete(userId)
+    }
+  }
+
+  lastCleanupAt = now
+}
+
+function isRateLimitedLocally(userId: string): boolean {
   const now = Date.now()
+  cleanupRateLimitBuckets(now)
   const windowStart = now - RATE_LIMIT_WINDOW_MS
   const recent = (requestTimestamps.get(userId) ?? []).filter((ts) => ts > windowStart)
 
@@ -32,7 +62,12 @@ function isRateLimited(userId: string): boolean {
   return false
 }
 
-async function resolveUserId(req: NextRequest): Promise<string | null> {
+type AuthSession = {
+  userId: string
+  accessToken: string
+}
+
+async function resolveUserSession(req: NextRequest): Promise<AuthSession | null> {
   const header = req.headers.get('authorization') ?? req.headers.get('Authorization')
   if (!header || !header.toLowerCase().startsWith('bearer ')) {
     return null
@@ -54,7 +89,51 @@ async function resolveUserId(req: NextRequest): Promise<string | null> {
   if (error || !data.user) {
     return null
   }
-  return data.user.id
+  return {
+    userId: data.user.id,
+    accessToken: token,
+  }
+}
+
+async function isRateLimitedGlobally(session: AuthSession): Promise<boolean | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) return null
+
+  const db = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+    },
+  })
+
+  const windowStartIso = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString()
+  const cleanupBeforeIso = new Date(Date.now() - RATE_LIMIT_WINDOW_MS * 10).toISOString()
+
+  const { count, error: countError } = await db
+    .from('nmu_ai_rate_limits')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', session.userId)
+    .gt('created_at', windowStartIso)
+
+  if (countError) return null
+  if ((count ?? 0) >= RATE_LIMIT_MAX) return true
+
+  const { error: insertError } = await db.from('nmu_ai_rate_limits').insert({
+    user_id: session.userId,
+  })
+  if (insertError) return null
+
+  // Best-effort cleanup to keep shared buckets compact.
+  void db
+    .from('nmu_ai_rate_limits')
+    .delete()
+    .eq('user_id', session.userId)
+    .lt('created_at', cleanupBeforeIso)
+
+  return false
 }
 
 export async function POST(req: NextRequest) {
@@ -66,15 +145,17 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const userId = await resolveUserId(req)
-  if (!userId) {
+  const session = await resolveUserSession(req)
+  if (!session) {
     return Response.json(
       { error: 'Authentication required.' },
       { status: 401 }
     )
   }
 
-  if (isRateLimited(userId)) {
+  const isGloballyLimited = await isRateLimitedGlobally(session)
+  const isLimited = isGloballyLimited ?? isRateLimitedLocally(session.userId)
+  if (isLimited) {
     return Response.json(
       { error: 'Rate limit exceeded. Please wait a minute before retrying.' },
       { status: 429 }

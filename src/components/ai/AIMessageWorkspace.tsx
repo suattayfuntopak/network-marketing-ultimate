@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'next/navigation'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -63,6 +64,26 @@ type TemplateDraft = {
 type HistoryDraft = {
   id: string | null
   content: string
+}
+
+const MESSAGE_CATEGORIES: MessageCategory[] = [
+  'first_contact',
+  'warm_up',
+  'value_share',
+  'invitation',
+  'follow_up',
+  'objection_handling',
+  'decision',
+  'after_no',
+  'reactivation',
+  'birthday',
+  'thank_you',
+  'onboarding',
+]
+
+function isMessageCategory(value: string | null): value is MessageCategory {
+  if (!value) return false
+  return MESSAGE_CATEGORIES.includes(value as MessageCategory)
 }
 
 function getCategoryLabel(locale: 'tr' | 'en', category: MessageCategory) {
@@ -171,6 +192,7 @@ function getPlaybookCopy(locale: 'tr' | 'en', playbook: Playbook['key']) {
 }
 
 export function AIMessageWorkspace() {
+  const searchParams = useSearchParams()
   const { locale } = useLanguage()
   const currentLocale: 'tr' | 'en' = locale === 'tr' ? 'tr' : 'en'
   const currentUser = useAppStore((state) => state.currentUser)
@@ -181,11 +203,34 @@ export function AIMessageWorkspace() {
   })
 
   const userKey = currentUser?.id ?? 'guest'
+  const queryPreset = useMemo<QueuedMessageDraftPreset | null>(() => {
+    const categoryParam = searchParams.get('category')
+    const audienceParam = searchParams.get('audience')
+    const contactIdParam = searchParams.get('contact')
+
+    const inferredCategory: MessageCategory | undefined =
+      isMessageCategory(categoryParam)
+        ? categoryParam
+        : audienceParam === 'team'
+          ? 'onboarding'
+          : audienceParam === 'customer'
+            ? 'follow_up'
+            : audienceParam === 'prospect'
+              ? 'reactivation'
+              : undefined
+
+    if (!inferredCategory && !contactIdParam) return null
+
+    return {
+      category: inferredCategory,
+      contactId: contactIdParam ?? undefined,
+    }
+  }, [searchParams])
   const [tab, setTab] = useState<TabKey>('ai')
   const [bootPreset] = useState<QueuedMessageDraftPreset | null>(() => consumeAIMessageDraftPreset())
-  const [showAIModal, setShowAIModal] = useState(Boolean(bootPreset))
+  const [showAIModal, setShowAIModal] = useState(Boolean(bootPreset ?? queryPreset))
   const [activeContact, setActiveContact] = useState<ContactRow | null>(null)
-  const [aiPreset, setAIPreset] = useState<QueuedMessageDraftPreset | null>(bootPreset)
+  const [aiPreset, setAIPreset] = useState<QueuedMessageDraftPreset | null>(bootPreset ?? queryPreset)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [templateSearch, setTemplateSearch] = useState('')
   const [bulkSearch, setBulkSearch] = useState('')

@@ -128,6 +128,58 @@ function buildContactsHref(segment: SegmentKey, options?: { contactId?: string; 
   return query ? `/contacts?${query}` : '/contacts'
 }
 
+function parseCsvRecords(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let value = ''
+  let inQuotes = false
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index]
+    const next = text[index + 1]
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        value += '"'
+        index += 1
+      } else {
+        inQuotes = !inQuotes
+      }
+      continue
+    }
+
+    if (char === ',' && !inQuotes) {
+      row.push(value)
+      value = ''
+      continue
+    }
+
+    if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && next === '\n') {
+        index += 1
+      }
+      row.push(value)
+      value = ''
+      if (row.some((cell) => cell.trim().length > 0)) {
+        rows.push(row)
+      }
+      row = []
+      continue
+    }
+
+    value += char
+  }
+
+  if (value.length > 0 || row.length > 0) {
+    row.push(value)
+    if (row.some((cell) => cell.trim().length > 0)) {
+      rows.push(row)
+    }
+  }
+
+  return rows
+}
+
 function ChannelButtons({ contact }: { contact: ContactRow }) {
   const phoneDigits = contact.phone?.replace(/\D/g, '') ?? ''
 
@@ -430,19 +482,21 @@ export default function ContactsPage() {
 
     try {
       const text = await file.text()
-      const [headerLine, ...lines] = text.split(/\r?\n/).filter(Boolean)
-      if (!headerLine) throw new Error(currentLocale === 'tr' ? 'CSV boş.' : 'CSV is empty.')
+      const parsedRows = parseCsvRecords(text)
+      if (parsedRows.length === 0) throw new Error(currentLocale === 'tr' ? 'CSV boş.' : 'CSV is empty.')
 
-      const headers = headerLine.split(',').map((header) => header.trim().replace(/^"|"$/g, ''))
+      const [headerRow, ...lines] = parsedRows
+      const headers = headerRow.map((header) => header.trim())
+      if (!headers.includes('full_name')) {
+        throw new Error(currentLocale === 'tr' ? 'CSV içinde full_name kolonu zorunludur.' : 'CSV must include a full_name column.')
+      }
       const importedRows = lines
-        .map((line) => {
-          const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)|(?<=,)(?=,)/g) ?? []
-          const normalizedValues = values.map((value) => value.replace(/^"|"$/g, '').replace(/""/g, '"'))
-          return headers.reduce<Record<string, string>>((accumulator, header, index) => {
-            accumulator[header] = normalizedValues[index] ?? ''
+        .map((values) =>
+          headers.reduce<Record<string, string>>((accumulator, header, index) => {
+            accumulator[header] = (values[index] ?? '').trim()
             return accumulator
-          }, {})
-        })
+          }, {}),
+        )
         .filter((row) => row.full_name?.trim())
 
       if (importedRows.length === 0) {
