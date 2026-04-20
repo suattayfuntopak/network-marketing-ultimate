@@ -68,18 +68,18 @@ export function ContactCreateModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-10 pb-16 backdrop-blur-sm sm:py-14"
       onClick={onClose}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 16 }}
-        className="shadow-float max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-3xl border border-border bg-elevated"
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        className="shadow-float my-2 flex max-h-[min(90vh,calc(100dvh-5rem))] w-full max-w-3xl shrink-0 flex-col overflow-hidden rounded-3xl border border-border bg-elevated"
         onClick={(event) => event.stopPropagation()}
       >
-        <form onSubmit={onSubmit} className="flex max-h-[90vh] flex-col">
-          <div className="flex items-start justify-between gap-3 border-b border-border p-5">
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border p-5">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
                 {isEdit ? <Pencil className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
@@ -108,7 +108,7 @@ export function ContactCreateModal({
             </button>
           </div>
 
-          <div className="border-b border-border px-5 pt-1">
+          <div className="shrink-0 border-b border-border px-5 pt-1">
             <div className="flex gap-1 overflow-x-auto pb-0">
               {TABS.map((item) => (
                 <button
@@ -409,7 +409,7 @@ export function ContactCreateModal({
             )}
           </div>
 
-          <div className="flex gap-3 border-t border-border bg-elevated/95 p-5">
+          <div className="flex shrink-0 gap-3 border-t border-border bg-elevated/95 p-5">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
               {tr ? 'İptal' : 'Cancel'}
             </Button>

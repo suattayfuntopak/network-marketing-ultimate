@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { addDays, differenceInCalendarDays, formatDistanceToNow, isSameDay, parseISO, startOfDay } from 'date-fns'
 import { enUS, tr as trLocale } from 'date-fns/locale'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -23,6 +23,22 @@ import {
 } from '@/components/contacts/contactLabels'
 import { cn } from '@/lib/utils'
 import type { ContactRow, InteractionRow, TaskRow } from '@/lib/queries'
+
+/** Slider / UI: 1–100 (DB 0 is shown as 1 until the user moves the thumb). */
+function clampWarmthSlider(value: number) {
+  if (!Number.isFinite(value)) return 1
+  return Math.min(100, Math.max(1, Math.round(value)))
+}
+
+function rawTemperatureFromServer(score: number | null | undefined) {
+  if (score == null || !Number.isFinite(score)) return 0
+  return Math.min(100, Math.max(0, Math.round(score)))
+}
+
+function sliderWarmthFromServer(score: number | null | undefined) {
+  const raw = rawTemperatureFromServer(score)
+  return raw < 1 ? 1 : raw
+}
 import {
   Archive,
   ArrowRight,
@@ -204,6 +220,27 @@ export function ContactDetailPersonView({
   const [historyExpanded, setHistoryExpanded] = useState(false)
   const [duePreset, setDuePreset] = useState<TaskDuePreset>('all')
 
+  const rawServerWarmth = rawTemperatureFromServer(contact.temperature_score)
+  const [localWarmth, setLocalWarmth] = useState(() => sliderWarmthFromServer(contact.temperature_score))
+  const warmthDirtyRef = useRef(false)
+
+  useEffect(() => {
+    if (!warmthPending) {
+      setLocalWarmth(sliderWarmthFromServer(contact.temperature_score))
+      warmthDirtyRef.current = false
+    }
+  }, [contact.temperature_score, contact.id, warmthPending])
+
+  function commitWarmthIfChanged() {
+    if (!warmthDirtyRef.current) return
+    warmthDirtyRef.current = false
+    const v = clampWarmthSlider(localWarmth)
+    setLocalWarmth(v)
+    if (v !== rawServerWarmth) onWarmthChange(v)
+  }
+
+  const warmthThumbPct = ((localWarmth - 1) / 99) * 100
+
   const stage = stageMeta(contact.pipeline_stage)
   const coaching = useMemo(() => microCoachingBlock(contact, locale), [contact, locale])
 
@@ -275,18 +312,34 @@ export function ContactDetailPersonView({
               <p className="text-sm text-text-muted">&ldquo;{contact.nickname.trim()}&rdquo;</p>
             )}
             {contact.profession && <p className="text-sm text-text-tertiary">{contact.profession}</p>}
-            <div className="mt-4 flex justify-center">
-              <ContactWarmthBar score={contact.temperature_score} className="max-w-[12rem]" />
-            </div>
-            <div className="mt-2">
+            <div className="mx-auto mt-4 w-full max-w-[13rem]">
+              <p className="mb-1 text-center text-[11px] font-medium uppercase tracking-wide text-text-tertiary">
+                {tr ? 'Sıcaklık skalası' : 'Warmth scale'}
+              </p>
+              <div className="relative pt-7">
+                <span
+                  className="pointer-events-none absolute top-0 select-none rounded-md bg-surface-hover px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-text-primary shadow-sm ring-1 ring-border"
+                  style={{ left: `${warmthThumbPct}%`, transform: 'translateX(-50%)' }}
+                >
+                  {localWarmth}
+                </span>
+                <ContactWarmthBar score={localWarmth} hideNumeric className="max-w-none min-w-0" />
+              </div>
               <input
                 type="range"
-                min={0}
+                min={1}
                 max={100}
-                value={contact.temperature_score ?? 0}
+                step={1}
+                value={localWarmth}
                 disabled={warmthPending}
-                onChange={(event) => onWarmthChange(Number(event.target.value))}
-                className="h-2 w-full max-w-[12rem] cursor-pointer accent-primary disabled:opacity-50"
+                onChange={(event) => {
+                  warmthDirtyRef.current = true
+                  setLocalWarmth(clampWarmthSlider(Number(event.target.value)))
+                }}
+                onPointerUp={commitWarmthIfChanged}
+                onPointerCancel={commitWarmthIfChanged}
+                onBlur={commitWarmthIfChanged}
+                className="mt-2 h-3 w-full cursor-pointer accent-primary disabled:opacity-50"
               />
             </div>
           </div>
