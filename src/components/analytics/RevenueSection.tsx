@@ -41,7 +41,7 @@ export function RevenueSection({ series, topProducts, totalRevenue, avgOrderValu
   const { locale } = useLanguage()
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,1fr)]">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.95fr)]">
       <Card padding="lg">
         <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
           <div>
