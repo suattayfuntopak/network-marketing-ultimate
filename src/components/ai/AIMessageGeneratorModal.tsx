@@ -474,7 +474,7 @@ function AIMessageGeneratorModalContent({
 
   return (
     <div className="grid max-h-[72vh] gap-0 overflow-hidden lg:grid-cols-[1.08fr_0.92fr]">
-      <div className="space-y-4 overflow-y-auto border-b border-border p-4 lg:border-b-0 lg:border-r">
+      <div className="space-y-4 overflow-y-auto border-b border-border p-4 pb-2 lg:border-b-0 lg:border-r">
         <div className="space-y-3">
           {selectedContact ? (
             <div className="rounded-2xl border border-border-subtle bg-surface/40 p-4">
@@ -614,17 +614,19 @@ function AIMessageGeneratorModalContent({
           </div>
         </div>
 
-        <Button
-          type="button"
-          size="lg"
-          onClick={handleGenerate}
-          loading={variantState.loading}
-          icon={<Sparkles className="h-4 w-4" />}
-          className="w-full"
-        >
-          {locale === 'tr' ? 'Üret' : 'Generate'}
-        </Button>
-        {error ? <p className="text-xs text-warning">{error}</p> : null}
+        <div className="sticky bottom-0 z-10 -mx-4 mt-1 border-t border-border-subtle bg-card/95 px-4 pb-2 pt-3 backdrop-blur">
+          <Button
+            type="button"
+            size="lg"
+            onClick={handleGenerate}
+            loading={variantState.loading}
+            icon={<Sparkles className="h-4 w-4" />}
+            className="w-full"
+          >
+            {locale === 'tr' ? 'Üret' : 'Generate'}
+          </Button>
+          {error ? <p className="mt-2 text-xs text-warning">{error}</p> : null}
+        </div>
       </div>
 
       <div className="space-y-4 overflow-y-auto p-4">
