@@ -320,94 +320,98 @@ export function ContactDetailPersonView({
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        {/* Left — profile */}
-        <Card className="xl:col-span-3 space-y-5 p-5">
-          <div className="text-center">
-            <Avatar name={contact.full_name} size="xl" className="mx-auto mb-3" />
-            <h2 className="text-lg font-bold text-text-primary">{contact.full_name}</h2>
-            {contact.nickname?.trim() && (
-              <p className="text-sm text-text-muted">&ldquo;{contact.nickname.trim()}&rdquo;</p>
-            )}
-            {contact.profession && <p className="text-sm text-text-tertiary">{contact.profession}</p>}
-            <div className="mx-auto mt-4 w-full max-w-[13rem]">
-              <p className="mb-1 text-center text-[11px] font-medium uppercase tracking-wide text-text-tertiary">
-                {tr ? 'Sıcaklık değeri' : 'Warmth value'}
+        {/* Left — stacked profile cards (separate boxes like reference UI) */}
+        <div className="flex flex-col gap-4 xl:col-span-3">
+          <Card className="space-y-5">
+            <div className="text-center">
+              <Avatar name={contact.full_name} size="xl" className="mx-auto mb-3" />
+              <h2 className="text-lg font-bold text-text-primary">{contact.full_name}</h2>
+              {contact.nickname?.trim() && (
+                <p className="text-sm text-text-muted">&ldquo;{contact.nickname.trim()}&rdquo;</p>
+              )}
+              {contact.profession && <p className="text-sm text-text-tertiary">{contact.profession}</p>}
+              <div className="mx-auto mt-4 w-full max-w-[13rem]">
+                <p className="mb-1 text-center text-[11px] font-medium uppercase tracking-wide text-text-tertiary">
+                  {tr ? 'Sıcaklık değeri' : 'Warmth value'}
+                </p>
+                <div className="mb-1.5 flex items-center justify-between text-xs font-semibold">
+                  <span className="text-text-secondary">{contact.temperature}</span>
+                  <span style={{ color: warmthScoreColor(localWarmth) }}>{localWarmth}</span>
+                </div>
+                <div className="relative pt-7">
+                  <span
+                    className="pointer-events-none absolute top-0 select-none rounded-md bg-surface-hover px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-text-primary shadow-sm ring-1 ring-border"
+                    style={{
+                      left: `${warmthThumbPct}%`,
+                      transform: 'translateX(-50%)',
+                      color: warmthScoreColor(localWarmth),
+                    }}
+                  >
+                    {localWarmth}
+                  </span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={100}
+                    step={1}
+                    value={localWarmth}
+                    disabled={warmthPending}
+                    onChange={(event) => {
+                      warmthDirtyRef.current = true
+                      setLocalWarmth(clampWarmthSlider(Number(event.target.value)))
+                    }}
+                    onPointerUp={commitWarmthIfChanged}
+                    onPointerCancel={commitWarmthIfChanged}
+                    onBlur={commitWarmthIfChanged}
+                    className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-transparent disabled:opacity-50 [&::-webkit-slider-runnable-track]:h-2.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:mt-[-4px] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-white/60 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-track]:h-2.5 [&::-moz-range-track]:rounded-full [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-white/60 [&::-moz-range-thumb]:bg-white"
+                    style={{
+                      background: 'linear-gradient(90deg, #06b6d4 0%, #3b82f6 35%, #f59e0b 70%, #ef4444 100%)',
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-2">
+              <span className={cn('inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-xs font-semibold', stage.className)}>
+                {stage[locale]}
+              </span>
+              <Badge variant="secondary" size="sm">
+                {interestLabel(contact.interest_type)}
+              </Badge>
+            </div>
+
+            <div className="flex justify-center">
+              <ContactChannelRow contact={contact} />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-center text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+                {tr ? 'Etiketler' : 'Tags'}
               </p>
-              <div className="mb-1.5 flex items-center justify-between text-xs font-semibold">
-                <span className="text-text-secondary">{contact.temperature}</span>
-                <span style={{ color: warmthScoreColor(localWarmth) }}>{localWarmth}</span>
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {tags.map((tag, index) => (
+                  <span key={tag} className={cn('inline-flex max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold', tagClass(index))}>
+                    {tag}
+                  </span>
+                ))}
               </div>
-              <div className="relative pt-7">
-                <span
-                  className="pointer-events-none absolute top-0 select-none rounded-md bg-surface-hover px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-text-primary shadow-sm ring-1 ring-border"
-                  style={{
-                    left: `${warmthThumbPct}%`,
-                    transform: 'translateX(-50%)',
-                    color: warmthScoreColor(localWarmth),
-                  }}
-                >
-                  {localWarmth}
-                </span>
-                <input
-                  type="range"
-                  min={1}
-                  max={100}
-                  step={1}
-                  value={localWarmth}
-                  disabled={warmthPending}
-                  onChange={(event) => {
-                    warmthDirtyRef.current = true
-                    setLocalWarmth(clampWarmthSlider(Number(event.target.value)))
-                  }}
-                  onPointerUp={commitWarmthIfChanged}
-                  onPointerCancel={commitWarmthIfChanged}
-                  onBlur={commitWarmthIfChanged}
-                  className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-transparent disabled:opacity-50 [&::-webkit-slider-runnable-track]:h-2.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:mt-[-4px] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-white/60 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-track]:h-2.5 [&::-moz-range-track]:rounded-full [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-white/60 [&::-moz-range-thumb]:bg-white"
-                  style={{
-                    background: 'linear-gradient(90deg, #06b6d4 0%, #3b82f6 35%, #f59e0b 70%, #ef4444 100%)',
-                  }}
-                />
+              <div className="flex gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <input
+                    value={tagDraft}
+                    onChange={(event) => setTagDraft(event.target.value)}
+                    onKeyDown={(event) => event.key === 'Enter' && (event.preventDefault(), submitTag())}
+                    placeholder={tr ? '+ Etiket ekle' : '+ Add tag'}
+                    className="w-full rounded-xl border border-dashed border-border bg-transparent px-3 py-2 pr-8 text-sm text-text-primary outline-none focus:border-primary/40"
+                  />
+                  <CornerDownLeft className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+                </div>
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div className="flex justify-center">
-            <ContactChannelRow contact={contact} />
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-2">
-            <span className={cn('inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-xs font-semibold', stage.className)}>
-              {stage[locale]}
-            </span>
-            <Badge variant="secondary" size="sm">
-              {interestLabel(contact.interest_type)}
-            </Badge>
-          </div>
-
-          <div className="space-y-2 border-t border-border pt-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">{tr ? 'Etiketler' : 'Tags'}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {tags.map((tag, index) => (
-                <span key={tag} className={cn('inline-flex max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold', tagClass(index))}>
-                  {tag}
-                </span>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <div className="relative min-w-0 flex-1">
-                <input
-                  value={tagDraft}
-                  onChange={(event) => setTagDraft(event.target.value)}
-                  onKeyDown={(event) => event.key === 'Enter' && (event.preventDefault(), submitTag())}
-                  placeholder={tr ? 'Yeni etiket' : 'New tag'}
-                  className="w-full rounded-xl border border-border bg-surface px-3 py-2 pr-8 text-sm text-text-primary outline-none focus:border-primary/40"
-                />
-                <CornerDownLeft className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2 border-t border-border pt-4">
+          <Card className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">{tr ? 'Aşama değiştir' : 'Change stage'}</p>
             <select
               value={contact.pipeline_stage}
@@ -421,74 +425,79 @@ export function ContactDetailPersonView({
                 </option>
               ))}
             </select>
-          </div>
+          </Card>
 
-          <div className="space-y-3 border-t border-border pt-4 text-sm">
-            {contact.email && (
-              <div className="flex gap-2">
-                <span className="shrink-0 text-text-tertiary">{tr ? 'E-posta' : 'Email'}</span>
-                <a href={`mailto:${contact.email}`} className="min-w-0 truncate text-primary hover:underline">
-                  {contact.email}
-                </a>
+          <Card className="space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">{tr ? 'Bilgiler' : 'Details'}</p>
+            <div className="space-y-3 text-sm">
+              {contact.email && (
+                <div className="flex gap-2">
+                  <span className="shrink-0 text-text-tertiary">{tr ? 'E-posta' : 'Email'}</span>
+                  <a href={`mailto:${contact.email}`} className="min-w-0 truncate text-primary hover:underline">
+                    {contact.email}
+                  </a>
+                </div>
+              )}
+              {contact.phone && (
+                <div className="flex gap-2">
+                  <span className="shrink-0 text-text-tertiary">{tr ? 'Telefon' : 'Phone'}</span>
+                  <a href={`tel:${contact.phone}`} className="text-text-primary">
+                    {contact.phone}
+                  </a>
+                </div>
+              )}
+              {contact.source && (
+                <div className="flex gap-2">
+                  <span className="shrink-0 text-text-tertiary">{tr ? 'Kaynak' : 'Source'}</span>
+                  <span className="text-text-secondary">{contact.source}</span>
+                </div>
+              )}
+              <div className="flex gap-2 text-xs text-text-muted">
+                <span>{tr ? 'Son temas' : 'Last touch'}:</span>
+                <span>{lastTouchLabel(contact.last_contact_date, locale)}</span>
+              </div>
+              <div className="flex gap-2 text-xs text-text-muted">
+                <span>{tr ? 'Sonraki takip' : 'Next follow-up'}:</span>
+                <span>{formatDate(contact.next_follow_up_date, locale)}</span>
+              </div>
+            </div>
+
+            {(contact.goals_notes || contact.family_notes || contact.interests || contact.pain_points) && (
+              <div className="space-y-3 border-t border-border-subtle pt-4 text-xs">
+                {contact.interests && (
+                  <div>
+                    <p className="font-semibold text-text-tertiary">{tr ? 'İlgi alanları' : 'Interests'}</p>
+                    <p className="mt-1 text-text-secondary">{contact.interests}</p>
+                  </div>
+                )}
+                {contact.pain_points && (
+                  <div>
+                    <p className="font-semibold text-text-tertiary">{tr ? 'Sıkıntılar' : 'Pain points'}</p>
+                    <p className="mt-1 text-text-secondary">{contact.pain_points}</p>
+                  </div>
+                )}
+                {contact.goals_notes && (
+                  <div>
+                    <p className="font-semibold text-text-tertiary">{tr ? 'Not / hedefler' : 'Notes / goals'}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-text-secondary">{contact.goals_notes}</p>
+                  </div>
+                )}
+                {contact.family_notes && (
+                  <div>
+                    <p className="font-semibold text-text-tertiary">{tr ? 'Aile' : 'Family'}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-text-secondary">{contact.family_notes}</p>
+                  </div>
+                )}
               </div>
             )}
-            {contact.phone && (
-              <div className="flex gap-2">
-                <span className="shrink-0 text-text-tertiary">{tr ? 'Telefon' : 'Phone'}</span>
-                <a href={`tel:${contact.phone}`} className="text-text-primary">
-                  {contact.phone}
-                </a>
-              </div>
-            )}
-            {contact.source && (
-              <div className="flex gap-2">
-                <span className="shrink-0 text-text-tertiary">{tr ? 'Kaynak' : 'Source'}</span>
-                <span className="text-text-secondary">{contact.source}</span>
-              </div>
-            )}
-            <div className="flex gap-2 text-xs text-text-muted">
-              <span>{tr ? 'Son temas' : 'Last touch'}:</span>
-              <span>{lastTouchLabel(contact.last_contact_date, locale)}</span>
-            </div>
-            <div className="flex gap-2 text-xs text-text-muted">
-              <span>{tr ? 'Sonraki takip' : 'Next follow-up'}:</span>
-              <span>{formatDate(contact.next_follow_up_date, locale)}</span>
-            </div>
-          </div>
 
-          {(contact.goals_notes || contact.family_notes || contact.interests || contact.pain_points) && (
-            <div className="space-y-3 border-t border-border pt-4 text-xs">
-              {contact.interests && (
-                <div>
-                  <p className="font-semibold text-text-tertiary">{tr ? 'İlgi alanları' : 'Interests'}</p>
-                  <p className="mt-1 text-text-secondary">{contact.interests}</p>
-                </div>
-              )}
-              {contact.pain_points && (
-                <div>
-                  <p className="font-semibold text-text-tertiary">{tr ? 'Sıkıntılar' : 'Pain points'}</p>
-                  <p className="mt-1 text-text-secondary">{contact.pain_points}</p>
-                </div>
-              )}
-              {contact.goals_notes && (
-                <div>
-                  <p className="font-semibold text-text-tertiary">{tr ? 'Not / hedefler' : 'Notes / goals'}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-text-secondary">{contact.goals_notes}</p>
-                </div>
-              )}
-              {contact.family_notes && (
-                <div>
-                  <p className="font-semibold text-text-tertiary">{tr ? 'Aile' : 'Family'}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-text-secondary">{contact.family_notes}</p>
-                </div>
-              )}
+            <div className="border-t border-border pt-4">
+              <Button variant="danger" className="w-full" onClick={onDelete} icon={<Trash2 className="h-4 w-4" />}>
+                {tr ? 'Sil' : 'Delete'}
+              </Button>
             </div>
-          )}
-
-          <Button variant="danger" className="w-full" onClick={onDelete} icon={<Trash2 className="h-4 w-4" />}>
-            {tr ? 'Sil' : 'Delete'}
-          </Button>
-        </Card>
+          </Card>
+        </div>
 
         {/* Middle — timeline */}
         <div className="space-y-4 xl:col-span-5">
