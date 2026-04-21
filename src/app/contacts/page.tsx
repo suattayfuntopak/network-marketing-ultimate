@@ -305,21 +305,6 @@ export default function ContactsPage() {
     onError: (error: Error) => setFormError(error.message),
   })
 
-  const quickNoteMutation = useMutation({
-    mutationFn: (text: string) =>
-      addInteraction(currentUser!.id, {
-        contact_id: selectedId!,
-        type: 'note',
-        channel: 'manual',
-        content: text,
-        date: new Date().toISOString(),
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['contacts'] })
-      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
-    },
-  })
-
   const warmthPatchMutation = useMutation({
     mutationFn: (score: number) =>
       patchContact(selectedId!, {
@@ -805,7 +790,15 @@ export default function ContactsPage() {
             formatDate={formatDate}
             formatDateTime={formatDateTime}
             onBack={closeContactDetail}
-            onDelete={() => deleteMutation.mutate(selected.id)}
+            onDelete={() => {
+              const ok = window.confirm(
+                currentLocale === 'tr'
+                  ? 'Bu kaydı gerçekten silmek istiyor musunuz?'
+                  : 'Are you sure you want to permanently delete this record?',
+              )
+              if (!ok) return
+              deleteMutation.mutate(selected.id)
+            }}
             onOpenAI={() => setAiModalOpen(true)}
             onEdit={() => {
               setEditingContact(selected)
@@ -820,8 +813,6 @@ export default function ContactsPage() {
               setTaskError('')
               setShowTaskModal(true)
             }}
-            onQuickNote={(text) => quickNoteMutation.mutateAsync(text)}
-            quickNotePending={quickNoteMutation.isPending}
             onStageChange={(stage) => stageMutation.mutate({ id: selected.id, stage })}
             stagePending={stageMutation.isPending}
             onWarmthChange={(score) => warmthPatchMutation.mutate(score)}

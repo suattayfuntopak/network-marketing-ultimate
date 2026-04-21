@@ -9,11 +9,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { ContactChannelRow } from '@/components/contacts/ContactChannelRow'
-import { ContactWarmthBar } from '@/components/contacts/ContactWarmthBar'
 import {
   INTERACTION_TYPE_LABELS,
-  OUTCOME_LABELS,
-  OUTCOME_VARIANTS,
   PIPELINE_STAGE_OPTIONS,
   TASK_PRIORITY_LABELS,
   TASK_PRIORITY_VARIANTS,
@@ -41,13 +38,12 @@ function sliderWarmthFromServer(score: number | null | undefined) {
 }
 import {
   Archive,
-  ArrowRight,
   CheckCircle2,
+  CornerDownLeft,
   Pencil,
   Plus,
-  SendHorizontal,
   Sparkles,
-  X,
+  Trash2,
 } from 'lucide-react'
 
 const TAG_PASTELS = [
@@ -157,6 +153,28 @@ function microCoachingBlock(contact: ContactRow, locale: 'tr' | 'en') {
   return { headline, suggested, objection }
 }
 
+function warmthScoreColor(score: number) {
+  const clamped = Math.max(0, Math.min(100, score))
+  const stops = [
+    { at: 0, rgb: [6, 182, 212] },
+    { at: 35, rgb: [59, 130, 246] },
+    { at: 70, rgb: [245, 158, 11] },
+    { at: 100, rgb: [239, 68, 68] },
+  ] as const
+  for (let i = 0; i < stops.length - 1; i += 1) {
+    const left = stops[i]
+    const right = stops[i + 1]
+    if (clamped >= left.at && clamped <= right.at) {
+      const ratio = (clamped - left.at) / (right.at - left.at)
+      const r = Math.round(left.rgb[0] + (right.rgb[0] - left.rgb[0]) * ratio)
+      const g = Math.round(left.rgb[1] + (right.rgb[1] - left.rgb[1]) * ratio)
+      const b = Math.round(left.rgb[2] + (right.rgb[2] - left.rgb[2]) * ratio)
+      return `rgb(${r}, ${g}, ${b})`
+    }
+  }
+  return 'rgb(239, 68, 68)'
+}
+
 export interface ContactDetailPersonViewProps {
   locale: 'tr' | 'en'
   contact: ContactRow
@@ -174,8 +192,6 @@ export interface ContactDetailPersonViewProps {
   onArchive: () => void
   onOpenInteractionModal: () => void
   onOpenTaskModal: () => void
-  onQuickNote: (text: string) => Promise<unknown>
-  quickNotePending: boolean
   onStageChange: (stage: string) => void
   stagePending: boolean
   onWarmthChange: (score: number) => void
@@ -203,8 +219,6 @@ export function ContactDetailPersonView({
   onArchive,
   onOpenInteractionModal,
   onOpenTaskModal,
-  onQuickNote,
-  quickNotePending,
   onStageChange,
   stagePending,
   onWarmthChange,
@@ -215,9 +229,7 @@ export function ContactDetailPersonView({
   onDeleteTask,
 }: ContactDetailPersonViewProps) {
   const tr = locale === 'tr'
-  const [noteDraft, setNoteDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
-  const [historyExpanded, setHistoryExpanded] = useState(false)
   const [duePreset, setDuePreset] = useState<TaskDuePreset>('all')
 
   const rawServerWarmth = rawTemperatureFromServer(contact.temperature_score)
@@ -244,10 +256,7 @@ export function ContactDetailPersonView({
   const stage = stageMeta(contact.pipeline_stage)
   const coaching = useMemo(() => microCoachingBlock(contact, locale), [contact, locale])
 
-  const visibleInteractions = useMemo(() => {
-    const limit = historyExpanded ? interactions.length : Math.min(8, interactions.length)
-    return interactions.slice(0, limit)
-  }, [interactions, historyExpanded])
+  const visibleInteractions = useMemo(() => interactions.slice(0, 10), [interactions])
 
   const openTasks = useMemo(
     () => tasks.filter((task) => task.status !== 'completed' && task.status !== 'skipped'),
@@ -258,13 +267,6 @@ export function ContactDetailPersonView({
     const anchor = new Date()
     return openTasks.filter((task) => taskMatchesDuePreset(task, duePreset, anchor))
   }, [openTasks, duePreset])
-
-  async function submitQuickNote() {
-    const text = noteDraft.trim()
-    if (!text) return
-    await onQuickNote(text)
-    setNoteDraft('')
-  }
 
   function submitTag() {
     const next = tagDraft.trim()
@@ -280,7 +282,7 @@ export function ContactDetailPersonView({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack} className="-ml-1 gap-2">
-            <ArrowRight className="h-4 w-4 rotate-180" />
+            <span aria-hidden>←</span>
             <span className="font-semibold text-text-primary">{contact.full_name}</span>
           </Button>
         </div>
@@ -314,33 +316,39 @@ export function ContactDetailPersonView({
             {contact.profession && <p className="text-sm text-text-tertiary">{contact.profession}</p>}
             <div className="mx-auto mt-4 w-full max-w-[13rem]">
               <p className="mb-1 text-center text-[11px] font-medium uppercase tracking-wide text-text-tertiary">
-                {tr ? 'Sıcaklık skalası' : 'Warmth scale'}
+                {tr ? 'Sıcaklık değeri' : 'Warmth value'}
               </p>
               <div className="relative pt-7">
                 <span
                   className="pointer-events-none absolute top-0 select-none rounded-md bg-surface-hover px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-text-primary shadow-sm ring-1 ring-border"
-                  style={{ left: `${warmthThumbPct}%`, transform: 'translateX(-50%)' }}
+                  style={{
+                    left: `${warmthThumbPct}%`,
+                    transform: 'translateX(-50%)',
+                    color: warmthScoreColor(localWarmth),
+                  }}
                 >
                   {localWarmth}
                 </span>
-                <ContactWarmthBar score={localWarmth} hideNumeric className="max-w-none min-w-0" />
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={localWarmth}
+                  disabled={warmthPending}
+                  onChange={(event) => {
+                    warmthDirtyRef.current = true
+                    setLocalWarmth(clampWarmthSlider(Number(event.target.value)))
+                  }}
+                  onPointerUp={commitWarmthIfChanged}
+                  onPointerCancel={commitWarmthIfChanged}
+                  onBlur={commitWarmthIfChanged}
+                  className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-transparent disabled:opacity-50 [&::-webkit-slider-runnable-track]:h-2.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:mt-[-4px] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-white/60 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-track]:h-2.5 [&::-moz-range-track]:rounded-full [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-white/60 [&::-moz-range-thumb]:bg-white"
+                  style={{
+                    background: 'linear-gradient(90deg, #06b6d4 0%, #3b82f6 35%, #f59e0b 70%, #ef4444 100%)',
+                  }}
+                />
               </div>
-              <input
-                type="range"
-                min={1}
-                max={100}
-                step={1}
-                value={localWarmth}
-                disabled={warmthPending}
-                onChange={(event) => {
-                  warmthDirtyRef.current = true
-                  setLocalWarmth(clampWarmthSlider(Number(event.target.value)))
-                }}
-                onPointerUp={commitWarmthIfChanged}
-                onPointerCancel={commitWarmthIfChanged}
-                onBlur={commitWarmthIfChanged}
-                className="mt-2 h-3 w-full cursor-pointer accent-primary disabled:opacity-50"
-              />
             </div>
           </div>
 
@@ -367,16 +375,16 @@ export function ContactDetailPersonView({
               ))}
             </div>
             <div className="flex gap-2">
-              <input
-                value={tagDraft}
-                onChange={(event) => setTagDraft(event.target.value)}
-                onKeyDown={(event) => event.key === 'Enter' && (event.preventDefault(), submitTag())}
-                placeholder={tr ? 'Yeni etiket' : 'New tag'}
-                className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-primary/40"
-              />
-              <Button type="button" size="sm" variant="outline" loading={tagPending} onClick={submitTag}>
-                +
-              </Button>
+              <div className="relative min-w-0 flex-1">
+                <input
+                  value={tagDraft}
+                  onChange={(event) => setTagDraft(event.target.value)}
+                  onKeyDown={(event) => event.key === 'Enter' && (event.preventDefault(), submitTag())}
+                  placeholder={tr ? 'Yeni etiket' : 'New tag'}
+                  className="w-full rounded-xl border border-border bg-surface px-3 py-2 pr-8 text-sm text-text-primary outline-none focus:border-primary/40"
+                />
+                <CornerDownLeft className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+              </div>
             </div>
           </div>
 
@@ -458,44 +466,18 @@ export function ContactDetailPersonView({
             </div>
           )}
 
-          <Button variant="danger" className="w-full" onClick={onDelete} icon={<X className="h-4 w-4" />}>
+          <Button variant="danger" className="w-full" onClick={onDelete} icon={<Trash2 className="h-4 w-4" />}>
             {tr ? 'Sil' : 'Delete'}
           </Button>
         </Card>
 
         {/* Middle — timeline */}
         <div className="space-y-4 xl:col-span-5">
-          <Card className="overflow-hidden p-0">
-            <div className="border-b border-border bg-surface/40 px-4 py-3">
-              <p className="text-sm font-semibold text-text-primary">{tr ? 'Hızlı not' : 'Quick note'}</p>
-              <p className="text-xs text-text-muted">{tr ? 'Zaman çizelgesine düşer.' : 'Appears on the timeline.'}</p>
-            </div>
-            <div className="flex gap-2 p-4">
-              <textarea
-                value={noteDraft}
-                onChange={(event) => setNoteDraft(event.target.value)}
-                rows={2}
-                placeholder={tr ? 'Kısa bir not yaz…' : 'Write a short note…'}
-                className="min-h-[72px] flex-1 resize-none rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-primary/40"
-              />
-              <Button
-                type="button"
-                className="self-end"
-                icon={<SendHorizontal className="h-4 w-4" />}
-                loading={quickNotePending}
-                disabled={!noteDraft.trim()}
-                onClick={() => void submitQuickNote()}
-              >
-                {tr ? 'Gönder' : 'Send'}
-              </Button>
-            </div>
-          </Card>
-
           <Card padding="none" className="overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border px-4 py-3">
               <CardTitle className="text-base">{tr ? 'Etkileşim geçmişi' : 'Interaction history'}</CardTitle>
-              <Button size="sm" variant="outline" onClick={onOpenInteractionModal}>
-                {tr ? 'Detaylı kayıt' : 'Full log'}
+              <Button size="sm" onClick={onOpenInteractionModal} icon={<Plus className="h-3.5 w-3.5" />}>
+                {tr ? 'Ekle' : 'Add'}
               </Button>
             </CardHeader>
             <div className="p-4">
@@ -504,41 +486,27 @@ export function ContactDetailPersonView({
               ) : interactions.length === 0 ? (
                 <p className="py-8 text-center text-sm text-text-tertiary">{tr ? 'Henüz kayıt yok.' : 'No entries yet.'}</p>
               ) : (
-                <div className="relative space-y-0 pl-6">
-                  <div className="absolute bottom-2 left-[11px] top-2 w-px bg-border" aria-hidden />
-                  {visibleInteractions.map((interaction, index) => (
-                    <div key={interaction.id} className="relative pb-6 last:pb-0">
-                      <div
-                        className={cn(
-                          'absolute left-0 top-1 flex h-[22px] w-[22px] items-center justify-center rounded-full border bg-elevated',
-                          index === 0 ? 'border-primary/40 text-primary' : 'border-border text-text-muted',
-                        )}
-                      >
-                        <ArrowRight className="h-3 w-3" />
-                      </div>
-                      <div className="rounded-xl border border-border-subtle bg-surface/50 p-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="primary" size="sm">
+                <div className="space-y-2">
+                  {visibleInteractions.map((interaction) => (
+                    <div key={interaction.id} className="rounded-xl border border-border-subtle bg-surface/50 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-text-primary">
                             {INTERACTION_TYPE_LABELS[interaction.type][locale]}
-                          </Badge>
-                          {interaction.outcome && (
-                            <Badge variant={OUTCOME_VARIANTS[interaction.outcome]} size="sm">
-                              {OUTCOME_LABELS[interaction.outcome][locale]}
-                            </Badge>
-                          )}
-                          <Badge size="sm">{channelLabel(interaction.channel, locale)}</Badge>
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-text-muted">{formatDateTime(interaction.date, locale)}</p>
                         </div>
-                        <p className="mt-2 text-sm text-text-primary whitespace-pre-wrap">{interaction.content}</p>
-                        <p className="mt-2 text-[11px] text-text-muted">{formatDateTime(interaction.date, locale)}</p>
+                        <p className="text-[11px] text-text-tertiary">{channelLabel(interaction.channel, locale)}</p>
                       </div>
+                      <p className="mt-2 text-sm text-text-primary whitespace-pre-wrap">{interaction.content}</p>
                     </div>
                   ))}
                 </div>
               )}
-              {interactions.length > 8 && (
+              {interactions.length > 10 && (
                 <div className="mt-2 flex justify-center border-t border-border pt-3">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setHistoryExpanded((v) => !v)}>
-                    {historyExpanded ? (tr ? 'Daralt' : 'Collapse') : tr ? 'Tümünü gör' : 'See all'}
+                  <Button type="button" variant="ghost" size="sm" onClick={onOpenInteractionModal}>
+                    {tr ? 'Tümünü Gör' : 'See All'}
                   </Button>
                 </div>
               )}
