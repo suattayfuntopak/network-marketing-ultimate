@@ -67,7 +67,17 @@ import {
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
-const validSegments = ['all', 'prospects', 'customers', 'team', 'follow_up', 'hot'] as const
+const validSegments = [
+  'all',
+  'prospects',
+  'customers',
+  'team',
+  'follow_up',
+  'hot',
+  'month_added',
+  'week_added',
+  'today_added',
+] as const
 type SegmentKey = (typeof validSegments)[number]
 
 function createEmptyForm(segment: SegmentKey): AddContactForm {
@@ -445,7 +455,7 @@ export default function ContactsPage() {
           value: contactStats.monthAdded,
           icon: CalendarClock,
           glow: 'primary' as const,
-          segment: null,
+          segment: 'month_added' as SegmentKey | null,
         },
         {
           key: 'week',
@@ -453,7 +463,7 @@ export default function ContactsPage() {
           value: contactStats.weekAdded,
           icon: CalendarRange,
           glow: 'warning' as const,
-          segment: null,
+          segment: 'week_added' as SegmentKey | null,
         },
         {
           key: 'today',
@@ -461,7 +471,7 @@ export default function ContactsPage() {
           value: contactStats.todayAdded,
           icon: CalendarDays,
           glow: 'success' as const,
-          segment: null,
+          segment: 'today_added' as SegmentKey | null,
         },
       ],
       bottom: [
@@ -503,6 +513,10 @@ export default function ContactsPage() {
 
   const filteredContacts = useMemo(() => {
     const needle = search.trim().toLowerCase()
+    const now = new Date()
+    const currentMonth = localCalendarYmd(now).slice(0, 7)
+    const weekStart = startOfWeek(now, { weekStartsOn: 1 })
+    const weekEnd = endOfWeek(now, { weekStartsOn: 1 })
     const haystack = (contact: ContactRow) => {
       if (!needle) return true
       const tagsJoined = (contact.tags ?? []).join(' ').toLowerCase()
@@ -534,6 +548,12 @@ export default function ContactsPage() {
             return isFollowUpDue(contact, todayKey)
           case 'hot':
             return contact.temperature === 'hot'
+          case 'month_added':
+            return localCalendarYmd(new Date(contact.created_at)).slice(0, 7) === currentMonth
+          case 'week_added':
+            return isWithinInterval(new Date(contact.created_at), { start: weekStart, end: weekEnd })
+          case 'today_added':
+            return localCalendarYmd(new Date(contact.created_at)) === localCalendarYmd(now)
           default:
             return true
         }

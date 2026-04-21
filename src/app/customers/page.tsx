@@ -390,6 +390,7 @@ export default function CustomersPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
                 {products.map(p => (
                   <div key={p.id}
+                    onClick={() => { setEditingProduct(p); setShowProductModal(true) }}
                     className="group relative p-3 rounded-xl bg-surface/50 border border-border-subtle hover:border-border cursor-pointer transition-all hover:shadow-lg">
                     {/* Edit/Delete */}
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
