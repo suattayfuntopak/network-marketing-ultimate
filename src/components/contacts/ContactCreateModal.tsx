@@ -24,7 +24,7 @@ const TABS: { id: TabId; tr: string; en: string }[] = [
 ]
 
 const fieldClass =
-  'w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all'
+  'w-full px-3.5 py-3 bg-surface border border-border rounded-xl text-text-primary text-base outline-none focus:border-primary/50 transition-all'
 
 interface Props {
   open: boolean
@@ -85,10 +85,10 @@ export function ContactCreateModal({
                 {isEdit ? <Pencil className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-text-primary">
+                <h2 className="text-xl font-semibold text-text-primary">
                   {isEdit ? (tr ? 'Kontağı Düzenle' : 'Edit contact') : tr ? 'Yeni Kontak' : 'New contact'}
                 </h2>
-                <p className="mt-0.5 text-sm text-text-tertiary">
+                <p className="mt-0.5 text-base text-text-tertiary">
                   {isEdit
                     ? tr
                       ? 'Kayıtlı kişiyi güncelle; kaydet ile değişikliklerin uygulanır.'
@@ -116,7 +116,7 @@ export function ContactCreateModal({
                   type="button"
                   onClick={() => setTab(item.id)}
                   className={cn(
-                    'relative shrink-0 px-3 py-2.5 text-sm font-medium transition-colors',
+                    'relative shrink-0 px-3.5 py-2.5 text-base font-medium transition-colors',
                     tab === item.id ? 'text-primary' : 'text-text-tertiary hover:text-text-secondary',
                   )}
                 >
@@ -140,7 +140,7 @@ export function ContactCreateModal({
             {tab === 'basic' && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'Ad Soyad *' : 'Full name *'}
                   </label>
                   <input
@@ -152,7 +152,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'Takma ad' : 'Nickname'}
                   </label>
                   <input
@@ -163,7 +163,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'Telefon' : 'Phone'}
                   </label>
                   <input
@@ -174,7 +174,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">WhatsApp</label>
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">WhatsApp</label>
                   <input
                     value={form.whatsapp_username}
                     onChange={(event) => setForm((c) => ({ ...c, whatsapp_username: event.target.value }))}
@@ -183,7 +183,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">E-posta</label>
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">E-posta</label>
                   <input
                     type="email"
                     value={form.email}
@@ -193,7 +193,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">Telegram</label>
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">Telegram</label>
                   <input
                     value={form.telegram_username}
                     onChange={(event) => setForm((c) => ({ ...c, telegram_username: event.target.value }))}
@@ -202,7 +202,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">Instagram</label>
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">Instagram</label>
                   <input
                     value={form.instagram_username}
                     onChange={(event) => setForm((c) => ({ ...c, instagram_username: event.target.value }))}
@@ -216,7 +216,7 @@ export function ContactCreateModal({
             {tab === 'detail' && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'Şehir' : 'City'}
                   </label>
                   <input
@@ -227,7 +227,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'Meslek' : 'Profession'}
                   </label>
                   <input
@@ -238,7 +238,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'İlişki türü' : 'Relationship'}
                   </label>
                   <input
@@ -249,7 +249,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'Doğum günü' : 'Birthday'}
                   </label>
                   <input
@@ -260,7 +260,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'Aile / ek notlar' : 'Family notes'}
                   </label>
                   <textarea
@@ -278,7 +278,7 @@ export function ContactCreateModal({
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="md:col-span-2">
-                    <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                    <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                       {tr ? 'Kaynak' : 'Source'}
                     </label>
                     <input
@@ -289,7 +289,7 @@ export function ContactCreateModal({
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                    <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                       {tr ? 'Kontak türü' : 'Contact type'}
                     </label>
                     <select
@@ -305,7 +305,7 @@ export function ContactCreateModal({
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                    <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                       {tr ? 'Aşama' : 'Stage'}
                     </label>
                     <select
@@ -324,10 +324,10 @@ export function ContactCreateModal({
                 </div>
                 <div className="rounded-2xl border border-border bg-surface/30 p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-text-tertiary">
+                    <span className="text-sm font-semibold uppercase tracking-[0.16em] text-text-tertiary">
                       {tr ? 'Sıcaklık skoru' : 'Warmth score'}
                     </span>
-                    <span className="tabular-nums text-sm font-semibold text-primary">{form.temperature_score}</span>
+                    <span className="tabular-nums text-base font-semibold text-primary">{form.temperature_score}</span>
                   </div>
                   <input
                     type="range"
@@ -336,9 +336,12 @@ export function ContactCreateModal({
                     value={form.temperature_score}
                     onChange={(event) =>
                       setForm((c) => ({ ...c, temperature_score: Number(event.target.value) }))}
-                    className="h-2 w-full cursor-pointer accent-primary"
+                    className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-transparent [&::-webkit-slider-runnable-track]:h-2.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:mt-[-4px] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-white/60 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-track]:h-2.5 [&::-moz-range-track]:rounded-full [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-white/60 [&::-moz-range-thumb]:bg-white"
+                    style={{
+                      background: 'linear-gradient(90deg, #06b6d4 0%, #3b82f6 35%, #f59e0b 70%, #ef4444 100%)',
+                    }}
                   />
-                  <p className="mt-2 text-xs text-text-muted">
+                  <p className="mt-2 text-sm text-text-muted">
                     {tr
                       ? '0 soğuk, 100 çok sıcak; liste ve filtreler otomatik güncellenir.'
                       : '0 is cold, 100 is very warm; table filters stay in sync.'}
@@ -350,7 +353,7 @@ export function ContactCreateModal({
             {tab === 'notes' && (
               <div className="space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'Notlar' : 'Notes'}
                   </label>
                   <textarea
@@ -362,7 +365,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'İlgi alanları' : 'Interests'}
                   </label>
                   <input
@@ -373,7 +376,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'Hedefler' : 'Goals'}
                   </label>
                   <input
@@ -384,7 +387,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'Sıkıntılar' : 'Pain points'}
                   </label>
                   <input
@@ -395,7 +398,7 @@ export function ContactCreateModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                     {tr ? 'Etiketler' : 'Tags'}
                   </label>
                   <input
