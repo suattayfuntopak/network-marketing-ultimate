@@ -38,10 +38,12 @@ function sliderWarmthFromServer(score: number | null | undefined) {
 }
 import {
   Archive,
+  ArrowRight,
   CheckCircle2,
   CornerDownLeft,
   Pencil,
   Plus,
+  SendHorizontal,
   Sparkles,
   Trash2,
   X,
@@ -193,6 +195,8 @@ export interface ContactDetailPersonViewProps {
   onArchive: () => void
   onOpenInteractionModal: () => void
   onOpenTaskModal: () => void
+  onQuickNote: (text: string) => Promise<unknown>
+  quickNotePending: boolean
   onStageChange: (stage: string) => void
   stagePending: boolean
   onWarmthChange: (score: number) => void
@@ -220,6 +224,8 @@ export function ContactDetailPersonView({
   onArchive,
   onOpenInteractionModal,
   onOpenTaskModal,
+  onQuickNote,
+  quickNotePending,
   onStageChange,
   stagePending,
   onWarmthChange,
@@ -230,6 +236,7 @@ export function ContactDetailPersonView({
   onDeleteTask,
 }: ContactDetailPersonViewProps) {
   const tr = locale === 'tr'
+  const [noteDraft, setNoteDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
   const [duePreset, setDuePreset] = useState<TaskDuePreset>('all')
 
@@ -268,6 +275,13 @@ export function ContactDetailPersonView({
     const anchor = new Date()
     return openTasks.filter((task) => taskMatchesDuePreset(task, duePreset, anchor))
   }, [openTasks, duePreset])
+
+  async function submitQuickNote() {
+    const text = noteDraft.trim()
+    if (!text) return
+    await onQuickNote(text)
+    setNoteDraft('')
+  }
 
   function submitTag() {
     const next = tagDraft.trim()
@@ -319,6 +333,10 @@ export function ContactDetailPersonView({
               <p className="mb-1 text-center text-[11px] font-medium uppercase tracking-wide text-text-tertiary">
                 {tr ? 'Sıcaklık değeri' : 'Warmth value'}
               </p>
+              <div className="mb-1.5 flex items-center justify-between text-xs font-semibold">
+                <span className="text-text-secondary">{contact.temperature}</span>
+                <span style={{ color: warmthScoreColor(localWarmth) }}>{localWarmth}</span>
+              </div>
               <div className="relative pt-7">
                 <span
                   className="pointer-events-none absolute top-0 select-none rounded-md bg-surface-hover px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-text-primary shadow-sm ring-1 ring-border"
@@ -482,14 +500,36 @@ export function ContactDetailPersonView({
               </Button>
             </CardHeader>
             <div className="p-4">
+              <div className="mb-4 flex gap-2">
+                <input
+                  value={noteDraft}
+                  onChange={(event) => setNoteDraft(event.target.value)}
+                  placeholder={tr ? 'Hızlı not ekle...' : 'Add quick note...'}
+                  className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary/40"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  icon={<SendHorizontal className="h-3.5 w-3.5" />}
+                  loading={quickNotePending}
+                  disabled={!noteDraft.trim()}
+                  onClick={() => void submitQuickNote()}
+                >
+                  {tr ? 'Gönder' : 'Send'}
+                </Button>
+              </div>
               {interactionsLoading ? (
                 <p className="py-8 text-center text-sm text-text-tertiary">{tr ? 'Yükleniyor…' : 'Loading…'}</p>
               ) : interactions.length === 0 ? (
                 <p className="py-8 text-center text-sm text-text-tertiary">{tr ? 'Henüz kayıt yok.' : 'No entries yet.'}</p>
               ) : (
-                <div className="space-y-2">
+                <div className="relative space-y-2 pl-6">
+                  <div className="absolute bottom-2 left-[11px] top-2 w-px bg-border-subtle" aria-hidden />
                   {visibleInteractions.map((interaction) => (
-                    <div key={interaction.id} className="rounded-xl border border-border-subtle bg-surface/50 p-3">
+                    <div key={interaction.id} className="relative rounded-xl border border-border-subtle bg-surface/50 p-3">
+                      <div className="absolute -left-6 top-3.5 flex h-5 w-5 items-center justify-center rounded-full border border-primary/30 bg-elevated text-primary">
+                        <ArrowRight className="h-3 w-3" />
+                      </div>
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold text-text-primary">
