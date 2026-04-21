@@ -26,6 +26,30 @@ const TABS: { id: TabId; tr: string; en: string }[] = [
 const fieldClass =
   'w-full px-3.5 py-3 bg-surface border border-border rounded-xl text-text-primary text-base outline-none focus:border-primary/50 transition-all'
 
+function warmthScoreColor(score: number) {
+  const clamped = Math.max(0, Math.min(100, score))
+  const stops = [
+    { at: 0, rgb: [6, 182, 212] },   // cyan
+    { at: 35, rgb: [59, 130, 246] }, // blue
+    { at: 70, rgb: [245, 158, 11] }, // amber
+    { at: 100, rgb: [239, 68, 68] }, // red
+  ] as const
+
+  for (let i = 0; i < stops.length - 1; i += 1) {
+    const left = stops[i]
+    const right = stops[i + 1]
+    if (clamped >= left.at && clamped <= right.at) {
+      const ratio = (clamped - left.at) / (right.at - left.at)
+      const r = Math.round(left.rgb[0] + (right.rgb[0] - left.rgb[0]) * ratio)
+      const g = Math.round(left.rgb[1] + (right.rgb[1] - left.rgb[1]) * ratio)
+      const b = Math.round(left.rgb[2] + (right.rgb[2] - left.rgb[2]) * ratio)
+      return `rgb(${r}, ${g}, ${b})`
+    }
+  }
+
+  return 'rgb(239, 68, 68)'
+}
+
 interface Props {
   open: boolean
   editingContact?: ContactRow | null
@@ -327,7 +351,12 @@ export function ContactCreateModal({
                     <span className="text-sm font-semibold uppercase tracking-[0.16em] text-text-tertiary">
                       {tr ? 'Sıcaklık skoru' : 'Warmth score'}
                     </span>
-                    <span className="tabular-nums text-base font-semibold text-primary">{form.temperature_score}</span>
+                    <span
+                      className="tabular-nums text-base font-semibold transition-colors"
+                      style={{ color: warmthScoreColor(form.temperature_score) }}
+                    >
+                      {form.temperature_score}
+                    </span>
                   </div>
                   <input
                     type="range"
