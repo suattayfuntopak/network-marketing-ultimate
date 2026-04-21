@@ -44,6 +44,7 @@ import {
   Plus,
   Sparkles,
   Trash2,
+  X,
 } from 'lucide-react'
 
 const TAG_PASTELS = [
