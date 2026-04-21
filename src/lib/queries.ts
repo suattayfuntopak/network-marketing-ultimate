@@ -4,6 +4,8 @@
 import { supabase } from './supabase'
 import type { Database } from './database.types'
 import type { Event, EventAttendee } from '@/types'
+import { CONTACT_ACTIVITY_LOG_CHANNEL, serializeContactActivity } from './contactActivityLog'
+import type { ContactActivityPayload } from './contactActivityLog'
 
 export type ContactRow = Database['public']['Tables']['nmu_contacts']['Row']
 export type TaskRow = Database['public']['Tables']['nmu_tasks']['Row']
@@ -315,10 +317,27 @@ export async function fetchInteractionsByContact(contactId: string): Promise<Int
     .select('*')
     .eq('user_id', userId)
     .eq('contact_id', contactId)
-    .order('date', { ascending: false })
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as InteractionRow[]
+}
+
+export async function addContactActivityLog(
+  userId: string,
+  contactId: string,
+  payload: ContactActivityPayload,
+): Promise<void> {
+  await addInteraction(
+    userId,
+    {
+      contact_id: contactId,
+      type: 'note',
+      channel: CONTACT_ACTIVITY_LOG_CHANNEL,
+      content: serializeContactActivity(payload),
+      date: new Date().toISOString(),
+    },
+    { skipContactTouch: true },
+  )
 }
 
 export async function addInteraction(
@@ -333,7 +352,8 @@ export async function addInteraction(
     date?: string
     duration_minutes?: number
     next_follow_up_date?: string
-  }
+  },
+  options?: { skipContactTouch?: boolean },
 ): Promise<InteractionRow> {
   const interactionDate = input.date ?? new Date().toISOString()
 
@@ -355,21 +375,23 @@ export async function addInteraction(
 
   if (error) throw error
 
-  const contactUpdate: Database['public']['Tables']['nmu_contacts']['Update'] = {
-    last_contact_date: interactionDate,
+  if (!options?.skipContactTouch) {
+    const contactUpdate: Database['public']['Tables']['nmu_contacts']['Update'] = {
+      last_contact_date: interactionDate,
+    }
+
+    if (input.next_follow_up_date !== undefined) {
+      contactUpdate.next_follow_up_date = input.next_follow_up_date || null
+    }
+
+    const { error: contactError } = await supabase
+      .from('nmu_contacts')
+      .update(contactUpdate)
+      .eq('id', input.contact_id)
+      .eq('user_id', userId)
+
+    if (contactError) throw contactError
   }
-
-  if (input.next_follow_up_date !== undefined) {
-    contactUpdate.next_follow_up_date = input.next_follow_up_date || null
-  }
-
-  const { error: contactError } = await supabase
-    .from('nmu_contacts')
-    .update(contactUpdate)
-    .eq('id', input.contact_id)
-    .eq('user_id', userId)
-
-  if (contactError) throw contactError
 
   return data as InteractionRow
 }
@@ -698,3 +720,5 @@ export async function upsertEventAttendees(
     .upsert(payload, { onConflict: 'event_id,contact_id' })
   if (error) throw error
 }
+
+export type { ContactActivityPayload } from './contactActivityLog'

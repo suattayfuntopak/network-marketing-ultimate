@@ -33,6 +33,7 @@ import {
   deleteContact,
   fetchInteractionsByContact,
   addInteraction,
+  addContactActivityLog,
   fetchTasksByContact,
   addTask,
   completeTask,
@@ -321,20 +322,33 @@ export default function ContactsPage() {
   })
 
   const warmthPatchMutation = useMutation({
-    mutationFn: (score: number) =>
-      patchContact(selectedId!, {
+    mutationFn: async ({ score, previousScore }: { score: number; previousScore: number | null }) => {
+      await patchContact(selectedId!, {
         temperature_score: score,
         temperature: temperatureFromScore(score),
-      }),
+      })
+      const prev = previousScore == null || !Number.isFinite(previousScore) ? null : Math.round(Number(previousScore))
+      if (currentUser?.id && prev !== null && prev !== score) {
+        await addContactActivityLog(currentUser.id, selectedId!, { kind: 'warmth_changed', previous: prev, score })
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contacts'] })
+      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
     },
   })
 
   const appendTagMutation = useMutation({
-    mutationFn: ({ id, tags }: { id: string; tags: string[] }) => patchContact(id, { tags }),
-    onSuccess: () => {
+    mutationFn: async (input: { id: string; tags: string[]; addedTag?: string; removedTag?: string }) => {
+      await patchContact(input.id, { tags: input.tags })
+      if (!currentUser?.id) return
+      if (input.addedTag) await addContactActivityLog(currentUser.id, input.id, { kind: 'tag_added', tag: input.addedTag })
+      if (input.removedTag)
+        await addContactActivityLog(currentUser.id, input.id, { kind: 'tag_removed', tag: input.removedTag })
+    },
+    onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['contacts'] })
+      qc.invalidateQueries({ queryKey: ['contact-interactions', variables.id] })
     },
   })
 
@@ -368,18 +382,24 @@ export default function ContactsPage() {
   })
 
   const contactTaskMutation = useMutation({
-    mutationFn: (values: ContactTaskFormValues & { contact_id: string }) =>
-      addTask(currentUser!.id, {
+    mutationFn: async (values: ContactTaskFormValues & { contact_id: string }) => {
+      const row = await addTask(currentUser!.id, {
         title: values.title,
         type: values.type,
         priority: values.priority,
         due_date: values.due_date,
         description: values.description,
         contact_id: values.contact_id,
-      }),
+      })
+      if (currentUser?.id) {
+        await addContactActivityLog(currentUser.id, values.contact_id, { kind: 'task_added', title: values.title })
+      }
+      return row
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['contact-tasks', selectedId] })
+      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
       setShowTaskModal(false)
       setTaskError('')
     },
@@ -387,25 +407,43 @@ export default function ContactsPage() {
   })
 
   const completeTaskMutation = useMutation({
-    mutationFn: completeTask,
+    mutationFn: async ({ id, title }: { id: string; title: string }) => {
+      await completeTask(id)
+      if (currentUser?.id && selectedId) {
+        await addContactActivityLog(currentUser.id, selectedId, { kind: 'task_completed', title })
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['contact-tasks', selectedId] })
+      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
     },
   })
 
   const deleteTaskMutation = useMutation({
-    mutationFn: deleteTask,
+    mutationFn: async ({ id, title }: { id: string; title: string }) => {
+      await deleteTask(id)
+      if (currentUser?.id && selectedId) {
+        await addContactActivityLog(currentUser.id, selectedId, { kind: 'task_deleted', title })
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['contact-tasks', selectedId] })
+      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
     },
   })
 
   const stageMutation = useMutation({
-    mutationFn: ({ id, stage }: { id: string; stage: string }) => updateContactStage(id, stage),
-    onSuccess: () => {
+    mutationFn: async ({ id, from, to }: { id: string; from: string; to: string }) => {
+      await updateContactStage(id, to)
+      if (currentUser?.id && from !== to) {
+        await addContactActivityLog(currentUser.id, id, { kind: 'stage_changed', from, to })
+      }
+    },
+    onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['contacts'] })
+      qc.invalidateQueries({ queryKey: ['contact-interactions', variables.id] })
     },
   })
 
@@ -830,17 +868,41 @@ export default function ContactsPage() {
             }}
             onQuickNote={(text) => quickNoteMutation.mutateAsync(text)}
             quickNotePending={quickNoteMutation.isPending}
-            onStageChange={(stage) => stageMutation.mutate({ id: selected.id, stage })}
+            onStageChange={(to) => {
+              const from = selected.pipeline_stage
+              if (from === to) return
+              stageMutation.mutate({ id: selected.id, from, to })
+            }}
             stagePending={stageMutation.isPending}
-            onWarmthChange={(score) => warmthPatchMutation.mutate(score)}
+            onWarmthChange={(score) =>
+              warmthPatchMutation.mutate({ score, previousScore: selected.temperature_score ?? null })
+            }
             warmthPending={warmthPatchMutation.isPending}
             onAddTag={(tag) => {
-              const next = [...(selected.tags ?? []), tag.trim()].filter(Boolean)
-              appendTagMutation.mutate({ id: selected.id, tags: next })
+              const trimmed = tag.trim()
+              if (!trimmed) return
+              const next = [...(selected.tags ?? []), trimmed]
+              appendTagMutation.mutate({ id: selected.id, tags: next, addedTag: trimmed })
+            }}
+            onRemoveTag={(tag) => {
+              const next = (selected.tags ?? []).filter((t) => t !== tag)
+              appendTagMutation.mutate({ id: selected.id, tags: next, removedTag: tag })
             }}
             tagPending={appendTagMutation.isPending}
-            onCompleteTask={(taskId) => completeTaskMutation.mutate(taskId)}
-            onDeleteTask={(taskId) => deleteTaskMutation.mutate(taskId)}
+            onCompleteTask={(taskId) => {
+              const task = contactTasks.find((t) => t.id === taskId)
+              completeTaskMutation.mutate({
+                id: taskId,
+                title: task?.title ?? (currentLocale === 'tr' ? 'Görev' : 'Task'),
+              })
+            }}
+            onDeleteTask={(taskId) => {
+              const task = contactTasks.find((t) => t.id === taskId)
+              deleteTaskMutation.mutate({
+                id: taskId,
+                title: task?.title ?? (currentLocale === 'tr' ? 'Görev' : 'Task'),
+              })
+            }}
           />
         </motion.div>
 

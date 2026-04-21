@@ -4,6 +4,18 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { addDays, differenceInCalendarDays, formatDistanceToNow, isSameDay, parseISO, startOfDay } from 'date-fns'
 import { enUS, tr as trLocale } from 'date-fns/locale'
+import {
+  Archive,
+  ArrowRight,
+  CheckCircle2,
+  CornerDownLeft,
+  Pencil,
+  Plus,
+  SendHorizontal,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
@@ -18,6 +30,8 @@ import {
   channelLabel,
   stageMeta,
 } from '@/components/contacts/contactLabels'
+import { formatActivityInteractionCopy } from '@/lib/contactActivityLog'
+import { toHeadingCase } from '@/lib/headingCase'
 import { cn } from '@/lib/utils'
 import type { ContactRow, InteractionRow, TaskRow } from '@/lib/queries'
 
@@ -36,18 +50,6 @@ function sliderWarmthFromServer(score: number | null | undefined) {
   const raw = rawTemperatureFromServer(score)
   return raw < 1 ? 1 : raw
 }
-import {
-  Archive,
-  ArrowRight,
-  CheckCircle2,
-  CornerDownLeft,
-  Pencil,
-  Plus,
-  SendHorizontal,
-  Sparkles,
-  Trash2,
-  X,
-} from 'lucide-react'
 
 const TAG_PASTELS = [
   'bg-fuchsia-500/[0.14] text-fuchsia-100/90 border-fuchsia-400/25',
@@ -156,28 +158,6 @@ function microCoachingBlock(contact: ContactRow, locale: 'tr' | 'en') {
   return { headline, suggested, objection }
 }
 
-function warmthScoreColor(score: number) {
-  const clamped = Math.max(0, Math.min(100, score))
-  const stops = [
-    { at: 0, rgb: [6, 182, 212] },
-    { at: 35, rgb: [59, 130, 246] },
-    { at: 70, rgb: [245, 158, 11] },
-    { at: 100, rgb: [239, 68, 68] },
-  ] as const
-  for (let i = 0; i < stops.length - 1; i += 1) {
-    const left = stops[i]
-    const right = stops[i + 1]
-    if (clamped >= left.at && clamped <= right.at) {
-      const ratio = (clamped - left.at) / (right.at - left.at)
-      const r = Math.round(left.rgb[0] + (right.rgb[0] - left.rgb[0]) * ratio)
-      const g = Math.round(left.rgb[1] + (right.rgb[1] - left.rgb[1]) * ratio)
-      const b = Math.round(left.rgb[2] + (right.rgb[2] - left.rgb[2]) * ratio)
-      return `rgb(${r}, ${g}, ${b})`
-    }
-  }
-  return 'rgb(239, 68, 68)'
-}
-
 export interface ContactDetailPersonViewProps {
   locale: 'tr' | 'en'
   contact: ContactRow
@@ -202,6 +182,7 @@ export interface ContactDetailPersonViewProps {
   onWarmthChange: (score: number) => void
   warmthPending: boolean
   onAddTag: (tag: string) => void
+  onRemoveTag: (tag: string) => void
   tagPending: boolean
   onCompleteTask: (taskId: string) => void
   onDeleteTask: (taskId: string) => void
@@ -231,6 +212,7 @@ export function ContactDetailPersonView({
   onWarmthChange,
   warmthPending,
   onAddTag,
+  onRemoveTag,
   tagPending,
   onCompleteTask,
   onDeleteTask,
@@ -239,6 +221,7 @@ export function ContactDetailPersonView({
   const [noteDraft, setNoteDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
   const [duePreset, setDuePreset] = useState<TaskDuePreset>('all')
+  const tagInputRef = useRef<HTMLInputElement>(null)
 
   const rawServerWarmth = rawTemperatureFromServer(contact.temperature_score)
   const [localWarmth, setLocalWarmth] = useState(() => sliderWarmthFromServer(contact.temperature_score))
@@ -246,8 +229,11 @@ export function ContactDetailPersonView({
 
   useEffect(() => {
     if (!warmthPending) {
-      setLocalWarmth(sliderWarmthFromServer(contact.temperature_score))
-      warmthDirtyRef.current = false
+      // Sync slider from server when switching contacts or after save; deferred to satisfy lint rules on effect setState.
+      queueMicrotask(() => {
+        setLocalWarmth(sliderWarmthFromServer(contact.temperature_score))
+        warmthDirtyRef.current = false
+      })
     }
   }, [contact.temperature_score, contact.id, warmthPending])
 
@@ -259,12 +245,17 @@ export function ContactDetailPersonView({
     if (v !== rawServerWarmth) onWarmthChange(v)
   }
 
-  const warmthThumbPct = ((localWarmth - 1) / 99) * 100
+  const warmthFillPct = Math.min(100, Math.max(0, localWarmth))
 
   const stage = stageMeta(contact.pipeline_stage)
   const coaching = useMemo(() => microCoachingBlock(contact, locale), [contact, locale])
 
-  const visibleInteractions = useMemo(() => interactions.slice(0, 10), [interactions])
+  const visibleInteractions = useMemo(() => {
+    const sorted = [...interactions].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )
+    return sorted.slice(0, 10)
+  }, [interactions])
 
   const openTasks = useMemo(
     () => tasks.filter((task) => task.status !== 'completed' && task.status !== 'skipped'),
@@ -322,7 +313,7 @@ export function ContactDetailPersonView({
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         {/* Left — stacked profile cards (separate boxes like reference UI) */}
         <div className="flex flex-col gap-4 xl:col-span-3">
-          <Card className="space-y-5">
+          <Card className="space-y-4">
             <div className="text-center">
               <Avatar name={contact.full_name} size="xl" className="mx-auto mb-3" />
               <h2 className="text-lg font-bold text-text-primary">{contact.full_name}</h2>
@@ -330,45 +321,30 @@ export function ContactDetailPersonView({
                 <p className="text-sm text-text-muted">&ldquo;{contact.nickname.trim()}&rdquo;</p>
               )}
               {contact.profession && <p className="text-sm text-text-tertiary">{contact.profession}</p>}
-              <div className="mx-auto mt-4 w-full max-w-[13rem]">
-                <p className="mb-1 text-center text-[11px] font-medium uppercase tracking-wide text-text-tertiary">
-                  {tr ? 'Sıcaklık değeri' : 'Warmth value'}
-                </p>
-                <div className="mb-1.5 flex items-center justify-between text-xs font-semibold">
-                  <span className="text-text-secondary">{contact.temperature}</span>
-                  <span style={{ color: warmthScoreColor(localWarmth) }}>{localWarmth}</span>
+              <div className="mx-auto mt-2 w-full max-w-[15rem]">
+                <div className="mb-1 flex items-center justify-between text-xs font-medium text-text-secondary">
+                  <span>{tr ? 'Sıcak' : 'Warm'}</span>
+                  <span className="tabular-nums font-semibold text-text-primary">{localWarmth}</span>
                 </div>
-                <div className="relative pt-7">
-                  <span
-                    className="pointer-events-none absolute top-0 select-none rounded-md bg-surface-hover px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-text-primary shadow-sm ring-1 ring-border"
-                    style={{
-                      left: `${warmthThumbPct}%`,
-                      transform: 'translateX(-50%)',
-                      color: warmthScoreColor(localWarmth),
-                    }}
-                  >
-                    {localWarmth}
-                  </span>
-                  <input
-                    type="range"
-                    min={1}
-                    max={100}
-                    step={1}
-                    value={localWarmth}
-                    disabled={warmthPending}
-                    onChange={(event) => {
-                      warmthDirtyRef.current = true
-                      setLocalWarmth(clampWarmthSlider(Number(event.target.value)))
-                    }}
-                    onPointerUp={commitWarmthIfChanged}
-                    onPointerCancel={commitWarmthIfChanged}
-                    onBlur={commitWarmthIfChanged}
-                    className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-transparent disabled:opacity-50 [&::-webkit-slider-runnable-track]:h-2.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:mt-[-4px] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-white/60 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-track]:h-2.5 [&::-moz-range-track]:rounded-full [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-white/60 [&::-moz-range-thumb]:bg-white"
-                    style={{
-                      background: 'linear-gradient(90deg, #06b6d4 0%, #3b82f6 35%, #f59e0b 70%, #ef4444 100%)',
-                    }}
-                  />
-                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={localWarmth}
+                  disabled={warmthPending}
+                  onChange={(event) => {
+                    warmthDirtyRef.current = true
+                    setLocalWarmth(clampWarmthSlider(Number(event.target.value)))
+                  }}
+                  onPointerUp={commitWarmthIfChanged}
+                  onPointerCancel={commitWarmthIfChanged}
+                  onBlur={commitWarmthIfChanged}
+                  className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-transparent disabled:opacity-50 [&::-webkit-slider-runnable-track]:h-2.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:mt-[-4px] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-white/70 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow [&::-moz-range-track]:h-2.5 [&::-moz-range-track]:rounded-full [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-white/70 [&::-moz-range-thumb]:bg-white"
+                  style={{
+                    background: `linear-gradient(90deg, rgb(245 158 11) 0%, rgb(245 158 11) ${warmthFillPct}%, rgb(39 39 42 / 0.92) ${warmthFillPct}%, rgb(39 39 42 / 0.92) 100%)`,
+                  }}
+                />
               </div>
             </div>
 
@@ -385,34 +361,49 @@ export function ContactDetailPersonView({
               <ContactChannelRow contact={contact} />
             </div>
 
-            <div className="space-y-2">
-              <p className="text-center text-xs font-semibold uppercase tracking-wider text-text-tertiary">
-                {tr ? 'Etiketler' : 'Tags'}
-              </p>
-              <div className="flex flex-wrap justify-center gap-1.5">
+            <div className="border-t border-border pt-4">
+              <div className="flex flex-wrap items-center gap-2">
                 {tags.map((tag, index) => (
-                  <span key={tag} className={cn('inline-flex max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold', tagClass(index))}>
-                    {tag}
+                  <span
+                    key={tag}
+                    className={cn(
+                      'inline-flex max-w-full items-center gap-1 truncate rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                      tagClass(index),
+                    )}
+                  >
+                    <span className="truncate">{tag}</span>
+                    <button
+                      type="button"
+                      disabled={tagPending}
+                      aria-label={tr ? 'Etiketi kaldır' : 'Remove tag'}
+                      onClick={() => onRemoveTag(tag)}
+                      className="shrink-0 rounded p-0.5 text-current opacity-70 hover:bg-white/10 hover:opacity-100 disabled:pointer-events-none disabled:opacity-30"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </span>
                 ))}
-              </div>
-              <div className="flex gap-2">
-                <div className="relative min-w-0 flex-1">
+                <div className="relative flex min-w-[8.5rem] max-w-[12rem] flex-1 items-center gap-1.5 rounded-xl border border-dashed border-border/80 bg-transparent px-2.5 py-1.5">
+                  <span className="shrink-0 text-xs font-medium text-text-muted">+</span>
                   <input
+                    ref={tagInputRef}
                     value={tagDraft}
+                    disabled={tagPending}
                     onChange={(event) => setTagDraft(event.target.value)}
                     onKeyDown={(event) => event.key === 'Enter' && (event.preventDefault(), submitTag())}
-                    placeholder={tr ? '+ Etiket ekle' : '+ Add tag'}
-                    className="w-full rounded-xl border border-dashed border-border bg-transparent px-3 py-2 pr-8 text-sm text-text-primary outline-none focus:border-primary/40"
+                    placeholder={tr ? 'Etiket ekle' : 'Add tag'}
+                    className="min-w-0 flex-1 border-0 bg-transparent py-0.5 text-sm text-text-primary outline-none placeholder:text-text-muted"
                   />
-                  <CornerDownLeft className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+                  <CornerDownLeft className="pointer-events-none h-3 w-3 shrink-0 text-text-muted" aria-hidden />
                 </div>
               </div>
             </div>
           </Card>
 
           <Card className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">{tr ? 'Aşama değiştir' : 'Change stage'}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+              {toHeadingCase(tr ? 'Aşama değiştir' : 'Change stage', locale)}
+            </p>
             <select
               value={contact.pipeline_stage}
               onChange={(event) => onStageChange(event.target.value)}
@@ -428,7 +419,9 @@ export function ContactDetailPersonView({
           </Card>
 
           <Card className="space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">{tr ? 'Bilgiler' : 'Details'}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+              {toHeadingCase(tr ? 'Bilgiler' : 'Details', locale)}
+            </p>
             <div className="space-y-3 text-sm">
               {contact.email && (
                 <div className="flex gap-2">
@@ -466,25 +459,31 @@ export function ContactDetailPersonView({
               <div className="space-y-3 border-t border-border-subtle pt-4 text-xs">
                 {contact.interests && (
                   <div>
-                    <p className="font-semibold text-text-tertiary">{tr ? 'İlgi alanları' : 'Interests'}</p>
+                    <p className="font-semibold text-text-tertiary">
+                      {toHeadingCase(tr ? 'İlgi alanları' : 'Interests', locale)}
+                    </p>
                     <p className="mt-1 text-text-secondary">{contact.interests}</p>
                   </div>
                 )}
                 {contact.pain_points && (
                   <div>
-                    <p className="font-semibold text-text-tertiary">{tr ? 'Sıkıntılar' : 'Pain points'}</p>
+                    <p className="font-semibold text-text-tertiary">
+                      {toHeadingCase(tr ? 'Sıkıntılar' : 'Pain points', locale)}
+                    </p>
                     <p className="mt-1 text-text-secondary">{contact.pain_points}</p>
                   </div>
                 )}
                 {contact.goals_notes && (
                   <div>
-                    <p className="font-semibold text-text-tertiary">{tr ? 'Not / hedefler' : 'Notes / goals'}</p>
+                    <p className="font-semibold text-text-tertiary">
+                      {toHeadingCase(tr ? 'Not / hedefler' : 'Notes / goals', locale)}
+                    </p>
                     <p className="mt-1 whitespace-pre-wrap text-text-secondary">{contact.goals_notes}</p>
                   </div>
                 )}
                 {contact.family_notes && (
                   <div>
-                    <p className="font-semibold text-text-tertiary">{tr ? 'Aile' : 'Family'}</p>
+                    <p className="font-semibold text-text-tertiary">{toHeadingCase(tr ? 'Aile' : 'Family', locale)}</p>
                     <p className="mt-1 whitespace-pre-wrap text-text-secondary">{contact.family_notes}</p>
                   </div>
                 )}
@@ -503,7 +502,7 @@ export function ContactDetailPersonView({
         <div className="space-y-4 xl:col-span-5">
           <Card padding="none" className="overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border px-4 py-3">
-              <CardTitle className="text-base">{tr ? 'Etkileşim geçmişi' : 'Interaction history'}</CardTitle>
+              <CardTitle className="text-base">{tr ? 'Etkileşim Geçmişi' : 'Interaction History'}</CardTitle>
               <Button size="sm" onClick={onOpenInteractionModal} icon={<Plus className="h-3.5 w-3.5" />}>
                 {tr ? 'Ekle' : 'Add'}
               </Button>
@@ -513,7 +512,7 @@ export function ContactDetailPersonView({
                 <input
                   value={noteDraft}
                   onChange={(event) => setNoteDraft(event.target.value)}
-                  placeholder={tr ? 'Hızlı not ekle...' : 'Add quick note...'}
+                  placeholder={toHeadingCase(tr ? 'Hızlı not ekle...' : 'Add quick note...', locale)}
                   className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary/40"
                 />
                 <Button
@@ -534,23 +533,33 @@ export function ContactDetailPersonView({
               ) : (
                 <div className="relative space-y-2 pl-6">
                   <div className="absolute bottom-2 left-[11px] top-2 w-px bg-border-subtle" aria-hidden />
-                  {visibleInteractions.map((interaction) => (
-                    <div key={interaction.id} className="relative rounded-xl border border-border-subtle bg-surface/50 p-3">
-                      <div className="absolute -left-6 top-3.5 flex h-5 w-5 items-center justify-center rounded-full border border-primary/30 bg-elevated text-primary">
-                        <ArrowRight className="h-3 w-3" />
-                      </div>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-semibold text-text-primary">
-                            {INTERACTION_TYPE_LABELS[interaction.type][locale]}
-                          </p>
-                          <p className="mt-0.5 text-[11px] text-text-muted">{formatDateTime(interaction.date, locale)}</p>
+                  {visibleInteractions.map((interaction) => {
+                    const activity = formatActivityInteractionCopy(interaction, locale, stageMeta)
+                    const when = interaction.created_at || interaction.date
+                    return (
+                      <div key={interaction.id} className="relative rounded-xl border border-border-subtle bg-surface/50 p-3">
+                        <div className="absolute -left-6 top-3.5 flex h-5 w-5 items-center justify-center rounded-full border border-primary/30 bg-elevated text-primary">
+                          <ArrowRight className="h-3 w-3" />
                         </div>
-                        <p className="text-[11px] text-text-tertiary">{channelLabel(interaction.channel, locale)}</p>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-text-primary">
+                              {activity
+                                ? activity.title
+                                : INTERACTION_TYPE_LABELS[interaction.type][locale]}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-text-muted">{formatDateTime(when, locale)}</p>
+                          </div>
+                          {!activity && (
+                            <p className="text-[11px] text-text-tertiary">{channelLabel(interaction.channel, locale)}</p>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm text-text-primary whitespace-pre-wrap">
+                          {activity ? activity.detail : interaction.content}
+                        </p>
                       </div>
-                      <p className="mt-2 text-sm text-text-primary whitespace-pre-wrap">{interaction.content}</p>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
               {interactions.length > 10 && (
@@ -638,21 +647,25 @@ export function ContactDetailPersonView({
           <Card className="space-y-4 border-warning/20 bg-warning/[0.06] p-5">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-warning" />
-              <CardTitle className="text-base">{tr ? 'Mikro koçluk' : 'Micro coaching'}</CardTitle>
+              <CardTitle className="text-base">{tr ? 'Mikro Koçluk' : 'Micro Coaching'}</CardTitle>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-warning">{tr ? 'Şimdi ne yapmalı?' : 'What to do now'}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-warning">
+                {toHeadingCase(tr ? 'Şimdi ne yapmalı?' : 'What to do now?', locale)}
+              </p>
               <p className="mt-1 text-sm text-text-secondary">{coaching.headline}</p>
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
-                {tr ? 'Önerilen mesaj' : 'Suggested message'}
+                {toHeadingCase(tr ? 'Önerilen mesaj' : 'Suggested message', locale)}
               </p>
               <p className="mt-2 rounded-xl border border-border bg-surface/60 p-3 text-sm text-text-primary">{coaching.suggested}</p>
             </div>
             {coaching.objection && (
               <div className="rounded-xl border border-border bg-surface/40 p-3">
-                <p className="text-xs font-semibold text-text-tertiary">{coaching.objection.label}</p>
+                <p className="text-xs font-semibold text-text-tertiary">
+                  {toHeadingCase(coaching.objection.label, locale)}
+                </p>
                 <p className="mt-1 text-sm text-text-secondary">{coaching.objection.text}</p>
                 <Link
                   href="/academy?tab=objections"

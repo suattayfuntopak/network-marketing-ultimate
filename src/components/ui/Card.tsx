@@ -3,6 +3,8 @@
 import { type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
+import { useLanguage } from '@/components/common/LanguageProvider'
+import { toHeadingCase } from '@/lib/headingCase'
 
 interface CardProps {
   children: ReactNode
@@ -55,7 +57,10 @@ export function CardHeader({ children, className }: { children: ReactNode; class
 }
 
 export function CardTitle({ children, className }: { children: ReactNode; className?: string }) {
-  return <h3 className={cn('text-sm font-semibold text-text-primary', className)}>{children}</h3>
+  const { locale } = useLanguage()
+  const headingLocale = locale === 'tr' ? 'tr' : 'en'
+  const rendered = typeof children === 'string' ? toHeadingCase(children, headingLocale) : children
+  return <h3 className={cn('text-sm font-semibold text-text-primary', className)}>{rendered}</h3>
 }
 
 export function CardDescription({ children, className }: { children: ReactNode; className?: string }) {

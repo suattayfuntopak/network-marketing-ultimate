@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { toHeadingCase } from '@/lib/headingCase'
 import { useAppStore } from '@/store/appStore'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useQuery } from '@tanstack/react-query'
@@ -126,7 +127,7 @@ export function Sidebar() {
                     exit={{ opacity: 0, width: 0 }}
                     className="overflow-hidden whitespace-nowrap"
                   >
-                    {navItem.label}
+                    {toHeadingCase(navItem.label, locale === 'tr' ? 'tr' : 'en')}
                   </motion.span>
                 )}
               </AnimatePresence>

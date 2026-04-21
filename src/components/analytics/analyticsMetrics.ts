@@ -1,4 +1,5 @@
 import type { ContactRow, InteractionRow, OrderRow, TaskRow } from '@/lib/queries'
+import { CONTACT_ACTIVITY_LOG_CHANNEL } from '@/lib/contactActivityLog'
 import type { Event } from '@/types'
 
 export type Locale = 'tr' | 'en'
@@ -246,6 +247,7 @@ export function buildInteractionMix(
       other: 0,
     }
     for (const interaction of interactions) {
+      if (interaction.channel === CONTACT_ACTIVITY_LOG_CHANNEL) continue
       const parsed = parseDate(interaction.date)
       if (!parsed) continue
       if (parsed < bucket.start || parsed > bucket.end) continue
