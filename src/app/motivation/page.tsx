@@ -884,7 +884,7 @@ export default function MotivationPage() {
                         <ChevronDown className="h-3.5 w-3.5 opacity-80" />
                       </Button>
                       {sendMenuOpen && hasDraft && (
-                        <ul className="absolute top-full z-30 mt-1 w-full min-w-[12rem] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-xl sm:left-0 sm:right-auto">
+                        <ul className="absolute bottom-full z-50 mb-1 w-full min-w-[12rem] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-xl sm:left-0 sm:right-auto">
                           {(
                             [
                               {
