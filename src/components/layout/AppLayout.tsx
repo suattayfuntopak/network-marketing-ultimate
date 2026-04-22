@@ -133,6 +133,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
       }
     }
 
+    async function bootstrapSession() {
+      const { data } = await supabase.auth.getSession()
+      await applySession(data.session)
+    }
+
+    void bootstrapSession()
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       void applySession(session)
     })
@@ -142,6 +149,50 @@ export function AppLayout({ children }: { children: ReactNode }) {
       subscription.unsubscribe()
     }
   }, [setCurrentUser])
+
+  useEffect(() => {
+    if (!authReady || !currentUser || isAuthRoute) return
+
+    const INACTIVITY_MS = 3 * 60 * 1000
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    const resetTimer = () => {
+      if (timer) {
+        clearTimeout(timer)
+      }
+      timer = setTimeout(async () => {
+        await supabase.auth.signOut()
+        syncAuthSessionCookie(false)
+        setCurrentUser(null)
+        router.replace('/auth/login')
+      }, INACTIVITY_MS)
+    }
+
+    const events: Array<keyof WindowEventMap> = [
+      'pointerdown',
+      'keydown',
+      'mousemove',
+      'touchstart',
+      'scroll',
+    ]
+
+    const onActivity = () => {
+      if (document.visibilityState === 'hidden') return
+      resetTimer()
+    }
+
+    events.forEach((eventName) => window.addEventListener(eventName, onActivity, { passive: true }))
+    document.addEventListener('visibilitychange', onActivity)
+    resetTimer()
+
+    return () => {
+      if (timer) {
+        clearTimeout(timer)
+      }
+      events.forEach((eventName) => window.removeEventListener(eventName, onActivity))
+      document.removeEventListener('visibilitychange', onActivity)
+    }
+  }, [authReady, currentUser, isAuthRoute, router, setCurrentUser])
 
   useEffect(() => {
     if (authReady && !currentUser && !isAuthRoute) {
@@ -193,7 +244,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Header />
-        <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-auto">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-6">
           {children}
         </main>
       </div>
