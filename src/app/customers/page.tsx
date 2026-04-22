@@ -429,7 +429,7 @@ export default function CustomersPage() {
                     {customerRows.map(({ customer, orderCount, totalSpent, lastOrderDate }) => (
                       <tr
                         key={customer.id}
-                        onClick={() => router.push(`/contacts?segment=customers&contact=${customer.id}`)}
+                        onClick={() => router.push(`/contacts?segment=customers&contact=${customer.id}&returnTo=%2Fcustomers`)}
                         className="cursor-pointer border-b border-border-subtle/70 hover:bg-surface/35 transition-colors"
                       >
                         <td className="px-4 py-3">
@@ -461,7 +461,7 @@ export default function CustomersPage() {
                   <button
                     type="button"
                     key={customer.id}
-                    onClick={() => router.push(`/contacts?segment=customers&contact=${customer.id}`)}
+                    onClick={() => router.push(`/contacts?segment=customers&contact=${customer.id}&returnTo=%2Fcustomers`)}
                     className="w-full p-4 text-left hover:bg-surface/35 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-3">
