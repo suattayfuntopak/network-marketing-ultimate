@@ -184,6 +184,7 @@ export default function LeaderPage() {
       category: 'follow_up',
       tone: 'friendly',
       extraContext: context,
+      ...(selectedContact && !isGeneralNoteSelected ? { contactId: selectedContact.id } : {}),
     })
     router.push('/ai')
   }
@@ -246,6 +247,7 @@ export default function LeaderPage() {
       category: 'follow_up',
       tone: 'friendly',
       extraContext: context,
+      contactId: contact.id,
     })
     router.push('/ai')
   }
