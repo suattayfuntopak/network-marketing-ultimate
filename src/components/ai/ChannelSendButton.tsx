@@ -29,6 +29,8 @@ type Props = {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success'
   className?: string
   buttonClassName?: string
+  /** Varsayılan: aşağı (top-full). Sadece alt kenarda taşma varsa `up` kullanın. */
+  menuPlacement?: 'up' | 'down'
 }
 
 function labelFor(channel: MessageSendChannel, locale: 'tr' | 'en') {
@@ -89,6 +91,7 @@ export function ChannelSendButton({
   variant = 'primary',
   className,
   buttonClassName,
+  menuPlacement = 'down',
 }: Props) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -127,7 +130,12 @@ export function ChannelSendButton({
         <ChevronDown className="h-3.5 w-3.5 opacity-80" />
       </Button>
       {open && hasDraft && (
-        <ul className="absolute bottom-full z-50 mb-1 w-full min-w-[12rem] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-xl sm:left-0 sm:right-auto">
+        <ul
+          className={cn(
+            'absolute z-50 w-full min-w-[12rem] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-xl sm:left-0 sm:right-auto',
+            menuPlacement === 'up' ? 'bottom-full mb-1' : 'top-full mt-1',
+          )}
+        >
           {CHANNELS.map((c) => {
             const dis = channelDisabled(c.id, linkMode, hasPhone)
             return (

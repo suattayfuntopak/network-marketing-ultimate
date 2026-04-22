@@ -840,6 +840,7 @@ export default function MotivationPage() {
                       linkMode="strict"
                       phone={singleContact?.phone}
                       email={singleContact?.email}
+                      menuPlacement="up"
                     />
                   </div>
                 </div>
