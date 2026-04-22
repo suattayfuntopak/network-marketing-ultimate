@@ -84,7 +84,12 @@ export const MOTIVATION_QUOTES: MotivationQuote[] = [
 
 export const FEATURED_VIDEO = {
   id: 'mgvkIS6FVHk',
-  title: 'Kısa ilham: Eylem ve tutarlılık hakkında',
+  /** Uzun açıklama (tooltip / ileri kullanım) */
+  title: 'Eylem ve tutarlılık: kısa not',
+  /** Kart üzerinde 1 satır */
+  titleShort: 'Eylem ve tutarlılık',
   duration: '~2 dk (altyazı YouTube’dan açılabilir)',
+  /** Kompakt süre etiketi */
+  durationShort: '~2 dk',
   category: 'Disiplin & eylem',
 } as const
