@@ -123,10 +123,9 @@ export default function LeaderPage() {
         content: `${LEADER_NOTE_PREFIX} ${payload.note}`,
         date: new Date().toISOString(),
       }),
-    onSuccess: () => {
-      if (selectedContact?.id) {
-        qc.invalidateQueries({ queryKey: ['leader-contact-notes', selectedContact.id] })
-      }
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['leader-contact-notes', variables.contactId] })
+      qc.invalidateQueries({ queryKey: ['contact-interactions', variables.contactId] })
     },
   })
 
@@ -134,18 +133,18 @@ export default function LeaderPage() {
     mutationFn: (payload: { interactionId: string; note: string }) =>
       updateInteraction(payload.interactionId, { content: `${LEADER_NOTE_PREFIX} ${payload.note}` }),
     onSuccess: () => {
-      if (selectedContact?.id) {
-        qc.invalidateQueries({ queryKey: ['leader-contact-notes', selectedContact.id] })
-      }
+      if (!selectedContact?.id) return
+      qc.invalidateQueries({ queryKey: ['leader-contact-notes', selectedContact.id] })
+      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedContact.id] })
     },
   })
 
   const deleteLeaderNoteMutation = useMutation({
     mutationFn: (interactionId: string) => deleteInteraction(interactionId),
     onSuccess: () => {
-      if (selectedContact?.id) {
-        qc.invalidateQueries({ queryKey: ['leader-contact-notes', selectedContact.id] })
-      }
+      if (!selectedContact?.id) return
+      qc.invalidateQueries({ queryKey: ['leader-contact-notes', selectedContact.id] })
+      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedContact.id] })
     },
   })
 
