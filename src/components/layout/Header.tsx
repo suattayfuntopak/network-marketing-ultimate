@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher'
@@ -9,15 +10,27 @@ import { useLanguage } from '@/components/common/LanguageProvider'
 import { useRouter } from 'next/navigation'
 import { syncAuthSessionCookie } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { academyLibraryItems, academyObjectionGuides } from '@/data/academyLibrary'
+import { fetchContacts, fetchEvents, fetchTasks } from '@/lib/queries'
+import type { Event } from '@/types'
 import { Avatar } from '@/components/ui/Avatar'
 import {
   Search, Bell, Bot, Menu, Command, X,
   Flame, TrendingUp, Sun, Moon,
-  UserPlus, ListTodo, GitBranch, User, Settings,
+  UserPlus, ListTodo, GitBranch, User, Settings, CalendarDays, GraduationCap, ShieldAlert,
   HelpCircle, MessageSquare, LogOut, ChevronDown
 } from 'lucide-react'
 import { useTheme } from '@/components/common/ThemeProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
+
+type SearchResultItem = {
+  id: string
+  kind: 'contact' | 'task' | 'event' | 'academy' | 'objection' | 'page'
+  title: string
+  subtitle: string
+  route: string
+  keywords: string
+}
 
 export function Header() {
   const {
@@ -32,10 +45,15 @@ export function Header() {
   const [notifOpen, setNotifOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const searchNeedle = searchQuery.trim().toLocaleLowerCase(locale)
 
   const streak = currentUser?.streak ?? 0
   const momentum = currentUser?.momentumScore ?? 0
   const isTurkish = locale === 'tr'
+  const searchButtonLabel = isTurkish ? 'Her şeyi ara' : 'Search everything'
+  const searchPlaceholder = isTurkish
+    ? 'Kişi, görev, eğitim, itiraz veya etkinlik ara...'
+    : 'Search people, tasks, training, objections, or events...'
   const userMenuItems = {
     profile: isTurkish ? 'Profilim' : 'My profile',
     settings: isTurkish ? 'Ayarlar' : 'Settings',
@@ -45,6 +63,146 @@ export function Header() {
     help: isTurkish ? 'Yardım & Destek' : 'Help & Support',
     feedback: isTurkish ? 'Geri Bildirim Gönder' : 'Send feedback',
     logout: isTurkish ? 'Çıkış Yap' : 'Sign out',
+  }
+
+  const { data: searchContacts = [] } = useQuery({
+    queryKey: ['search-contacts'],
+    queryFn: fetchContacts,
+    enabled: searchOpen && Boolean(currentUser),
+    staleTime: 30_000,
+  })
+
+  const { data: searchTasks = [] } = useQuery({
+    queryKey: ['search-tasks'],
+    queryFn: fetchTasks,
+    enabled: searchOpen && Boolean(currentUser),
+    staleTime: 30_000,
+  })
+
+  const { data: searchEvents = [] } = useQuery<Event[]>({
+    queryKey: ['search-events'],
+    queryFn: fetchEvents,
+    enabled: searchOpen && Boolean(currentUser),
+    staleTime: 30_000,
+  })
+
+  const searchResults = useMemo<SearchResultItem[]>(() => {
+    const pageItems: SearchResultItem[] = [
+      { id: 'page-dashboard', kind: 'page', title: isTurkish ? 'Pano' : 'Dashboard', subtitle: isTurkish ? 'Genel görünüm' : 'Overall view', route: '/dashboard', keywords: 'dashboard pano genel home board' },
+      { id: 'page-contacts', kind: 'page', title: isTurkish ? 'Kontaklar' : 'Contacts', subtitle: isTurkish ? 'Kişi ve müşteri kayıtları' : 'People and customer records', route: '/contacts', keywords: 'contacts kontaklar kişi customer müşteri' },
+      { id: 'page-tasks', kind: 'page', title: isTurkish ? 'Görevler ve Takipler' : 'Tasks & Follow-ups', subtitle: isTurkish ? 'Bugünkü aksiyonlar' : 'Action list', route: '/tasks', keywords: 'task görev follow up takip aksiyon todo' },
+      { id: 'page-events', kind: 'page', title: isTurkish ? 'Etkinlikler' : 'Events', subtitle: isTurkish ? 'Sunumlar ve toplantılar' : 'Meetings and presentations', route: '/events', keywords: 'event etkinlik toplantı zoom webinar sunum presentation' },
+      { id: 'page-academy', kind: 'page', title: isTurkish ? 'Akademi' : 'Academy', subtitle: isTurkish ? 'Eğitim kütüphanesi' : 'Learning library', route: '/academy', keywords: 'academy eğitim kurs içerik lesson training script' },
+    ]
+
+    const contactItems: SearchResultItem[] = searchContacts.map((contact) => ({
+      id: `contact-${contact.id}`,
+      kind: 'contact',
+      title: contact.full_name,
+      subtitle: [contact.profession, contact.location, contact.pipeline_stage].filter(Boolean).join(' • '),
+      route: `/contacts?contact=${contact.id}`,
+      keywords: [
+        contact.full_name,
+        contact.nickname,
+        contact.email,
+        contact.phone,
+        contact.profession,
+        contact.location,
+        contact.pipeline_stage,
+        contact.interests,
+        ...(contact.tags ?? []),
+      ]
+        .filter(Boolean)
+        .join(' '),
+    }))
+
+    const taskItems: SearchResultItem[] = searchTasks.map((task) => ({
+      id: `task-${task.id}`,
+      kind: 'task',
+      title: task.title,
+      subtitle: [task.type, task.status, task.priority, task.due_date].filter(Boolean).join(' • '),
+      route: '/tasks',
+      keywords: [task.title, task.description, task.type, task.status, task.priority, task.due_date].filter(Boolean).join(' '),
+    }))
+
+    const eventItems: SearchResultItem[] = searchEvents.map((event) => ({
+      id: `event-${event.id}`,
+      kind: 'event',
+      title: event.title,
+      subtitle: [event.type, event.status, event.location, event.startDate].filter(Boolean).join(' • '),
+      route: '/events',
+      keywords: [event.title, event.description, event.type, event.status, event.location, event.startDate, ...event.attendees.map((attendee) => attendee.name)]
+        .filter(Boolean)
+        .join(' '),
+    }))
+
+    const academyItems: SearchResultItem[] = academyLibraryItems.map((item) => ({
+      id: `academy-${item.id}`,
+      kind: 'academy',
+      title: item.title[locale],
+      subtitle: [item.category, item.type, item.level].join(' • '),
+      route: '/academy?tab=library',
+      keywords: [item.title[locale], item.summary[locale], item.content[locale], item.category, item.type, item.level, ...item.tags]
+        .filter(Boolean)
+        .join(' '),
+    }))
+
+    const objectionItems: SearchResultItem[] = academyObjectionGuides.map((guide) => ({
+      id: `objection-${guide.id}`,
+      kind: 'objection',
+      title: guide.objection[locale],
+      subtitle: [guide.category, isTurkish ? 'İtiraz Rehberi' : 'Objection Guide'].join(' • '),
+      route: '/academy?tab=objections',
+      keywords: [guide.objection[locale], guide.shortResponse[locale], guide.fullResponse[locale], guide.approach[locale], guide.exampleDialog[locale], guide.category, ...guide.tags]
+        .filter(Boolean)
+        .join(' '),
+    }))
+
+    return [...contactItems, ...taskItems, ...eventItems, ...academyItems, ...objectionItems, ...pageItems]
+  }, [isTurkish, locale, searchContacts, searchEvents, searchTasks])
+
+  const filteredSearchResults = useMemo(() => {
+    if (!searchNeedle) return []
+    return searchResults
+      .filter((item) => `${item.title} ${item.subtitle} ${item.keywords}`.toLocaleLowerCase(locale).includes(searchNeedle))
+      .slice(0, 16)
+  }, [locale, searchNeedle, searchResults])
+
+  const groupedResults = useMemo(() => {
+    const groups: Record<SearchResultItem['kind'], SearchResultItem[]> = {
+      contact: [],
+      task: [],
+      event: [],
+      academy: [],
+      objection: [],
+      page: [],
+    }
+    filteredSearchResults.forEach((item) => groups[item.kind].push(item))
+    return groups
+  }, [filteredSearchResults])
+
+  function openSearchResult(route: string) {
+    setSearchOpen(false)
+    setSearchQuery('')
+    router.push(route)
+  }
+
+  function kindLabel(kind: SearchResultItem['kind']) {
+    if (kind === 'contact') return isTurkish ? 'Kişiler' : 'People'
+    if (kind === 'task') return isTurkish ? 'Görevler & Takipler' : 'Tasks & Follow-ups'
+    if (kind === 'event') return isTurkish ? 'Etkinlikler' : 'Events'
+    if (kind === 'academy') return isTurkish ? 'Eğitim İçeriği' : 'Training Content'
+    if (kind === 'objection') return isTurkish ? 'İtiraz Rehberi' : 'Objection Guides'
+    return isTurkish ? 'Sayfalar' : 'Pages'
+  }
+
+  function kindIcon(kind: SearchResultItem['kind']) {
+    if (kind === 'contact') return User
+    if (kind === 'task') return ListTodo
+    if (kind === 'event') return CalendarDays
+    if (kind === 'academy') return GraduationCap
+    if (kind === 'objection') return ShieldAlert
+    return Search
   }
 
   useEffect(() => {
@@ -103,7 +261,7 @@ export function Header() {
               className="flex items-center justify-center sm:justify-start gap-2 h-9 w-9 sm:w-auto px-0 sm:px-3 rounded-xl bg-surface/60 border border-border-subtle text-text-tertiary hover:text-text-secondary hover:border-border transition-all text-sm shrink-0"
             >
               <Search className="w-4 h-4" />
-              <span className="hidden sm:inline">{t.common.search}</span>
+              <span className="hidden sm:inline">{searchButtonLabel}</span>
               <span className="hidden md:inline-flex items-center gap-0.5 ml-4 text-[10px] font-medium bg-surface-hover px-1.5 py-0.5 rounded">
                 <Command className="w-2.5 h-2.5" />K
               </span>
@@ -359,8 +517,14 @@ export function Header() {
                 <input
                   autoFocus
                   value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder={t.common.search}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && filteredSearchResults.length > 0) {
+                      event.preventDefault()
+                      openSearchResult(filteredSearchResults[0].route)
+                    }
+                  }}
+                  placeholder={searchPlaceholder}
                   className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted outline-none text-sm"
                 />
                 <button onClick={() => setSearchOpen(false)} className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover">
@@ -368,24 +532,71 @@ export function Header() {
                 </button>
               </div>
               <div className="p-4">
-                <p className="text-xs text-text-tertiary mb-3">{t.common.quickActions}</p>
-                <div className="space-y-1">
-                  {[
-                    { label: t.common.addNewProspect, icon: UserPlus, route: '/contacts?segment=prospects&new=1' },
-                    { label: t.common.createTask,      icon: ListTodo,  route: '/tasks' },
-                    { label: t.common.startAISession,  icon: Bot,       route: '/ai' },
-                    { label: t.common.viewTodaysPipeline, icon: GitBranch, route: '/pipeline' },
-                  ].map(({ label, icon: Icon, route }) => (
-                    <button
-                      key={route}
-                      onClick={() => { router.push(route); setSearchOpen(false) }}
-                      className="w-full flex items-center gap-3 p-2.5 rounded-xl text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-                    >
-                      <Icon className="w-4 h-4 text-text-tertiary" />
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                {searchNeedle ? (
+                  filteredSearchResults.length === 0 ? (
+                    <div className="py-6 text-center">
+                      <p className="text-sm font-medium text-text-primary">
+                        {isTurkish ? 'Sonuç bulunamadı' : 'No results found'}
+                      </p>
+                      <p className="text-xs text-text-tertiary mt-1">
+                        {isTurkish
+                          ? 'Farklı bir anahtar kelime deneyin.'
+                          : 'Try a different keyword.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                      {(Object.keys(groupedResults) as SearchResultItem['kind'][]).map((kind) => {
+                        if (groupedResults[kind].length === 0) return null
+                        const Icon = kindIcon(kind)
+                        return (
+                          <div key={kind}>
+                            <p className="text-[11px] uppercase tracking-wide text-text-tertiary mb-2 flex items-center gap-1.5">
+                              <Icon className="w-3.5 h-3.5" />
+                              {kindLabel(kind)}
+                            </p>
+                            <div className="space-y-1">
+                              {groupedResults[kind].map((result) => (
+                                <button
+                                  key={result.id}
+                                  onClick={() => openSearchResult(result.route)}
+                                  className="w-full flex items-start gap-3 p-2.5 rounded-xl text-left text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
+                                >
+                                  <Icon className="w-4 h-4 mt-0.5 text-text-tertiary shrink-0" />
+                                  <span className="min-w-0">
+                                    <span className="block text-text-primary truncate">{result.title}</span>
+                                    <span className="block text-xs text-text-tertiary truncate">{result.subtitle}</span>
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                ) : (
+                  <>
+                    <p className="text-xs text-text-tertiary mb-3">{t.common.quickActions}</p>
+                    <div className="space-y-1">
+                      {[
+                        { label: t.common.addNewProspect, icon: UserPlus, route: '/contacts?segment=prospects&new=1' },
+                        { label: t.common.createTask, icon: ListTodo, route: '/tasks' },
+                        { label: t.common.startAISession, icon: Bot, route: '/ai' },
+                        { label: t.common.viewTodaysPipeline, icon: GitBranch, route: '/pipeline' },
+                      ].map(({ label, icon: Icon, route }) => (
+                        <button
+                          key={route}
+                          onClick={() => { router.push(route); setSearchOpen(false) }}
+                          className="w-full flex items-center gap-3 p-2.5 rounded-xl text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
+                        >
+                          <Icon className="w-4 h-4 text-text-tertiary" />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </motion.div>
           </motion.div>
