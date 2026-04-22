@@ -390,6 +390,33 @@ export async function fetchInteractionsByContact(contactId: string): Promise<Int
   return (data ?? []) as InteractionRow[]
 }
 
+export async function updateInteraction(
+  id: string,
+  input: Partial<{
+    content: string
+    outcome: InteractionRow['outcome'] | null
+    next_action: string | null
+  }>
+): Promise<void> {
+  const userId = await requireSessionUserId()
+  const { error } = await supabase
+    .from('nmu_interactions')
+    .update(input)
+    .eq('id', id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function deleteInteraction(id: string): Promise<void> {
+  const userId = await requireSessionUserId()
+  const { error } = await supabase
+    .from('nmu_interactions')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
 export async function addContactActivityLog(
   userId: string,
   contactId: string,

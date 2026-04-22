@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { addDays, differenceInCalendarDays, formatDistanceToNow, isSameDay, parseISO, startOfDay } from 'date-fns'
 import { enUS, tr as trLocale } from 'date-fns/locale'
@@ -8,7 +7,13 @@ import {
   Archive,
   ArrowRight,
   CheckCircle2,
+  Check,
   CornerDownLeft,
+  Copy,
+  Edit3,
+  Mail,
+  MessageCircle,
+  MessageSquare,
   Pencil,
   Plus,
   SendHorizontal,
@@ -27,7 +32,6 @@ import {
   TASK_PRIORITY_LABELS,
   TASK_PRIORITY_VARIANTS,
   TASK_TYPE_LABELS,
-  channelLabel,
   stageMeta,
 } from '@/components/contacts/contactLabels'
 import { formatActivityInteractionCopy } from '@/lib/contactActivityLog'
@@ -142,6 +146,8 @@ export interface ContactDetailPersonViewProps {
   tagPending: boolean
   onCompleteTask: (taskId: string) => void
   onDeleteTask: (taskId: string) => void
+  onUpdateInteraction: (interactionId: string, content: string) => void
+  onDeleteInteraction: (interactionId: string) => void
 }
 
 export function ContactDetailPersonView({
@@ -172,6 +178,8 @@ export function ContactDetailPersonView({
   tagPending,
   onCompleteTask,
   onDeleteTask,
+  onUpdateInteraction,
+  onDeleteInteraction,
 }: ContactDetailPersonViewProps) {
   const tr = locale === 'tr'
   const [noteDraft, setNoteDraft] = useState('')
@@ -184,6 +192,11 @@ export function ContactDetailPersonView({
   )
   const [coachingLoading, setCoachingLoading] = useState(false)
   const [coachingError, setCoachingError] = useState('')
+  const [copiedInteractionId, setCopiedInteractionId] = useState<string | null>(null)
+  const [editingInteractionId, setEditingInteractionId] = useState<string | null>(null)
+  const [editingInteractionContent, setEditingInteractionContent] = useState('')
+  const [copiedCoaching, setCopiedCoaching] = useState(false)
+  const [openCoachingSendMenu, setOpenCoachingSendMenu] = useState(false)
   const tagInputRef = useRef<HTMLInputElement>(null)
 
   const rawServerWarmth = rawTemperatureFromServer(contact.temperature_score)
@@ -290,6 +303,41 @@ export function ContactDetailPersonView({
     if (!text) return
     await onQuickNote(text)
     setNoteDraft('')
+  }
+
+  function getCoachingSendHref(channel: 'whatsapp' | 'telegram' | 'email' | 'sms') {
+    const message = encodeURIComponent(coachingMessage)
+    const phone = contact.phone?.replace(/\D/g, '') ?? ''
+    if (channel === 'whatsapp') return `https://wa.me/${phone || ''}?text=${message}`
+    if (channel === 'telegram') return `https://t.me/share/url?text=${message}`
+    if (channel === 'email') return contact.email ? `mailto:${contact.email}?body=${message}` : 'mailto:?body=' + message
+    return phone ? `sms:${phone}?body=${message}` : `sms:?body=${message}`
+  }
+
+  async function copyCoachingMessage() {
+    await navigator.clipboard.writeText(coachingMessage)
+    setCopiedCoaching(true)
+    window.setTimeout(() => setCopiedCoaching(false), 1200)
+  }
+
+  function startEditInteraction(interaction: InteractionRow) {
+    setEditingInteractionId(interaction.id)
+    setEditingInteractionContent(interaction.content)
+  }
+
+  function saveEditedInteraction() {
+    if (!editingInteractionId || !editingInteractionContent.trim()) return
+    onUpdateInteraction(editingInteractionId, editingInteractionContent.trim())
+    setEditingInteractionId(null)
+    setEditingInteractionContent('')
+  }
+
+  async function copyInteraction(content: string, interactionId: string) {
+    await navigator.clipboard.writeText(content)
+    setCopiedInteractionId(interactionId)
+    window.setTimeout(() => {
+      setCopiedInteractionId((current) => (current === interactionId ? null : current))
+    }, 1200)
   }
 
   function submitTag() {
@@ -554,7 +602,7 @@ export function ContactDetailPersonView({
                     const activity = formatActivityInteractionCopy(interaction, locale, stageMeta)
                     const when = interaction.created_at || interaction.date
                     return (
-                      <div key={interaction.id} className="relative rounded-xl border border-border-subtle bg-surface/50 p-3">
+                      <div key={interaction.id} className="group relative rounded-xl border border-border-subtle bg-surface/50 p-3">
                         <div className="absolute -left-6 top-3.5 flex h-5 w-5 items-center justify-center rounded-full border border-primary/30 bg-elevated text-primary">
                           <ArrowRight className="h-3 w-3" />
                         </div>
@@ -567,13 +615,57 @@ export function ContactDetailPersonView({
                             </p>
                             <p className="mt-0.5 text-[11px] text-text-muted">{formatDateTime(when, locale)}</p>
                           </div>
-                          {!activity && (
-                            <p className="text-[11px] text-text-tertiary">{channelLabel(interaction.channel, locale)}</p>
-                          )}
+                          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button
+                              type="button"
+                              onClick={() => void copyInteraction(activity ? activity.detail : interaction.content, interaction.id)}
+                              className="rounded-lg p-1.5 text-text-tertiary hover:bg-surface-hover hover:text-text-primary"
+                              title={tr ? 'Kopyala' : 'Copy'}
+                            >
+                              {copiedInteractionId === interaction.id ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+                            </button>
+                            {!activity && (
+                              <button
+                                type="button"
+                                onClick={() => startEditInteraction(interaction)}
+                                className="rounded-lg p-1.5 text-text-tertiary hover:bg-surface-hover hover:text-text-primary"
+                                title={tr ? 'Düzenle' : 'Edit'}
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => onDeleteInteraction(interaction.id)}
+                              className="rounded-lg p-1.5 text-text-tertiary hover:bg-error/10 hover:text-error"
+                              title={tr ? 'Sil' : 'Delete'}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <p className="mt-2 text-sm text-text-primary whitespace-pre-wrap">
-                          {activity ? activity.detail : interaction.content}
-                        </p>
+                        {editingInteractionId === interaction.id && !activity ? (
+                          <div className="mt-2 space-y-2">
+                            <textarea
+                              value={editingInteractionContent}
+                              onChange={(event) => setEditingInteractionContent(event.target.value)}
+                              className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-primary/40"
+                              rows={3}
+                            />
+                            <div className="flex justify-end gap-2">
+                              <Button type="button" size="sm" variant="ghost" onClick={() => setEditingInteractionId(null)}>
+                                {tr ? 'İptal' : 'Cancel'}
+                              </Button>
+                              <Button type="button" size="sm" onClick={saveEditedInteraction}>
+                                {tr ? 'Kaydet' : 'Save'}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-sm text-text-primary whitespace-pre-wrap">
+                            {activity ? activity.detail : interaction.content}
+                          </p>
+                        )}
                       </div>
                     )
                   })}
@@ -693,12 +785,39 @@ export function ContactDetailPersonView({
             >
               {tr ? 'Mesajı Hazırla' : 'Prepare Message'}
             </Button>
-            <Link
-              href="/academy?tab=objections"
-              className="block text-center text-xs text-text-muted transition-colors hover:text-primary"
-            >
-              {tr ? 'Akademi · İtiraz senaryoları' : 'Academy · Objection scripts'}
-            </Link>
+            <div className="flex items-center gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => void copyCoachingMessage()} icon={copiedCoaching ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}>
+                {tr ? 'Kopyala' : 'Copy'}
+              </Button>
+              <div className="relative">
+                <Button type="button" size="sm" variant="secondary" onClick={() => setOpenCoachingSendMenu((current) => !current)} icon={<SendHorizontal className="h-3.5 w-3.5" />}>
+                  {tr ? 'Gönder' : 'Send'}
+                </Button>
+                {openCoachingSendMenu && (
+                  <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-xl border border-border-subtle bg-card p-1.5 shadow-xl">
+                    {[
+                      { id: 'whatsapp', label: 'WhatsApp', icon: <MessageCircle className="h-3.5 w-3.5" /> },
+                      { id: 'telegram', label: 'Telegram', icon: <SendHorizontal className="h-3.5 w-3.5" /> },
+                      { id: 'email', label: 'Email', icon: <Mail className="h-3.5 w-3.5" /> },
+                      { id: 'sms', label: 'SMS', icon: <MessageSquare className="h-3.5 w-3.5" /> },
+                    ].map((channel) => (
+                      <button
+                        key={channel.id}
+                        type="button"
+                        onClick={() => {
+                          window.open(getCoachingSendHref(channel.id as 'whatsapp' | 'telegram' | 'email' | 'sms'), '_blank', 'noopener,noreferrer')
+                          setOpenCoachingSendMenu(false)
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-text-primary transition-colors hover:bg-surface-hover"
+                      >
+                        {channel.icon}
+                        <span>{channel.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </Card>
         </div>
       </div>

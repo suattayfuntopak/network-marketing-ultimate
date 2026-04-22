@@ -34,6 +34,8 @@ import {
   deleteContact,
   fetchInteractionsByContact,
   addInteraction,
+  updateInteraction,
+  deleteInteraction,
   addContactActivityLog,
   fetchTasksByContact,
   addTask,
@@ -388,6 +390,20 @@ export default function ContactsPage() {
       setInteractionError('')
     },
     onError: (error: Error) => setInteractionError(error.message),
+  })
+
+  const updateInteractionMutation = useMutation({
+    mutationFn: ({ id, content }: { id: string; content: string }) => updateInteraction(id, { content }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
+    },
+  })
+
+  const deleteInteractionMutation = useMutation({
+    mutationFn: (id: string) => deleteInteraction(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
+    },
   })
 
   const contactTaskMutation = useMutation({
@@ -959,6 +975,12 @@ export default function ContactsPage() {
                 id: taskId,
                 title: task?.title ?? (currentLocale === 'tr' ? 'Görev' : 'Task'),
               })
+            }}
+            onUpdateInteraction={(interactionId, content) => {
+              updateInteractionMutation.mutate({ id: interactionId, content })
+            }}
+            onDeleteInteraction={(interactionId) => {
+              deleteInteractionMutation.mutate(interactionId)
             }}
           />
         </motion.div>
