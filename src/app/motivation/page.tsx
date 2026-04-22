@@ -22,8 +22,6 @@ import {
   Play,
   Share2,
   Sparkles,
-  Wand2,
-  X,
 } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.03 } } }
@@ -107,7 +105,6 @@ export default function MotivationPage() {
   const [favIds] = usePersistentState<string[]>('nmu-motivation-fav-quotes', [], { version: 1 })
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [videoThumbError, setVideoThumbError] = useState(false)
-  const [showMiniPlayer, setShowMiniPlayer] = useState(false)
   const [videoSaved, setVideoSaved] = usePersistentState<string[]>('nmu-motivation-saved-videos', [], { version: 1 })
 
   const [segment, setSegment] = useState<Segment>('single')
@@ -130,6 +127,8 @@ export default function MotivationPage() {
   const [copyFlash, setCopyFlash] = useState(false)
   const [previewTab, setPreviewTab] = useState<'message' | 'variants' | 'bulk'>('message')
   const [variantIndex, setVariantIndex] = useState(0)
+  const [variantCount, setVariantCount] = useState<1 | 2 | 3>(1)
+  const [dayVideoNote, setDayVideoNote] = useState('')
   const previewTextRef = useRef<HTMLTextAreaElement | null>(null)
   const contextNotesRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -162,12 +161,12 @@ export default function MotivationPage() {
     if (stagnant7.length) {
       const n = stagnant7[0]!.full_name
       return tr
-        ? `Bugünün net önerisi: son 7 gündür sessiz kalanlardan biriyle (${n}) kısa ve sıcak bir sohbet başlat.`
+        ? `Son 7 gündür sessiz kalanlardan biriyle (${n}) kısa ve sıcak bir sohbet başlat.`
         : `Start a short, warm chat with someone quiet for 7+ days (e.g. ${n.split(' ')[0]}).`
     }
     if (toRecognize) {
       return tr
-        ? `Bugün kutlanacak küçük ilerleme: ${toRecognize.full_name} — samimi bir not yeter.`
+        ? `Kutlanacak küçük ilerleme: ${toRecognize.full_name} — samimi bir not yeter.`
         : `A small win to celebrate: ${toRecognize.full_name} — one genuine note.`
     }
     return tr
@@ -259,29 +258,41 @@ export default function MotivationPage() {
   )
 
   const runGenerate = useCallback(
-    async (mode: 'one' | 'three' | 'refine', refineHint?: string) => {
+    async (mode: 'one' | 'two' | 'three' | 'refine', refineHint?: string) => {
       setLoading(true)
       if (mode !== 'refine') {
         setOutHint('')
         setVariations([])
       }
       try {
-        const wantThree = mode === 'three'
-        if (mode === 'one' || wantThree) setVariantIndex(0)
+        const count = mode === 'one' ? 1 : mode === 'two' ? 2 : mode === 'three' ? 3 : 0
+        const isMulti = count > 1
+        if (mode === 'one' || isMulti) setVariantIndex(0)
+
+        const trMultiLine =
+          count === 3
+            ? 'Tam 3 farklı varyasyon yaz. Yalnızca mesaj metinleri; aralarını TEK SIRA olarak --- (üç tire) ile ayır. Başlık ekleme.'
+            : count === 2
+              ? 'Tam 2 farklı varyasyon yaz. Yalnızca mesaj metinleri; aralarını TEK SIRA olarak --- (üç tire) ile ayır. Başlık ekleme.'
+              : 'Tek bir metin ver; başlık, numaralandırma, tırnak dışı açıklama ekleme.'
+
+        const enMultiLine =
+          count === 3
+            ? 'Output exactly 3 variants separated only by --- on its own line. No headings.'
+            : count === 2
+              ? 'Output exactly 2 variants separated only by --- on its own line. No headings.'
+              : 'Output a single message only.'
+
         const baseInstruction = tr
           ? [
               'Sen, doğrudan satış liderlerine kısa, gönderilebilir motivasyon metinleri yazan profesyonel bir uygunsun.',
-              wantThree
-                ? 'Tam 3 farklı varyasyon yaz. Yalnızca mesaj metinleri; aralarını TEK SIRA olarak --- (üç tire) ile ayır. Başlık ekleme.'
-                : 'Tek bir metin ver; başlık, numaralandırma, tırnak dışı açıklama ekleme.',
+              trMultiLine,
               buildContextBlock('generate'),
               'Mesaj: kişiyi gördüğünü hissettir, mümkünse küçük bir ilerlemeyi veya niteliği takdir et, baskı olmadan tek net adım veya yumuşak çağrı, sıcak kapanış. Klişe “sen yaparsın, garanti kazanç” dili yok.',
             ]
           : [
               'You write send-ready, respectful motivation for direct selling leaders.',
-              wantThree
-                ? 'Output exactly 3 variants separated only by --- on its own line. No headings.'
-                : 'Output a single message only.',
+              enMultiLine,
               buildContextBlock('generate'),
             ]
 
@@ -307,16 +318,21 @@ export default function MotivationPage() {
           const r = await postAiChat([{ role: 'user', content: baseInstruction.join('\n\n') }])
           if (!r.ok) throw new Error('ai')
           const text = (await r.text()).trim()
-          if (wantThree) {
-            const parts = text.split(/\n*---\n*/).map((p) => p.trim()).filter(Boolean)
-            setVariations(parts.length ? parts : [text])
+          if (isMulti) {
+            const parts = text
+              .split(/\n*---\n*/)
+              .map((p) => p.trim())
+              .filter(Boolean)
+            const n = count
+            const useParts = parts.length >= n ? parts.slice(0, n) : parts.length ? parts : [text]
+            setVariations(useParts)
             setOutTitle(tr ? 'Varyasyonlar' : 'Variants')
-            setOutBody(parts[0] ?? text)
-            setPreviewTab('variants')
+            setOutBody(useParts[0] ?? text)
+            setPreviewTab(useParts.length > 1 ? 'variants' : 'message')
             setOutHint(
               tr
-                ? 'Üç taslak: ihtiyacına göre birini seç veya birleştir. Çıktı, kişiye küçük ilerlemeyi görünür kılar ve baskı kurmadan davet eder.'
-                : 'Pick one variant or merge. Framing: visible progress, zero-pressure invitation.',
+                ? 'Taslakları seç veya birleştir. Küçük ilerleme odağı, baskısız davet.'
+                : 'Pick or merge. Visible progress, zero-pressure invitation.',
             )
           } else {
             setOutBody(text)
@@ -427,62 +443,56 @@ export default function MotivationPage() {
       variants={container}
       initial="hidden"
       animate="show"
-      className="w-full max-w-[1024px] mx-auto space-y-4 sm:space-y-5"
+      className="w-full max-w-[min(100%,1800px)] mx-auto space-y-4 sm:space-y-5 px-3 sm:px-5 lg:px-8"
     >
-      {/* 1) Kompakt hero + günün sözü */}
-      <motion.section
-        variants={item}
-        className="flex flex-col gap-3.5 sm:flex-row sm:items-stretch sm:justify-between sm:gap-6"
-      >
-        <div className="min-w-0 max-w-md space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-text-primary sm:text-[1.65rem]">
-            {h(s('Motivasyon Merkezi', 'Motivation hub'))}
-          </h1>
-          <p className="text-[13px] leading-relaxed text-text-secondary/90">
-            {s(
-              'İlham al, hedefi netle, mesajı saniyeler içinde hazırla.',
-              'Get inspired, lock the target, prep your message in seconds.',
-            )}
-          </p>
-          <p className="text-xs leading-relaxed text-text-muted/75">
-            {s(
-              'Doğru kişiye, doğru anda, doğru tonda destek ver.',
-              'Support the right person, at the right moment, in the right tone.',
-            )}
-          </p>
-        </div>
+      {/* 1) Başlık */}
+      <motion.section variants={item} className="min-w-0">
+        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-text-primary sm:text-[1.75rem]">
+          {h(s('Motivasyon', 'Motivation'))}
+        </h1>
+        <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-text-secondary/90 sm:text-sm">
+          {s(
+            'İlham al, hedefini netleştir, saniyeler içinde motivasyon mesajları hazırla!',
+            'Get inspired, clarify your goal, and prep motivation messages in seconds!',
+          )}
+        </p>
+      </motion.section>
 
-        <aside className="w-full shrink-0 sm:max-w-[20rem] sm:self-start">
-          <div
-            className={cn(
-              'relative overflow-hidden rounded-xl p-4',
-              'border border-white/[0.07] bg-slate-950/70',
-              'shadow-[0_12px_40px_-24px_rgba(0,0,0,0.85)]',
-            )}
-          >
-            <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-cyan-500/[0.035]" />
-            <p className={cn(lab, 'text-cyan-200/40')}>{h(s("Günün sözü", "Today's line"))}</p>
-            <div className="mt-2.5">
-              <span className="inline-block border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[9px] font-medium tracking-[0.14em] text-cyan-100/50">
-                {currentQuote.category}
-              </span>
+      {/* 2) Günün sözü — tam genişlik */}
+      <motion.section variants={item} className="min-w-0">
+        <div
+          className={cn(
+            'relative w-full overflow-hidden rounded-2xl p-4 sm:p-5',
+            'border border-white/[0.07] bg-slate-950/70',
+            'shadow-[0_20px_50px_-28px_rgba(0,0,0,0.85)]',
+          )}
+        >
+          <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-cyan-500/[0.04]" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+            <div className="min-w-0 flex-1">
+              <p className={cn(lab, 'text-cyan-200/40')}>{h(s("Günün sözü", "Today's line"))}</p>
+              <div className="mt-2.5">
+                <span className="inline-block border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[9px] font-medium tracking-[0.14em] text-cyan-100/50">
+                  {currentQuote.category}
+                </span>
+              </div>
+              <blockquote className="mt-3 text-base font-light leading-[1.55] tracking-[-0.015em] text-text-primary/88 sm:text-[1.05rem]">
+                <span className="text-cyan-200/25">“</span>
+                {currentQuote.text}
+                <span className="text-cyan-200/25">”</span>
+              </blockquote>
+              <footer className="mt-4 space-y-0.5 border-t border-white/[0.06] pt-4 sm:max-w-lg">
+                <p className="text-[13px] font-medium text-text-primary/95">{currentQuote.author}</p>
+                <p className="text-[10px] leading-snug text-text-muted/70">{currentQuote.role}</p>
+              </footer>
             </div>
-            <blockquote className="mt-3 text-[0.9rem] font-light leading-[1.55] tracking-[-0.015em] text-text-primary/88">
-              <span className="text-cyan-200/25">“</span>
-              {currentQuote.text}
-              <span className="text-cyan-200/25">”</span>
-            </blockquote>
-            <footer className="mt-3 space-y-0.5 border-t border-white/[0.06] pt-3">
-              <p className="text-[12.5px] font-medium text-text-primary/95">{currentQuote.author}</p>
-              <p className="text-[9.5px] leading-snug text-text-muted/70">{currentQuote.role}</p>
-            </footer>
-            <div className="mt-3 flex items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-2 lg:flex-col lg:items-stretch">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
                 onClick={newQuote}
-                className="h-7 border-white/[0.1] bg-transparent px-2.5 text-[11px] text-text-secondary hover:bg-white/[0.04]"
+                className="h-8 border-white/[0.1] bg-transparent px-3 text-xs text-text-secondary hover:bg-white/[0.04]"
               >
                 {s('Yeni söz', 'New quote')}
               </Button>
@@ -491,14 +501,14 @@ export default function MotivationPage() {
                 size="sm"
                 variant="ghost"
                 onClick={shareQuote}
-                className="h-7 gap-1 px-2 text-[11px] text-text-muted/80 hover:text-text-secondary"
-                icon={<Share2 className="h-3 w-3 opacity-60" />}
+                className="h-8 gap-1.5 px-3 text-xs text-text-muted/80 hover:text-text-secondary"
+                icon={<Share2 className="h-3.5 w-3.5 opacity-60" />}
               >
                 {s('Paylaş', 'Share')}
               </Button>
             </div>
           </div>
-        </aside>
+        </div>
       </motion.section>
 
       {/* 2) Ana kahraman: motivasyon akış stüdyosu */}
@@ -711,140 +721,46 @@ export default function MotivationPage() {
                 </div>
               )}
 
-              <div className="mt-auto space-y-2 border-t border-white/[0.06] pt-3">
+              <div className="mt-auto space-y-3 border-t border-white/[0.06] pt-3">
+                <div>
+                  <p className={lab}>{s('Varyasyon sayısı', 'Variation count')}</p>
+                  <div className="mt-1.5 flex gap-1.5">
+                    {([1, 2, 3] as const).map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setVariantCount(n)}
+                        className={cn(
+                          'h-8 min-w-0 flex-1 rounded-full border px-1.5 text-[11px] font-semibold transition sm:text-xs',
+                          variantCount === n
+                            ? 'border-cyan-400 bg-cyan-400 text-slate-950 shadow-sm'
+                            : 'border-white/[0.1] bg-slate-900/50 text-text-secondary/90 hover:border-white/[0.16]',
+                        )}
+                      >
+                        {tr
+                          ? `${n} Mesaj`
+                          : n === 1
+                            ? '1 message'
+                            : `${n} messages`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <Button
                   type="button"
                   size="lg"
-                  className="h-11 w-full text-[15px] font-medium shadow-[0_0_0_1px_rgba(34,211,238,0.12)]"
-                  onClick={() => void runGenerate('one')}
+                  className="h-11 w-full border-0 text-[15px] font-semibold text-slate-950 shadow-md"
+                  style={{ background: 'linear-gradient(180deg, #22d3ee 0%, #06b6d4 100%)' }}
+                  onClick={() => {
+                    void runGenerate(
+                      variantCount === 1 ? 'one' : variantCount === 2 ? 'two' : 'three',
+                    )
+                  }}
                   loading={loading}
-                  icon={<Wand2 className="h-4 w-4" />}
+                  icon={<Sparkles className="h-4 w-4 text-slate-950" strokeWidth={2} />}
                 >
-                  {s('Mesaj üret', 'Generate message')}
+                  {s('Üret', 'Generate')}
                 </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="md"
-                  className="h-9 w-full"
-                  onClick={() => void runGenerate('three')}
-                  loading={loading}
-                  icon={<Sparkles className="h-3.5 w-3.5" />}
-                >
-                  {s('3 varyasyon üret', 'Generate 3 variants')}
-                </Button>
-              </div>
-
-              {/* Destek: mini medya (asıl odak değil) */}
-              <div
-                className={cn(
-                  'mt-1 rounded-lg border border-white/[0.06] p-2.5',
-                  'bg-slate-950/40',
-                )}
-              >
-                <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-text-muted/50">
-                  {s('Sessiz eşlik', 'Quiet support')}
-                </p>
-                <div className="mt-2 flex gap-2.5">
-                  <button
-                    type="button"
-                    onClick={openYouTube}
-                    className="group relative h-11 w-16 shrink-0 overflow-hidden rounded-md border border-white/[0.08] text-left"
-                  >
-                    {videoThumbError ? (
-                      <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90">
-                        <Play className="h-3.5 w-3.5 text-text-muted/50" />
-                      </div>
-                    ) : (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={videoThumb}
-                        alt=""
-                        onError={() => setVideoThumbError(true)}
-                        className="h-full w-full object-cover opacity-90"
-                      />
-                    )}
-                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/50 to-transparent">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/30 text-white/95">
-                        <Play className="h-2.5 w-2.5 fill-current pl-px" />
-                      </span>
-                    </div>
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline gap-x-1.5">
-                      <span className="text-[7px] font-medium uppercase tracking-wider text-text-muted/60">
-                        {FEATURED_VIDEO.category}
-                      </span>
-                      <span className="text-[8px] tabular-nums text-text-muted/45">{FEATURED_VIDEO.durationShort}</span>
-                    </div>
-                    <p className="mt-0.5 line-clamp-2 text-[11px] font-medium leading-snug text-text-primary/80">
-                      {FEATURED_VIDEO.titleShort}
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={openYouTube}
-                        className="h-6 border-white/[0.1] px-2 text-[10px]"
-                      >
-                        {s('İzle', 'Watch')}
-                      </Button>
-                      <button
-                        type="button"
-                        onClick={() => setShowMiniPlayer((v) => !v)}
-                        className="text-[9px] text-text-muted/50 hover:text-text-tertiary/90"
-                      >
-                        {showMiniPlayer ? s('Mini gizle', 'Hide player') : s('Mini oynat', 'Mini play')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={toggleVideoSave}
-                        className={cn(
-                          'text-text-muted/40 hover:text-text-tertiary/80',
-                          videoSaved.includes(FEATURED_VIDEO.id) && 'text-amber-200/40',
-                        )}
-                        aria-label={s('Kaydet', 'Save')}
-                      >
-                        <Bookmark className="h-2.5 w-2.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                {showMiniPlayer && !videoThumbError && (
-                  <div className="relative mt-2 overflow-hidden rounded-md border border-white/[0.06] bg-black/50">
-                    <button
-                      type="button"
-                      onClick={() => setShowMiniPlayer(false)}
-                      className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded bg-black/50 text-text-muted hover:text-text-secondary"
-                      aria-label={s('Kapat', 'Close')}
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                    <div className="h-[3.5rem] w-full">
-                      <iframe
-                        title="YouTube"
-                        className="h-full w-full"
-                        src={videoSrc}
-                        allow="clipboard-write; encrypted-media; picture-in-picture; fullscreen"
-                        allowFullScreen
-                        loading="lazy"
-                      />
-                    </div>
-                    <p className="border-t border-white/[0.06] px-2 py-0.5 text-center text-[8px] text-text-muted/60">
-                      <button
-                        type="button"
-                        className="hover:text-text-tertiary/90"
-                        onClick={() => {
-                          setShowMiniPlayer(false)
-                          openYouTube()
-                        }}
-                      >
-                        {s("YouTube'ta aç", 'Open in YouTube')}
-                      </button>
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -901,7 +817,7 @@ export default function MotivationPage() {
                   <div className="space-y-2">
                     {!hasVariations ? (
                       <p className="text-sm text-text-muted/70">
-                        {s('Önce "3 varyasyon üret" ile taslakları al.', 'Use “Generate 3 variants” to get drafts.')}
+                        {s('Önce varyasyon sayısını seçip "Üret" de.', 'Pick a count above, then hit Generate.')}
                       </p>
                     ) : (
                       <div className="space-y-2">
@@ -1087,13 +1003,102 @@ export default function MotivationPage() {
         </div>
       </motion.section>
 
-      {/* 3) Sessiz öneri şeridi */}
+      {/* 4) Günün videosu + özet alanı (stüdyo ile aynı genişlik) */}
+      <motion.section variants={item} className="min-w-0">
+        <h2 className="mb-2.5 text-sm font-medium tracking-[-0.02em] text-text-primary/95 sm:text-base">
+          {h(s('Günün videosu', "Today's video"))}
+        </h2>
+        <div
+          className={cn(
+            'overflow-hidden rounded-2xl',
+            'border border-white/[0.07] bg-gradient-to-b from-slate-900/40 via-slate-950/50 to-slate-950/90',
+            'shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_24px_60px_-32px_rgba(0,0,0,0.75)]',
+          )}
+        >
+          <div className="grid min-h-0 grid-cols-1 lg:grid-cols-12">
+            <div className="border-b border-white/[0.05] lg:col-span-7 lg:border-b-0 lg:border-r lg:border-white/[0.05]">
+              <div className="relative aspect-video w-full bg-black/50">
+                {/* Thumbnail probe: if it fails, skip embed to avoid a broken player */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={videoThumb} alt="" className="absolute h-px w-px opacity-0" onError={() => setVideoThumbError(true)} />
+                {videoThumbError ? (
+                  <button
+                    type="button"
+                    onClick={openYouTube}
+                    className="flex h-full w-full flex-col items-center justify-center gap-2 text-text-muted/70 transition hover:text-text-secondary"
+                  >
+                    <span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                      <Play className="h-6 w-6" />
+                    </span>
+                    <span className="text-xs">{s("YouTube'ta aç", 'Open in YouTube')}</span>
+                  </button>
+                ) : (
+                  <iframe
+                    title="YouTube"
+                    className="absolute inset-0 h-full w-full"
+                    src={videoSrc}
+                    allow="clipboard-write; encrypted-media; picture-in-picture; fullscreen"
+                    allowFullScreen
+                    loading="lazy"
+                  />
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5 border-t border-white/[0.05] p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-2.5">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-baseline gap-x-2 text-[9px] uppercase tracking-wider text-text-muted/60">
+                    <span>{FEATURED_VIDEO.category}</span>
+                    <span className="tabular-nums text-text-muted/40">{FEATURED_VIDEO.durationShort}</span>
+                  </div>
+                  <p className="mt-0.5 text-sm font-medium leading-snug text-text-primary/90">{FEATURED_VIDEO.titleShort}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={openYouTube}
+                    className="h-8 border-white/[0.1] text-xs"
+                  >
+                    {s('İzle', 'Watch')}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={toggleVideoSave}
+                    className={cn(
+                      'flex h-8 w-8 items-center justify-center rounded-md border border-white/[0.08] text-text-muted/50 transition hover:text-text-tertiary/80',
+                      videoSaved.includes(FEATURED_VIDEO.id) && 'text-amber-200/50',
+                    )}
+                    aria-label={s('Listeye ekle', 'Save')}
+                  >
+                    <Bookmark className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="flex min-h-[14rem] flex-col p-3 sm:p-4 lg:col-span-5 lg:min-h-0">
+              <p className={lab}>{s('Video özeti', 'Video summary')}</p>
+              <p className="mt-0.5 text-[10px] text-text-muted/55">
+                {s('İleride otomatik özet; şimdilik not alanı.', 'Auto summary later; notes for now.')}
+              </p>
+              <Textarea
+                value={dayVideoNote}
+                onChange={(e) => setDayVideoNote(e.target.value)}
+                rows={8}
+                placeholder={s('Video ile ilgili kısa not veya özet bu alana…', 'Short notes or summary for this video…')}
+                className="mt-2 min-h-[10rem] flex-1 resize-y rounded-md border border-white/[0.08] bg-slate-950/40 text-[13px] leading-relaxed text-text-primary/90"
+              />
+            </div>
+          </div>
+        </div>
+      </motion.section>
+
+      {/* 5) Bugünün önerisi */}
       <motion.div
         variants={item}
-        className="flex items-center gap-3 rounded-lg border border-white/[0.05] bg-slate-950/30 px-3 py-2.5 sm:px-4"
+        className="rounded-lg border border-white/[0.05] bg-slate-950/30 p-3 sm:px-4 sm:py-3"
       >
-        <div className="h-1 w-1 shrink-0 rounded-full bg-cyan-400/30" />
-        <p className="text-[12px] leading-relaxed text-text-secondary/80">{insightLine}</p>
+        <p className={lab}>{h(s("Bugünün önerisi", "Today's suggestion"))}</p>
+        <p className="mt-1.5 text-[12px] leading-relaxed text-text-secondary/85">{insightLine}</p>
       </motion.div>
     </motion.div>
   )
