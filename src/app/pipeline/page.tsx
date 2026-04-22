@@ -9,29 +9,30 @@ import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { fetchContacts, updateContactStage } from '@/lib/queries'
 import type { ContactRow } from '@/lib/queries'
+import { stageMeta } from '@/components/contacts/contactLabels'
 import { Plus, GripVertical } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
 const PIPELINE_STAGES = [
-  { stage: 'new',                label: 'Yeni Potansiyel',      color: '#64748b' },
-  { stage: 'contact_planned',    label: 'İletişim Planlandı',   color: '#8b5cf6' },
-  { stage: 'first_contact',      label: 'İlk İletişim',         color: '#6366f1' },
-  { stage: 'interested',         label: 'İlgileniyor',           color: '#0ea5e9' },
-  { stage: 'invited',            label: 'Davet Edildi',          color: '#06b6d4' },
-  { stage: 'presentation_sent',  label: 'Sunum Gönderildi',     color: '#14b8a6' },
-  { stage: 'presentation_done',  label: 'Sunum Yapıldı',        color: '#f97316' },
-  { stage: 'followup_pending',   label: 'Takip Ediliyor',       color: '#f59e0b' },
-  { stage: 'objection_handling', label: 'İtiraz Yönetimi',      color: '#f97316' },
-  { stage: 'ready_to_buy',       label: 'Karar Aşamasında',     color: '#22c55e' },
-  { stage: 'became_customer',    label: 'Müşteri',              color: '#10b981' },
-  { stage: 'ready_to_join',      label: 'Katılmaya Hazır',      color: '#a855f7' },
-  { stage: 'became_member',      label: 'Ekip Üyesi',           color: '#d946ef' },
-  { stage: 'nurture_later',      label: 'Sonra İlgilen',        color: '#64748b' },
-  { stage: 'dormant',            label: 'Pasif',                color: '#475569' },
-  { stage: 'lost',               label: 'Kaybedildi',           color: '#334155' },
-]
+  { stage: 'new', color: '#64748b' },
+  { stage: 'contact_planned', color: '#8b5cf6' },
+  { stage: 'first_contact', color: '#6366f1' },
+  { stage: 'interested', color: '#0ea5e9' },
+  { stage: 'invited', color: '#06b6d4' },
+  { stage: 'presentation_sent', color: '#14b8a6' },
+  { stage: 'presentation_done', color: '#f97316' },
+  { stage: 'followup_pending', color: '#f59e0b' },
+  { stage: 'objection_handling', color: '#f97316' },
+  { stage: 'ready_to_buy', color: '#22c55e' },
+  { stage: 'became_customer', color: '#10b981' },
+  { stage: 'ready_to_join', color: '#a855f7' },
+  { stage: 'became_member', color: '#d946ef' },
+  { stage: 'nurture_later', color: '#64748b' },
+  { stage: 'dormant', color: '#475569' },
+  { stage: 'lost', color: '#334155' },
+] as const
 
 export default function PipelinePage() {
   const { t, locale } = useLanguage()
@@ -139,7 +140,7 @@ export default function PipelinePage() {
               >
                 <div className="flex min-w-0 flex-1 items-center gap-1.5">
                   <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: stage.color }} />
-                  <span className="truncate text-sm font-semibold text-text-primary/95">{stage.label}</span>
+                  <span className="truncate text-sm font-semibold text-text-primary/95">{stageMeta(stage.stage)[currentLocale]}</span>
                   <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-xs font-bold text-text-tertiary ring-1 ring-border-subtle">
                     {stageContacts.length}
                   </span>
@@ -174,15 +175,7 @@ export default function PipelinePage() {
                       {[contact.location, contact.profession].filter(Boolean).join(' · ') || (currentLocale === 'tr' ? 'Kontak kaydı' : 'Contact')}
                     </p>
                     <div className="mt-2 text-sm font-semibold text-warning">
-                      {Math.min(100, Math.max(0, Math.round(contact.temperature_score ?? 0)))} - {contact.temperature}
-                    </div>
-                    <div className="mt-2 border-t border-border-subtle pt-2">
-                      <p className="text-[10px] font-bold tracking-wide text-text-muted">
-                        {currentLocale === 'tr' ? 'SIRADAKİ ADIM' : 'NEXT STEP'}
-                      </p>
-                      <p className="mt-1 truncate text-xs text-text-secondary">
-                        {currentLocale === 'tr' ? 'Şimdi: tek bir sonraki adımı netleştir' : 'Now: define one clear next action'}
-                      </p>
+                      {Math.min(100, Math.max(0, Math.round(contact.temperature_score ?? 0)))} - {t.temperature[contact.temperature]}
                     </div>
                   </motion.div>
                 ))}
