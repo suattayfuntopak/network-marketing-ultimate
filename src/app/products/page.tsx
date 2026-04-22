@@ -3,6 +3,7 @@
 import { type ReactNode, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { Button } from '@/components/ui/Button'
@@ -23,6 +24,7 @@ export default function ProductsPage() {
   const { locale } = useLanguage()
   const h = useHeadingCase()
   const qc = useQueryClient()
+  const router = useRouter()
   const { currentUser } = useAppStore()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
 
@@ -153,11 +155,16 @@ export default function ProductsPage() {
               </Card>
             ) : (
               visibleProducts.map(({ product, quantity, revenue }) => (
-                <Card key={product.id} className="relative overflow-hidden">
+                <Card
+                  key={product.id}
+                  className="relative overflow-hidden cursor-pointer"
+                  onClick={() => router.push(`/products/${product.id}`)}
+                >
                   <div className="absolute right-3 top-3 flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation()
                         setEditingProduct(product)
                         setShowProductModal(true)
                       }}
@@ -167,7 +174,10 @@ export default function ProductsPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => deleteMutation.mutate(product.id)}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        deleteMutation.mutate(product.id)
+                      }}
                       className="rounded-lg border border-border bg-surface/80 p-1.5 text-text-secondary hover:text-error"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

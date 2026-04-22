@@ -1,6 +1,6 @@
 'use client'
 
-import { type FormEvent, useMemo, useRef, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { endOfWeek, formatDistanceToNow, isWithinInterval, startOfWeek } from 'date-fns'
 import { enUS, tr as trLocale } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -62,6 +62,7 @@ import {
   ListChecks,
   Plus,
   ShoppingBag,
+  Sparkles,
   Trash2,
   Upload,
   UserPlus,
@@ -149,11 +150,12 @@ function localCalendarYmd(date: Date) {
   return `${y}-${m}-${d}`
 }
 
-function buildContactsHref(segment: SegmentKey, options?: { contactId?: string; newModal?: boolean }) {
+function buildContactsHref(segment: SegmentKey, options?: { contactId?: string; newModal?: boolean; aiOpen?: boolean }) {
   const params = new URLSearchParams()
   if (segment !== 'all') params.set('segment', segment)
   if (options?.contactId) params.set('contact', options.contactId)
   if (options?.newModal) params.set('new', '1')
+  if (options?.aiOpen) params.set('ai', '1')
   const query = params.toString()
   return query ? `/contacts?${query}` : '/contacts'
 }
@@ -252,6 +254,7 @@ export default function ContactsPage() {
     ? (requestedSegment as SegmentKey)
     : 'all'
   const routeModalOpen = searchParams.get('new') === '1'
+  const routeAiOpen = searchParams.get('ai') === '1'
 
   const [search, setSearch] = useState('')
   const [selectedStage, setSelectedStage] = useState<string>('all')
@@ -634,9 +637,22 @@ export default function ContactsPage() {
   }
 
   const selected = selectedId ? contacts.find((contact) => contact.id === selectedId) ?? null : null
+
+  useEffect(() => {
+    if (!selected) return
+    if (!routeAiOpen) return
+    setAiModalOpen(true)
+  }, [routeAiOpen, selected])
+
   function openContactDetail(contactId: string) {
     router.push(buildContactsHref(activeSegment, { contactId }))
   }
+  function closeAiModal() {
+    setAiModalOpen(false)
+    if (!selectedId || !routeAiOpen) return
+    router.push(buildContactsHref(activeSegment, { contactId: selectedId }))
+  }
+
 
   function closeContactDetail() {
     router.push(buildContactsHref(activeSegment))
@@ -919,7 +935,7 @@ export default function ContactsPage() {
 
         <AIMessageGeneratorModal
           open={aiModalOpen}
-          onClose={() => setAiModalOpen(false)}
+          onClose={closeAiModal}
           locale={currentLocale}
           contact={selected}
           initialCategory="follow_up"
@@ -1284,6 +1300,28 @@ export default function ContactsPage() {
                             </button>
                             {rowMenuContactId === contact.id && (
                               <div className="absolute right-2 top-14 z-20 w-36 rounded-xl border border-border bg-card p-1.5 shadow-xl">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRowMenuContactId(null)
+                                    openContactDetail(contact.id)
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                                >
+                                  <Contact className="h-3.5 w-3.5" />
+                                  {currentLocale === 'tr' ? 'Detaya Git' : 'Open Detail'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRowMenuContactId(null)
+                                    router.push(buildContactsHref(activeSegment, { contactId: contact.id, aiOpen: true }))
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-warning hover:bg-warning/10"
+                                >
+                                  <Sparkles className="h-3.5 w-3.5" />
+                                  {currentLocale === 'tr' ? 'AI Mesaj Üret' : 'Generate AI'}
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => {
