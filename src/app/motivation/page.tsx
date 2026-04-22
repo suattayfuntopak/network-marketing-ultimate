@@ -11,22 +11,8 @@ import { usePersistentState } from '@/hooks/usePersistentState'
 import { postAiChat } from '@/lib/aiClient'
 import { fetchContacts, type ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
-import {
-  CELEBRITY_QUOTES,
-  getDailyVideoForDate,
-  type MotivationQuote,
-} from '@/app/motivation/motivationData'
-import {
-  Bookmark,
-  ChevronDown,
-  Copy,
-  Edit3,
-  MessageSquare,
-  Play,
-  SendHorizontal,
-  Share2,
-  Sparkles,
-} from 'lucide-react'
+import { CELEBRITY_QUOTES, type MotivationQuote } from '@/app/motivation/motivationData'
+import { ChevronDown, Copy, Edit3, MessageSquare, SendHorizontal, Share2, Sparkles } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.03 } } }
 const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }
@@ -109,8 +95,6 @@ export default function MotivationPage() {
   const [quoteIndex, setQuoteIndex] = useState(0)
   const [favIds] = usePersistentState<string[]>('nmu-motivation-fav-quotes', [], { version: 1 })
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [videoThumbError, setVideoThumbError] = useState(false)
-  const [videoSaved, setVideoSaved] = usePersistentState<string[]>('nmu-motivation-saved-videos', [], { version: 1 })
 
   const [segment, setSegment] = useState<Segment>('single')
   const [tagFilter, setTagFilter] = useState('')
@@ -132,9 +116,6 @@ export default function MotivationPage() {
   const [previewTab, setPreviewTab] = useState<'message' | 'variants'>('message')
   const [variantIndex, setVariantIndex] = useState(0)
   const [variantCount, setVariantCount] = useState<1 | 2 | 3>(1)
-  const [dayVideoNote, setDayVideoNote] = useState('')
-  const [videoSummaryLoading, setVideoSummaryLoading] = useState(false)
-  const [dateKey, setDateKey] = useState(() => new Date().toDateString())
   const [sendMenuOpen, setSendMenuOpen] = useState(false)
   const sendMenuRef = useRef<HTMLDivElement>(null)
   const previewTextRef = useRef<HTMLTextAreaElement | null>(null)
@@ -182,60 +163,10 @@ export default function MotivationPage() {
       : 'Breathe, one clear line—today, truly listen to one person.'
   }, [tr, stagnant7, toRecognize])
 
-  const dailyVideo = useMemo(
-    () => getDailyVideoForDate(new Date(`${dateKey}T12:00:00`)),
-    [dateKey],
-  )
-
   useEffect(() => {
     if (!CELEBRITY_QUOTES.length) return
     setQuoteIndex(Math.floor(Math.random() * CELEBRITY_QUOTES.length))
   }, [])
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      const n = new Date().toDateString()
-      setDateKey((k) => (k === n ? k : n))
-    }, 45_000)
-    return () => clearInterval(id)
-  }, [])
-
-  useEffect(() => {
-    setDayVideoNote('')
-  }, [dailyVideo.id, dateKey])
-
-  useEffect(() => {
-    let cancelled = false
-    setVideoSummaryLoading(true)
-    const v = dailyVideo
-    const staticFallback = tr ? v.summaryTr : v.summaryEn
-    const prompt = tr
-      ? `Network marketing, doğrudan satış veya kişisel gelişim bağlamında, aşağıdaki günlük kısa video notu için 70–100 kelimelik TEK paragraf Türkçe özet yaz. Abartı yok, etik, motive edici. Garanti/şifa/kolay zenginlik dili yok. Başlık: ${v.titleLong}. Tema: ${v.contextHint}. Yedek metin: ${v.summaryTr}`
-      : `In one paragraph (80–100 words, English), summarize the following daily short-video theme for network marketing or personal development. Ethical, motivating, no hype. Title: ${v.titleLong}. Theme: ${v.contextHint}. Notes: ${v.summaryEn}`
-
-    void (async () => {
-      try {
-        const r = await postAiChat([{ role: 'user', content: prompt }])
-        if (cancelled) return
-        if (!r.ok) throw new Error('ai')
-        const t = (await r.text()).trim()
-        if (t) {
-          setDayVideoNote((prev) => (prev.trim() ? prev : t))
-        } else {
-          setDayVideoNote((prev) => (prev.trim() ? prev : staticFallback))
-        }
-      } catch {
-        if (cancelled) return
-        setDayVideoNote((prev) => (prev.trim() ? prev : staticFallback))
-      } finally {
-        if (!cancelled) setVideoSummaryLoading(false)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [dailyVideo, tr, dateKey])
 
   useEffect(() => {
     if (!sendMenuOpen) return
@@ -422,21 +353,6 @@ export default function MotivationPage() {
     void navigator.clipboard.writeText(t)
   }
 
-  const videoId = dailyVideo.id
-  const videoSrc = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1`
-  const videoThumb = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
-  const videoWatch = `https://www.youtube.com/watch?v=${videoId}`
-
-  const openYouTube = () => {
-    window.open(videoWatch, '_blank', 'noopener,noreferrer')
-  }
-
-  const toggleVideoSave = () => {
-    setVideoSaved((prev) =>
-      prev.includes(videoId) ? prev.filter((x) => x !== videoId) : [...prev, videoId],
-    )
-  }
-
   const openSendChannel = (ch: 'whatsapp' | 'telegram' | 'email' | 'sms' | 'instagram') => {
     if (!outBody.trim()) return
     const t = encodeURIComponent(outBody)
@@ -558,7 +474,7 @@ export default function MotivationPage() {
         </div>
       </motion.section>
 
-      {/* 2) Ana kahraman: motivasyon akış stüdyosu */}
+      {/* 3) Ana kahraman: motivasyon akış stüdyosu */}
       <motion.section variants={item} className="min-w-0">
         <div
           className={cn('overflow-hidden rounded-2xl border border-border bg-surface shadow-sm')}
@@ -1039,85 +955,7 @@ export default function MotivationPage() {
         </div>
       </motion.section>
 
-      {/* 4) Günün videosu — sol: oynatıcı + alt bilgi, sağ: özet (aynı sütun yüksekliği) */}
-      <motion.section variants={item} className="min-w-0">
-        <h2 className="mb-3 text-lg font-semibold text-text-primary sm:text-xl">
-          {h(s('Günün videosu', "Today's video"))}
-        </h2>
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
-          <div className="grid min-h-0 grid-cols-1 items-stretch lg:grid-cols-12">
-            <div className="flex min-h-0 min-w-0 flex-col border-b border-border lg:col-span-7 lg:border-b-0">
-              <div className="relative w-full min-w-0 overflow-hidden bg-black/30">
-                <div className="relative aspect-video w-full">
-                  {/* Thumbnail probe: hata varsa embed göstermeyip link ver */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={videoThumb} alt="" className="absolute h-px w-px opacity-0" onError={() => setVideoThumbError(true)} />
-                  {videoThumbError ? (
-                    <button
-                      type="button"
-                      onClick={openYouTube}
-                      className="flex h-full w-full min-h-[12rem] flex-col items-center justify-center gap-2 text-text-tertiary transition hover:text-text-secondary"
-                    >
-                      <span className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-surface">
-                        <Play className="h-6 w-6" />
-                      </span>
-                      <span className="text-sm">{s("YouTube'ta aç", 'Open in YouTube')}</span>
-                    </button>
-                  ) : (
-                    <iframe
-                      title="YouTube"
-                      className="absolute inset-0 h-full w-full"
-                      src={videoSrc}
-                      allow="clipboard-write; encrypted-media; picture-in-picture; fullscreen"
-                      allowFullScreen
-                      loading="lazy"
-                    />
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-baseline gap-x-2 text-xs font-medium text-text-tertiary">
-                    <span>{h(dailyVideo.category)}</span>
-                    <span className="tabular-nums text-text-tertiary/80">{dailyVideo.durationShort}</span>
-                  </div>
-                  <p className="mt-0.5 text-sm font-semibold leading-snug text-text-primary">{dailyVideo.titleShort}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <Button type="button" size="sm" variant="outline" onClick={openYouTube} className="h-9 rounded-xl border-border text-sm">
-                    {h(s('İzle', 'Watch'))}
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={toggleVideoSave}
-                    className={cn(
-                      'flex h-9 w-9 items-center justify-center rounded-xl border border-border text-text-tertiary transition hover:text-text-secondary',
-                      videoSaved.includes(videoId) && 'text-amber-200/60',
-                    )}
-                    aria-label={h(s('Listeye ekle', 'Save'))}
-                  >
-                    <Bookmark className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="flex min-h-0 min-w-0 flex-col border-t border-border p-4 sm:p-5 lg:col-span-5 lg:min-h-0 lg:self-stretch lg:border-l lg:border-t-0">
-              <p className={sectionLabelClass}>{h(s('Video özeti', 'Video summary'))}</p>
-              {videoSummaryLoading && (
-                <p className="mt-1 text-xs text-text-tertiary/90">{s('Yapay zekâ özeti hazırlanıyor…', 'Preparing AI summary…')}</p>
-              )}
-              <Textarea
-                value={dayVideoNote}
-                onChange={(e) => setDayVideoNote(e.target.value)}
-                placeholder={s('Video ile ilgili kısa not veya özet bu alana…', 'Short notes or summary for this video…')}
-                className="mt-3 w-full min-h-[14rem] flex-1 resize-none rounded-xl border border-border bg-surface px-3 py-2.5 text-sm leading-relaxed text-text-primary lg:min-h-0"
-              />
-            </div>
-          </div>
-        </div>
-      </motion.section>
-
-      {/* 5) Bugünün önerisi */}
+      {/* 4) Bugünün önerisi */}
       <motion.div
         variants={item}
         className="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5"
