@@ -245,8 +245,6 @@ export function ContactDetailPersonView({
     if (v !== rawServerWarmth) onWarmthChange(v)
   }
 
-  const warmthFillPct = Math.min(100, Math.max(0, localWarmth))
-
   const stage = stageMeta(contact.pipeline_stage)
   const coaching = useMemo(() => microCoachingBlock(contact, locale), [contact, locale])
 
@@ -342,9 +340,9 @@ export function ContactDetailPersonView({
                   onPointerUp={commitWarmthIfChanged}
                   onPointerCancel={commitWarmthIfChanged}
                   onBlur={commitWarmthIfChanged}
-                  className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-transparent disabled:opacity-50 [&::-webkit-slider-runnable-track]:h-2.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:mt-[-4px] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-white/70 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow [&::-moz-range-track]:h-2.5 [&::-moz-range-track]:rounded-full [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-white/70 [&::-moz-range-thumb]:bg-white"
+                  className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-transparent disabled:opacity-50 [&::-webkit-slider-runnable-track]:h-2.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:mt-[-4px] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-white/80 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0_12px_rgba(56,189,248,0.55)] [&::-moz-range-track]:h-2.5 [&::-moz-range-track]:rounded-full [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-white/80 [&::-moz-range-thumb]:bg-white"
                   style={{
-                    background: `linear-gradient(90deg, rgb(245 158 11) 0%, rgb(245 158 11) ${warmthFillPct}%, rgb(39 39 42 / 0.92) ${warmthFillPct}%, rgb(39 39 42 / 0.92) 100%)`,
+                    background: 'linear-gradient(90deg, rgb(34 211 238) 0%, rgb(59 130 246) 28%, rgb(245 158 11) 58%, rgb(249 115 22) 78%, rgb(239 68 68) 100%)',
                   }}
                 />
               </div>

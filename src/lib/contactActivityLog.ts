@@ -6,6 +6,10 @@ export type ContactActivityPayload =
   | { kind: 'tag_added'; tag: string }
   | { kind: 'tag_removed'; tag: string }
   | { kind: 'stage_changed'; from: string; to: string }
+  | { kind: 'profile_updated' }
+  | { kind: 'order_added'; totalTry: number; itemCount: number }
+  | { kind: 'order_status_changed'; from: string; to: string }
+  | { kind: 'order_deleted'; totalTry: number }
   | { kind: 'task_added'; title: string }
   | { kind: 'task_completed'; title: string }
   | { kind: 'task_deleted'; title: string }
@@ -74,6 +78,30 @@ export function formatActivityInteractionCopy(
       return {
         title: tr ? 'Takip Silindi' : 'Follow-up Deleted',
         detail: tr ? `“${payload.title}”` : `“${payload.title}”`,
+      }
+    case 'profile_updated':
+      return {
+        title: tr ? 'Kişi Bilgileri Güncellendi' : 'Profile Updated',
+        detail: tr ? 'Kişi kartındaki bilgiler güncellendi.' : 'Contact profile information was updated.',
+      }
+    case 'order_added':
+      return {
+        title: tr ? 'Sipariş Eklendi' : 'Order Added',
+        detail: tr
+          ? `${payload.itemCount} ürün kalemi • ₺${payload.totalTry.toLocaleString('tr-TR')}`
+          : `${payload.itemCount} line items • TRY ${payload.totalTry.toLocaleString('en-US')}`,
+      }
+    case 'order_status_changed':
+      return {
+        title: tr ? 'Sipariş Durumu Güncellendi' : 'Order Status Updated',
+        detail: tr ? `${payload.from} → ${payload.to}` : `${payload.from} → ${payload.to}`,
+      }
+    case 'order_deleted':
+      return {
+        title: tr ? 'Sipariş Silindi' : 'Order Deleted',
+        detail: tr
+          ? `Kayıt tutarı: ₺${payload.totalTry.toLocaleString('tr-TR')}`
+          : `Removed amount: TRY ${payload.totalTry.toLocaleString('en-US')}`,
       }
     case 'warmth_changed':
       return {

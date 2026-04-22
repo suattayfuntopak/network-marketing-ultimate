@@ -324,6 +324,7 @@ export async function updateContactRecord(id: string, input: AddContactInput): P
     .eq('user_id', userId)
   if (error) throw error
   await syncCustomerRegistry(userId, id, input.pipeline_stage ?? null)
+  await addContactActivityLog(userId, id, { kind: 'profile_updated' })
 }
 
 export async function patchContact(id: string, patch: Database['public']['Tables']['nmu_contacts']['Update']): Promise<void> {
@@ -633,27 +634,61 @@ export async function addOrder(
     .select()
     .single()
   if (error) throw error
+  await addContactActivityLog(userId, input.contact_id, {
+    kind: 'order_added',
+    totalTry: input.total_try,
+    itemCount: input.items.length,
+  })
   return data as OrderRow
 }
 
 export async function updateOrderStatus(id: string, status: OrderRow['status']): Promise<void> {
   const userId = await requireSessionUserId()
+  const { data: existing, error: existingError } = await supabase
+    .from('nmu_orders')
+    .select('contact_id,status')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single()
+  if (existingError) throw existingError
+
   const { error } = await supabase
     .from('nmu_orders')
     .update({ status })
     .eq('id', id)
     .eq('user_id', userId)
   if (error) throw error
+
+  if (existing.status !== status) {
+    await addContactActivityLog(userId, existing.contact_id, {
+      kind: 'order_status_changed',
+      from: existing.status,
+      to: status,
+    })
+  }
 }
 
 export async function deleteOrder(id: string): Promise<void> {
   const userId = await requireSessionUserId()
+  const { data: existing, error: existingError } = await supabase
+    .from('nmu_orders')
+    .select('contact_id,total_try')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single()
+  if (existingError) throw existingError
+
   const { error } = await supabase
     .from('nmu_orders')
     .delete()
     .eq('id', id)
     .eq('user_id', userId)
   if (error) throw error
+
+  await addContactActivityLog(userId, existing.contact_id, {
+    kind: 'order_deleted',
+    totalTry: Number(existing.total_try) || 0,
+  })
 }
 
 // ─── EVENTS ───────────────────────────────────────────────────
