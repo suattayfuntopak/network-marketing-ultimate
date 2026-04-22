@@ -8,20 +8,18 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Input, Textarea } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { stageMeta } from '@/components/contacts/contactLabels'
+import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
 import { cn } from '@/lib/utils'
 import { postAiChat } from '@/lib/aiClient'
 import { fetchContacts, type ContactRow } from '@/lib/queries'
-import { FaInstagram, FaTelegramPlane, FaWhatsapp } from 'react-icons/fa'
 import {
   Check,
   Copy,
-  Mail,
-  MessageSquare,
   Save,
-  SendHorizontal,
   Sparkles,
   WandSparkles,
 } from 'lucide-react'
+import type { MessageSendChannel } from '@/lib/openChannelSend'
 
 export type MessageCategory =
   | 'first_contact'
@@ -101,7 +99,6 @@ type VariantState = {
   savedIndex: number | null
 }
 
-const SEND_CHANNEL_ORDER: MessageChannel[] = ['whatsapp', 'telegram', 'email', 'sms', 'instagram_dm']
 const VARIANT_COUNT_OPTIONS = [1, 2, 3] as const
 
 const CATEGORY_META: Record<MessageCategory, { tr: string; en: string }> = {
@@ -122,14 +119,6 @@ const CATEGORY_META: Record<MessageCategory, { tr: string; en: string }> = {
   customer_team_invite: { tr: 'Müşteriyi Ekibe Davet', en: 'Invite Customer to Team' },
   thank_you: { tr: 'Teşekkür', en: 'Thank You' },
   onboarding: { tr: 'Yeni Üye Karşılama', en: 'Onboarding' },
-}
-
-const CHANNEL_META: Record<MessageChannel, { tr: string; en: string }> = {
-  whatsapp: { tr: 'WhatsApp', en: 'WhatsApp' },
-  telegram: { tr: 'Telegram', en: 'Telegram' },
-  sms: { tr: 'SMS', en: 'SMS' },
-  email: { tr: 'E-posta', en: 'Email' },
-  instagram_dm: { tr: 'Instagram DM', en: 'Instagram DM' },
 }
 
 const TONE_META: Record<MessageTone, { tr: string; en: string }> = {
@@ -306,7 +295,6 @@ function AIMessageGeneratorModalContent({
   const [selectedContactId, setSelectedContactId] = useState<string>(contact?.id ?? 'all')
   const [variants, setVariants] = useState<string[]>([])
   const [sendChannelsByVariant, setSendChannelsByVariant] = useState<Record<number, MessageChannel>>({})
-  const [openSendMenuIndex, setOpenSendMenuIndex] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [variantState, setVariantState] = useState<VariantState>({
     loading: false,
@@ -411,7 +399,6 @@ function AIMessageGeneratorModalContent({
 
       setVariants(normalizedVariants)
       setSendChannelsByVariant({})
-      setOpenSendMenuIndex(null)
       onGenerated({
         id: crypto.randomUUID(),
         contactId: selectedContact?.id ?? null,
@@ -439,7 +426,6 @@ function AIMessageGeneratorModalContent({
       )
       setVariants(fallback)
       setSendChannelsByVariant({})
-      setOpenSendMenuIndex(null)
       setError(
         locale === 'tr'
           ? 'Canlı üretim yerine güçlü bir yerel taslak oluşturuldu.'
@@ -494,36 +480,8 @@ function AIMessageGeneratorModalContent({
     }, 1500)
   }
 
-  function buildPhoneDigits() {
-    return selectedContact?.phone?.replace(/\D/g, '') ?? ''
-  }
-
-  function getSendHref(message: string, channel: MessageChannel) {
-    const encoded = encodeURIComponent(message)
-    const phoneDigits = buildPhoneDigits()
-
-    if (channel === 'whatsapp') return `https://wa.me/${phoneDigits || ''}?text=${encoded}`
-    if (channel === 'sms') return phoneDigits ? `sms:${phoneDigits}?body=${encoded}` : null
-    if (channel === 'email') return selectedContact?.email ? `mailto:${selectedContact.email}?body=${encoded}` : null
-    if (channel === 'telegram') return 'https://t.me/'
-    if (channel === 'instagram_dm') return 'https://instagram.com/'
-    return null
-  }
-
-  function getChannelIcon(channel: MessageChannel) {
-    if (channel === 'whatsapp') return <FaWhatsapp className="h-3.5 w-3.5" />
-    if (channel === 'telegram') return <FaTelegramPlane className="h-3.5 w-3.5" />
-    if (channel === 'email') return <Mail className="h-3.5 w-3.5" />
-    if (channel === 'sms') return <MessageSquare className="h-3.5 w-3.5" />
-    return <FaInstagram className="h-3.5 w-3.5" />
-  }
-
-  function handleSendChannel(index: number, channel: MessageChannel, message: string) {
-    const href = getSendHref(message, channel)
-    setSendChannelsByVariant((current) => ({ ...current, [index]: channel }))
-    setOpenSendMenuIndex(null)
-    if (!href) return
-    window.open(href, '_blank', 'noopener,noreferrer')
+  function mapToMessageChannel(ch: MessageSendChannel): MessageChannel {
+    return ch === 'instagram' ? 'instagram_dm' : ch
   }
 
   return (
@@ -743,9 +701,7 @@ function AIMessageGeneratorModalContent({
           </div>
         ) : (
           <div className="space-y-3">
-            {variants.map((variant, index) => {
-              const selectedSendChannel = sendChannelsByVariant[index] ?? defaultSendChannel
-              return (
+            {variants.map((variant, index) => (
                 <div key={`${index}-${variant.slice(0, 20)}`} className="rounded-2xl border border-border-subtle bg-surface/35 p-4">
                   <Badge variant="secondary">{locale === 'tr' ? `Varyasyon ${index + 1}` : `Variant ${index + 1}`}</Badge>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-text-secondary">{variant}</p>
@@ -768,39 +724,23 @@ function AIMessageGeneratorModalContent({
                     >
                       {locale === 'tr' ? 'Kaydet' : 'Save'}
                     </Button>
-                    <div className="relative inline-flex">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        icon={<SendHorizontal className="h-3.5 w-3.5" />}
-                        onClick={() => setOpenSendMenuIndex((current) => (current === index ? null : index))}
-                      >
-                        {locale === 'tr' ? 'Gönder' : 'Send'}
-                      </Button>
-                      {openSendMenuIndex === index ? (
-                        <div className="absolute left-0 top-full z-20 mt-2 w-44 rounded-xl border border-border-subtle bg-card p-1.5 shadow-xl">
-                          {SEND_CHANNEL_ORDER.map((channel) => (
-                            <button
-                              key={channel}
-                              type="button"
-                              onClick={() => handleSendChannel(index, channel, variant)}
-                              className={cn(
-                                'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-text-primary transition-colors hover:bg-surface-hover',
-                                selectedSendChannel === channel ? 'bg-surface/50' : '',
-                              )}
-                            >
-                              {getChannelIcon(channel)}
-                              <span>{getLabel(CHANNEL_META, locale, channel)}</span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
+                    <ChannelSendButton
+                      body={variant}
+                      label={locale === 'tr' ? 'Gönder' : 'Send'}
+                      locale={locale}
+                      linkMode={selectedContact ? 'strict' : 'loose'}
+                      phone={selectedContact?.phone}
+                      email={selectedContact?.email}
+                      size="sm"
+                      variant="secondary"
+                      className="inline-flex w-auto min-w-[7.5rem] max-w-full flex-1"
+                      onAfterSend={(ch) =>
+                        setSendChannelsByVariant((current) => ({ ...current, [index]: mapToMessageChannel(ch) }))
+                      }
+                    />
                   </div>
                 </div>
-              )
-            })}
+            ))}
           </div>
         )}
       </div>

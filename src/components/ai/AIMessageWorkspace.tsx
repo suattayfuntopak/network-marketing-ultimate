@@ -18,11 +18,11 @@ import { useAppStore } from '@/store/appStore'
 import {
   AIMessageGeneratorModal,
   type MessageCategory,
-  type MessageChannel,
   type MessageHistoryRecord,
   type MessageTemplateRecord,
   type QueuedMessageDraftPreset,
 } from './AIMessageGeneratorModal'
+import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
 import {
   Search,
   Sparkles,
@@ -36,20 +36,12 @@ import {
   Copy,
   Trash2,
   Pencil,
-  SendHorizontal,
-  MessageCircle,
-  Send,
-  Mail,
-  MessageSquare,
-  Camera,
   Check,
   X,
 } from 'lucide-react'
 
 type SegmentKey = 'all' | 'team' | 'customers' | 'follow_due' | 'hot' | 'dormant'
 const DORMANT_DAYS_THRESHOLD = 21
-const SEND_CHANNEL_ORDER: MessageChannel[] = ['whatsapp', 'telegram', 'email', 'sms', 'instagram_dm']
-
 const MESSAGE_CATEGORIES: MessageCategory[] = [
   'first_contact',
   'warm_up',
@@ -183,8 +175,6 @@ export function AIMessageWorkspace() {
   const [copiedTemplateId, setCopiedTemplateId] = useState<string | null>(null)
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null)
   const [editingTemplateContent, setEditingTemplateContent] = useState('')
-  const [openSendMenuTemplateId, setOpenSendMenuTemplateId] = useState<string | null>(null)
-
   const [templates, setTemplates] = usePersistentState<MessageTemplateRecord[]>(`nmu-message-templates-${userKey}`, [], { version: 1 })
   const [, setHistoryItems] = usePersistentState<MessageHistoryRecord[]>(`nmu-message-history-${userKey}`, [], { version: 1 })
 
@@ -278,42 +268,6 @@ export function AIMessageWorkspace() {
       current.map((template) => (template.id === id ? { ...template, content } : template)),
     )
     cancelEditTemplate()
-  }
-
-  function getSendHref(content: string, channel: MessageChannel) {
-    const encoded = encodeURIComponent(content)
-    if (channel === 'whatsapp') return `https://wa.me/?text=${encoded}`
-    if (channel === 'telegram') return `https://t.me/share/url?text=${encoded}`
-    if (channel === 'email') return `mailto:?body=${encoded}`
-    if (channel === 'sms') return `sms:?body=${encoded}`
-    return 'https://instagram.com/'
-  }
-
-  function getChannelLabel(channel: MessageChannel) {
-    const labels: Record<MessageChannel, { tr: string; en: string }> = {
-      whatsapp: { tr: 'WhatsApp', en: 'WhatsApp' },
-      telegram: { tr: 'Telegram', en: 'Telegram' },
-      email: { tr: 'Email', en: 'Email' },
-      sms: { tr: 'SMS', en: 'SMS' },
-      instagram_dm: { tr: 'Instagram', en: 'Instagram' },
-    }
-    return labels[channel][currentLocale]
-  }
-
-  function getChannelIcon(channel: MessageChannel) {
-    if (channel === 'whatsapp') return <MessageCircle className="h-3.5 w-3.5" />
-    if (channel === 'telegram') return <Send className="h-3.5 w-3.5" />
-    if (channel === 'email') return <Mail className="h-3.5 w-3.5" />
-    if (channel === 'sms') return <MessageSquare className="h-3.5 w-3.5" />
-    return <Camera className="h-3.5 w-3.5" />
-  }
-
-  function sendTemplateToChannel(content: string, channel: MessageChannel, templateId: string) {
-    const href = getSendHref(content, channel)
-    setOpenSendMenuTemplateId(null)
-    if (!href) return
-    window.open(href, '_blank', 'noopener,noreferrer')
-    setCopiedTemplateId(templateId)
   }
 
   return (
@@ -568,31 +522,16 @@ export function AIMessageWorkspace() {
                     >
                       {copiedTemplateId === template.id ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
                     </button>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        title={currentLocale === 'tr' ? 'Gönder' : 'Send'}
-                        onClick={() => setOpenSendMenuTemplateId((current) => (current === template.id ? null : template.id))}
-                        className="rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface-hover hover:text-secondary"
-                      >
-                        <SendHorizontal className="h-4 w-4" />
-                      </button>
-                      {openSendMenuTemplateId === template.id ? (
-                        <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-xl border border-border-subtle bg-card p-1.5 shadow-xl">
-                          {SEND_CHANNEL_ORDER.map((channel) => (
-                            <button
-                              key={channel}
-                              type="button"
-                              onClick={() => sendTemplateToChannel(template.content, channel, template.id)}
-                              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-text-primary transition-colors hover:bg-surface-hover"
-                            >
-                              {getChannelIcon(channel)}
-                              <span>{getChannelLabel(channel)}</span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
+                    <ChannelSendButton
+                      body={template.content}
+                      label={h(currentLocale === 'tr' ? 'Gönder' : 'Send')}
+                      locale={currentLocale}
+                      linkMode="loose"
+                      size="sm"
+                      variant="secondary"
+                      className="w-[10.5rem] shrink-0"
+                      onAfterSend={() => setCopiedTemplateId(template.id)}
+                    />
                   </div>
                 </div>
                 {editingTemplateId === template.id ? (

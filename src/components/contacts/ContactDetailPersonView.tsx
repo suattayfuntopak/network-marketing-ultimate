@@ -11,9 +11,6 @@ import {
   CornerDownLeft,
   Copy,
   Edit3,
-  Mail,
-  MessageCircle,
-  MessageSquare,
   Pencil,
   Plus,
   SendHorizontal,
@@ -35,6 +32,7 @@ import {
   stageMeta,
 } from '@/components/contacts/contactLabels'
 import { formatActivityInteractionCopy } from '@/lib/contactActivityLog'
+import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
 import { postAiChat } from '@/lib/aiClient'
 import { toHeadingCase } from '@/lib/headingCase'
 import { cn } from '@/lib/utils'
@@ -196,7 +194,6 @@ export function ContactDetailPersonView({
   const [editingInteractionId, setEditingInteractionId] = useState<string | null>(null)
   const [editingInteractionContent, setEditingInteractionContent] = useState('')
   const [copiedCoaching, setCopiedCoaching] = useState(false)
-  const [openCoachingSendMenu, setOpenCoachingSendMenu] = useState(false)
   const tagInputRef = useRef<HTMLInputElement>(null)
 
   const rawServerWarmth = rawTemperatureFromServer(contact.temperature_score)
@@ -303,15 +300,6 @@ export function ContactDetailPersonView({
     if (!text) return
     await onQuickNote(text)
     setNoteDraft('')
-  }
-
-  function getCoachingSendHref(channel: 'whatsapp' | 'telegram' | 'email' | 'sms') {
-    const message = encodeURIComponent(coachingMessage)
-    const phone = contact.phone?.replace(/\D/g, '') ?? ''
-    if (channel === 'whatsapp') return `https://wa.me/${phone || ''}?text=${message}`
-    if (channel === 'telegram') return `https://t.me/share/url?text=${message}`
-    if (channel === 'email') return contact.email ? `mailto:${contact.email}?body=${message}` : 'mailto:?body=' + message
-    return phone ? `sms:${phone}?body=${message}` : `sms:?body=${message}`
   }
 
   async function copyCoachingMessage() {
@@ -789,34 +777,17 @@ export function ContactDetailPersonView({
               <Button type="button" size="sm" variant="outline" onClick={() => void copyCoachingMessage()} icon={copiedCoaching ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}>
                 {tr ? 'Kopyala' : 'Copy'}
               </Button>
-              <div className="relative">
-                <Button type="button" size="sm" variant="secondary" onClick={() => setOpenCoachingSendMenu((current) => !current)} icon={<SendHorizontal className="h-3.5 w-3.5" />}>
-                  {tr ? 'Gönder' : 'Send'}
-                </Button>
-                {openCoachingSendMenu && (
-                  <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-xl border border-border-subtle bg-card p-1.5 shadow-xl">
-                    {[
-                      { id: 'whatsapp', label: 'WhatsApp', icon: <MessageCircle className="h-3.5 w-3.5" /> },
-                      { id: 'telegram', label: 'Telegram', icon: <SendHorizontal className="h-3.5 w-3.5" /> },
-                      { id: 'email', label: 'Email', icon: <Mail className="h-3.5 w-3.5" /> },
-                      { id: 'sms', label: 'SMS', icon: <MessageSquare className="h-3.5 w-3.5" /> },
-                    ].map((channel) => (
-                      <button
-                        key={channel.id}
-                        type="button"
-                        onClick={() => {
-                          window.open(getCoachingSendHref(channel.id as 'whatsapp' | 'telegram' | 'email' | 'sms'), '_blank', 'noopener,noreferrer')
-                          setOpenCoachingSendMenu(false)
-                        }}
-                        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-text-primary transition-colors hover:bg-surface-hover"
-                      >
-                        {channel.icon}
-                        <span>{channel.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ChannelSendButton
+                body={coachingMessage}
+                label={toHeadingCase(tr ? 'Gönder' : 'Send', locale)}
+                locale={locale}
+                linkMode="strict"
+                phone={contact.phone}
+                email={contact.email}
+                size="sm"
+                variant="secondary"
+                className="min-w-0 flex-1"
+              />
             </div>
           </Card>
         </div>

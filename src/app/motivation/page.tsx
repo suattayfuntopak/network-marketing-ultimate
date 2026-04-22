@@ -12,7 +12,8 @@ import { postAiChat } from '@/lib/aiClient'
 import { fetchContacts, type ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { CELEBRITY_QUOTES, type MotivationQuote } from '@/app/motivation/motivationData'
-import { ChevronDown, Copy, Edit3, MessageSquare, SendHorizontal, Share2, Sparkles } from 'lucide-react'
+import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
+import { ChevronDown, Copy, Edit3, Share2, Sparkles } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.03 } } }
 const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }
@@ -116,8 +117,6 @@ export default function MotivationPage() {
   const [previewTab, setPreviewTab] = useState<'message' | 'variants'>('message')
   const [variantIndex, setVariantIndex] = useState(0)
   const [variantCount, setVariantCount] = useState<1 | 2 | 3>(1)
-  const [sendMenuOpen, setSendMenuOpen] = useState(false)
-  const sendMenuRef = useRef<HTMLDivElement>(null)
   const previewTextRef = useRef<HTMLTextAreaElement | null>(null)
   const contextNotesRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -167,15 +166,6 @@ export default function MotivationPage() {
     if (!CELEBRITY_QUOTES.length) return
     setQuoteIndex(Math.floor(Math.random() * CELEBRITY_QUOTES.length))
   }, [])
-
-  useEffect(() => {
-    if (!sendMenuOpen) return
-    const onDoc = (e: MouseEvent) => {
-      if (sendMenuRef.current && !sendMenuRef.current.contains(e.target as Node)) setSendMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [sendMenuOpen])
 
   const buildContextBlock = useCallback(
     (target: 'generate' | 'refine', base?: string) => {
@@ -353,31 +343,6 @@ export default function MotivationPage() {
     void navigator.clipboard.writeText(t)
   }
 
-  const openSendChannel = (ch: 'whatsapp' | 'telegram' | 'email' | 'sms' | 'instagram') => {
-    if (!outBody.trim()) return
-    const t = encodeURIComponent(outBody)
-    const phone = singleContact?.phone?.replace(/\D/g, '') ?? ''
-    const email = singleContact?.email?.trim() ?? ''
-    if (ch === 'whatsapp') {
-      if (!phone) return
-      window.open(`https://wa.me/${phone}?text=${t}`, '_blank', 'noopener,noreferrer')
-    } else if (ch === 'telegram') {
-      window.open(`https://t.me/share/url?url=${encodeURIComponent(' ')}&text=${t}`, '_blank', 'noopener,noreferrer')
-    } else if (ch === 'email') {
-      const href = email
-        ? `mailto:${email}?body=${t}`
-        : `mailto:?body=${t}`
-      window.open(href, '_blank', 'noopener,noreferrer')
-    } else if (ch === 'sms') {
-      if (!phone) return
-      window.open(`sms:${phone}?body=${t}`, '_blank', 'noopener,noreferrer')
-    } else if (ch === 'instagram') {
-      void navigator.clipboard.writeText(outBody)
-      window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer')
-    }
-    setSendMenuOpen(false)
-  }
-
   const s = (trTR: string, en: string) => (tr ? trTR : en)
 
   const exampleMessage = useMemo(
@@ -389,8 +354,6 @@ export default function MotivationPage() {
   )
 
   const hasDraft = outBody.trim().length > 0
-  const hasPhone = (singleContact?.phone?.replace(/\D/g, '')?.length ?? 0) > 0
-  const hasEmail = Boolean(singleContact?.email?.trim())
 
   const focusPreviewEdit = () => {
     queueMicrotask(() => previewTextRef.current?.focus())
@@ -870,83 +833,14 @@ export default function MotivationPage() {
                     >
                       {h(s('Düzenle', 'Edit'))}
                     </Button>
-                    <div className="relative min-w-0 sm:min-w-[10rem] sm:flex-1" ref={sendMenuRef}>
-                      <Button
-                        type="button"
-                        size="md"
-                        variant="primary"
-                        className="h-9 w-full gap-1"
-                        disabled={!hasDraft}
-                        onClick={() => setSendMenuOpen((o) => !o)}
-                        icon={<SendHorizontal className="h-3.5 w-3.5" />}
-                      >
-                        {h(s('Gönder', 'Send'))}
-                        <ChevronDown className="h-3.5 w-3.5 opacity-80" />
-                      </Button>
-                      {sendMenuOpen && hasDraft && (
-                        <ul className="absolute bottom-full z-50 mb-1 w-full min-w-[12rem] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-xl sm:left-0 sm:right-auto">
-                          {(
-                            [
-                              {
-                                id: 'whatsapp' as const,
-                                label: 'WhatsApp',
-                                iconUrl: 'https://cdn.simpleicons.org/whatsapp/25D366',
-                                disabled: !hasPhone,
-                                title: s('Tek kişi ve telefon gerekir', 'Need one person with phone'),
-                              },
-                              {
-                                id: 'telegram' as const,
-                                label: 'Telegram',
-                                iconUrl: 'https://cdn.simpleicons.org/telegram/26A5E4',
-                                disabled: false,
-                                title: undefined,
-                              },
-                              {
-                                id: 'email' as const,
-                                label: s('E-posta', 'Email'),
-                                iconUrl: 'https://cdn.simpleicons.org/gmail/EA4335',
-                                disabled: false,
-                                title: hasEmail ? undefined : s('Genel e-posta istemcisi açılır', 'Opens default mail client'),
-                              },
-                              {
-                                id: 'sms' as const,
-                                label: 'SMS',
-                                disabled: !hasPhone,
-                                title: s('Tek kişi ve telefon gerekir', 'Need one person with phone'),
-                              },
-                              {
-                                id: 'instagram' as const,
-                                label: 'Instagram',
-                                iconUrl: 'https://cdn.simpleicons.org/instagram/E4405F',
-                                disabled: false,
-                                title: s('Metin panoya; Instagram açılır', 'Text copied; opens Instagram'),
-                              },
-                            ] as const
-                          ).map((c) => (
-                            <li key={c.id}>
-                              <button
-                                type="button"
-                                title={c.title}
-                                disabled={c.disabled}
-                                onClick={() => {
-                                  if (c.disabled) return
-                                  openSendChannel(c.id)
-                                }}
-                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-text-primary transition enabled:hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
-                              >
-                                {'iconUrl' in c && c.iconUrl ? (
-                                  /* eslint-disable-next-line @next/next/no-img-element */
-                                  <img src={c.iconUrl} alt="" className="h-4 w-4 shrink-0" width={16} height={16} />
-                                ) : (
-                                  <MessageSquare className="h-4 w-4 shrink-0 text-cyan-300" />
-                                )}
-                                <span>{c.label}</span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
+                    <ChannelSendButton
+                      body={outBody}
+                      label={h(s('Gönder', 'Send'))}
+                      locale={tr ? 'tr' : 'en'}
+                      linkMode="strict"
+                      phone={singleContact?.phone}
+                      email={singleContact?.email}
+                    />
                   </div>
                 </div>
               )}
