@@ -249,6 +249,7 @@ export default function ContactsPage() {
 
   const selectedId = searchParams.get('contact')
   const requestedSegment = searchParams.get('segment')
+  const returnTo = searchParams.get('returnTo')
   const activeSegment: SegmentKey = requestedSegment && validSegments.includes(requestedSegment as SegmentKey)
     ? (requestedSegment as SegmentKey)
     : 'all'
@@ -652,7 +653,11 @@ export default function ContactsPage() {
 
 
   function closeContactDetail() {
-    router.push(buildContactsHref(activeSegment))
+    if (returnTo && returnTo.startsWith('/')) {
+      router.replace(returnTo)
+      return
+    }
+    router.replace(buildContactsHref(activeSegment))
   }
 
   function openEditContact(contact: ContactRow) {

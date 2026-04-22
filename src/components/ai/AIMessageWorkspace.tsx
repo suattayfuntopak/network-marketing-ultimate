@@ -330,7 +330,7 @@ export function AIMessageWorkspace() {
               })}
             </p>
             <h1 className="mt-2 text-2xl font-bold text-text-primary sm:text-[1.75rem]">
-              {h(currentLocale === 'tr' ? 'Mesajlar' : 'Messages')}
+              {h(currentLocale === 'tr' ? 'Yapay Zeka Mesajı Üret' : 'Generate AI Messages')}
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -376,7 +376,7 @@ export function AIMessageWorkspace() {
                 className={cn(
                   'rounded-3xl border bg-surface/30 p-5 text-left transition-all',
                   active
-                    ? 'border-primary/30 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_36%),linear-gradient(135deg,rgba(4,18,28,0.96),rgba(8,20,35,0.92))]'
+                    ? 'border-primary/35 bg-primary/10 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.15)]'
                     : 'border-border-subtle hover:border-primary/20 hover:bg-surface/40',
                 )}
               >
@@ -421,7 +421,7 @@ export function AIMessageWorkspace() {
                 className={cn(
                   'rounded-3xl border bg-surface/30 p-5 text-left transition-all',
                   active
-                    ? 'border-primary/30 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_36%),linear-gradient(135deg,rgba(4,18,28,0.96),rgba(8,20,35,0.92))]'
+                    ? 'border-primary/35 bg-primary/10 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.15)]'
                     : 'border-border-subtle hover:border-primary/20 hover:bg-surface/40',
                 )}
               >

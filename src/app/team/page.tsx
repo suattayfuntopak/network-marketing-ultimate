@@ -59,7 +59,7 @@ function buildContactDirectoryCard(contact: ContactRow, tasks: TaskRow[]): Direc
     relationshipStrength: contact.relationship_strength,
     openTasks: relatedTasks.length,
     overdueTasks: relatedTasks.filter((task) => task.status === 'overdue').length,
-    route: `/contacts?contact=${contact.id}`,
+    route: `/contacts?contact=${contact.id}&returnTo=%2Fteam`,
   }
 }
 

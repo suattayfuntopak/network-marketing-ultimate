@@ -557,6 +557,32 @@ function AIMessageGeneratorModalContent({
                 onChange={(event) => setContactSearch(event.target.value)}
                 placeholder={locale === 'tr' ? 'Kişi ara...' : 'Search contact...'}
               />
+              {contactSearch.trim().length > 0 && (
+                <div className="max-h-36 overflow-y-auto rounded-xl border border-border-subtle bg-surface/45">
+                  {selectableContacts.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-text-tertiary">
+                      {locale === 'tr' ? 'Sonuç bulunamadı.' : 'No results found.'}
+                    </p>
+                  ) : (
+                    selectableContacts.slice(0, 10).map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedContactId(item.id)
+                          setContactSearch(item.full_name)
+                        }}
+                        className="flex w-full items-start justify-between gap-2 border-b border-border-subtle px-3 py-2 text-left text-xs text-text-secondary last:border-b-0 hover:bg-surface-hover"
+                      >
+                        <span className="truncate text-text-primary">{item.full_name}</span>
+                        <span className="truncate text-text-tertiary">
+                          {[item.profession, item.location].filter(Boolean).join(' • ')}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
               <div>
                 <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
                   {locale === 'tr' ? 'Kişi Seç' : 'Select Contact'}
