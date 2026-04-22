@@ -4,10 +4,11 @@ import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { usePersistentState } from '@/hooks/usePersistentState'
 import type { ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import type { Event } from '@/types'
-import { CheckSquare, Mail, MessageCircle, Search, Send, Smartphone, Square, Users } from 'lucide-react'
+import { CheckSquare, History, Link2, Mail, MessageCircle, Search, Send, Smartphone, Square, Users } from 'lucide-react'
 
 export type InviteChannel = 'whatsapp' | 'telegram' | 'email' | 'sms'
 
@@ -45,7 +46,32 @@ interface Props {
   onSyncAttendees: (contactIds: string[], markAsSent: boolean) => Promise<void>
 }
 
-function eventMessage(locale: 'tr' | 'en', contactName: string, event: Event) {
+type InviteHistoryItem = {
+  id: string
+  eventId: string
+  channel: InviteChannel
+  contactIds: string[]
+  createdAt: string
+}
+
+type InviteTemplate = {
+  id: string
+  name: string
+  body: string
+}
+
+type EventInviteConfig = {
+  eventId: string
+  whatsappGroupLink: string
+  telegramGroupLink: string
+}
+
+function templateMessage(
+  template: string,
+  event: Event,
+  locale: 'tr' | 'en',
+  options?: { name?: string; groupLink?: string },
+) {
   const eventDate = new Date(event.startDate).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
     day: 'numeric',
     month: 'long',
@@ -59,13 +85,17 @@ function eventMessage(locale: 'tr' | 'en', contactName: string, event: Event) {
     minute: '2-digit',
   })}`
 
-  return locale === 'tr'
-    ? `Merhaba ${contactName}, seni "${event.title}" etkinliğimize davet etmek istiyorum. ${eventDate} tarihinde ${eventTime} arasında ${event.location || 'online'} olarak planlandı. ${event.meetingUrl ? `Katılım linki: ${event.meetingUrl}` : ''}`.trim()
-    : `Hi ${contactName}, I'd like to invite you to "${event.title}". It is planned for ${eventDate}, ${eventTime}, at ${event.location || 'online'}. ${event.meetingUrl ? `Join link: ${event.meetingUrl}` : ''}`.trim()
+  return template
+    .replaceAll('{name}', options?.name ?? (locale === 'tr' ? 'değerli katılımcı' : 'participant'))
+    .replaceAll('{eventTitle}', event.title)
+    .replaceAll('{date}', eventDate)
+    .replaceAll('{time}', eventTime)
+    .replaceAll('{location}', event.location || (locale === 'tr' ? 'online' : 'online'))
+    .replaceAll('{meetingUrl}', event.meetingUrl ?? '')
+    .replaceAll('{groupLink}', options?.groupLink ?? '')
 }
 
-function contactLink(contact: ContactRow, event: Event, channel: InviteChannel, locale: 'tr' | 'en') {
-  const message = eventMessage(locale, contact.full_name, event)
+function contactLink(contact: ContactRow, event: Event, channel: InviteChannel, message: string) {
   const encodedMessage = encodeURIComponent(message)
   const normalizedPhone = contact.phone?.replace(/\D/g, '') ?? ''
 
@@ -83,25 +113,6 @@ function contactLink(contact: ContactRow, event: Event, channel: InviteChannel, 
   return `https://t.me/share/url?url=${encodeURIComponent(event.meetingUrl || window.location.href)}&text=${encodedMessage}`
 }
 
-function buildBulkAnnouncement(locale: 'tr' | 'en', event: Event) {
-  const eventDate = new Date(event.startDate).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-  const eventTime = `${new Date(event.startDate).toLocaleTimeString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })} - ${new Date(event.endDate).toLocaleTimeString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })}`
-
-  return locale === 'tr'
-    ? `Duyuru: "${event.title}" etkinliği ${eventDate} tarihinde ${eventTime} saatlerinde ${event.location || 'online'} gerçekleşecek.${event.meetingUrl ? ` Katılım linki: ${event.meetingUrl}` : ''}`
-    : `Announcement: "${event.title}" will take place on ${eventDate}, ${eventTime}, at ${event.location || 'online'}.${event.meetingUrl ? ` Join link: ${event.meetingUrl}` : ''}`
-}
-
 export function EventInviteModal({
   open,
   onClose,
@@ -117,7 +128,76 @@ export function EventInviteModal({
   const [selectedInviteIds, setSelectedInviteIds] = useState<string[]>([])
   const [inviteChannel, setInviteChannel] = useState<InviteChannel>('whatsapp')
   const [inviteFeedback, setInviteFeedback] = useState('')
+  const [activeTemplateId, setActiveTemplateId] = useState('default')
+  const [messageBody, setMessageBody] = useState('')
   const [lastOpenedFor, setLastOpenedFor] = useState<string | null>(null)
+  const [historyItems, setHistoryItems] = usePersistentState<InviteHistoryItem[]>('nmu-event-invite-history', [], { version: 1 })
+  const [eventConfigs, setEventConfigs] = usePersistentState<EventInviteConfig[]>('nmu-event-invite-configs', [], { version: 1 })
+  const [customTemplates, setCustomTemplates] = usePersistentState<InviteTemplate[]>('nmu-event-invite-templates', [], { version: 1 })
+
+  const defaultTemplates: InviteTemplate[] = useMemo(
+    () => [
+      {
+        id: 'default',
+        name: locale === 'tr' ? 'Standart Davet' : 'Standard Invite',
+        body:
+          locale === 'tr'
+            ? 'Merhaba {name}, "{eventTitle}" etkinliğine davetlisin. Tarih: {date}, Saat: {time}, Konum: {location}. Toplantı: {meetingUrl} Grup: {groupLink}'
+            : 'Hi {name}, you are invited to "{eventTitle}". Date: {date}, Time: {time}, Location: {location}. Meeting: {meetingUrl} Group: {groupLink}',
+      },
+      {
+        id: 'short',
+        name: locale === 'tr' ? 'Kısa Hatırlatma' : 'Quick Reminder',
+        body:
+          locale === 'tr'
+            ? '"{eventTitle}" hatırlatması: {date} {time}. Link: {meetingUrl}'
+            : '"{eventTitle}" reminder: {date} {time}. Link: {meetingUrl}',
+      },
+    ],
+    [locale],
+  )
+  const allTemplates = useMemo(() => [...defaultTemplates, ...customTemplates], [customTemplates, defaultTemplates])
+  const eventConfig = useMemo(
+    () => eventConfigs.find((item) => item.eventId === event?.id) ?? null,
+    [event?.id, eventConfigs],
+  )
+  const whatsappGroupLink = eventConfig?.whatsappGroupLink ?? ''
+  const telegramGroupLink = eventConfig?.telegramGroupLink ?? ''
+  const groupLink = inviteChannel === 'whatsapp' ? whatsappGroupLink : inviteChannel === 'telegram' ? telegramGroupLink : ''
+
+  function updateEventConfig(patch: Partial<EventInviteConfig>) {
+    if (!event) return
+    setEventConfigs((current) => {
+      const existing = current.find((item) => item.eventId === event.id)
+      const next: EventInviteConfig = {
+        eventId: event.id,
+        whatsappGroupLink: existing?.whatsappGroupLink ?? '',
+        telegramGroupLink: existing?.telegramGroupLink ?? '',
+        ...patch,
+      }
+      if (!existing) return [next, ...current]
+      return current.map((item) => (item.eventId === event.id ? next : item))
+    })
+  }
+
+  function applyTemplate(templateId: string, channel: InviteChannel) {
+    if (!event) return
+    const template = allTemplates.find((entry) => entry.id === templateId)
+    if (!template) return
+    setActiveTemplateId(templateId)
+    const link = channel === 'whatsapp' ? whatsappGroupLink : channel === 'telegram' ? telegramGroupLink : ''
+    setMessageBody(templateMessage(template.body, event, locale, { groupLink: link }))
+  }
+
+  function saveCurrentAsTemplate() {
+    if (!messageBody.trim()) return
+    const name = window.prompt(locale === 'tr' ? 'Şablon adı' : 'Template name', locale === 'tr' ? 'Özel Şablon' : 'Custom Template')
+    if (!name?.trim()) return
+    const id = `custom-${Date.now()}`
+    const next = { id, name: name.trim(), body: messageBody.trim() }
+    setCustomTemplates((current) => [next, ...current].slice(0, 50))
+    setActiveTemplateId(id)
+  }
 
   const openToken = open ? event?.id ?? 'open' : null
   if (openToken !== lastOpenedFor) {
@@ -126,6 +206,10 @@ export function EventInviteModal({
       setInviteSearch('')
       setSelectedInviteIds(event?.attendees.map((attendee) => attendee.contactId) ?? [])
       setInviteFeedback('')
+      setActiveTemplateId('default')
+      if (event) {
+        setMessageBody(templateMessage(defaultTemplates[0].body, event, locale, { groupLink }))
+      }
     }
   }
 
@@ -159,7 +243,13 @@ export function EventInviteModal({
   function selectEligibleInvites() {
     if (!event) return
     const eligibleIds = inviteableContacts
-      .filter((contact) => Boolean(contactLink(contact, event, inviteChannel, locale)))
+      .filter((contact) => {
+        const text = templateMessage(messageBody || defaultTemplates[0].body, event, locale, {
+          name: contact.full_name,
+          groupLink,
+        })
+        return Boolean(contactLink(contact, event, inviteChannel, text))
+      })
       .map((contact) => contact.id)
     setSelectedInviteIds(eligibleIds)
   }
@@ -169,7 +259,13 @@ export function EventInviteModal({
 
     const selectedContacts = contacts.filter((contact) => contactIds.includes(contact.id))
     const links = selectedContacts
-      .map((contact) => ({ contact, link: contactLink(contact, event, inviteChannel, locale) }))
+      .map((contact) => {
+        const message = templateMessage(messageBody || defaultTemplates[0].body, event, locale, {
+          name: contact.full_name,
+          groupLink,
+        })
+        return { contact, link: contactLink(contact, event, inviteChannel, message) }
+      })
       .filter((entry) => Boolean(entry.link))
 
     if (links.length === 0) {
@@ -184,7 +280,7 @@ export function EventInviteModal({
       if (recipients.length > 0) {
         const first = recipients[0]
         const bcc = recipients.slice(1).join(',')
-        const body = encodeURIComponent(buildBulkAnnouncement(locale, event))
+        const body = encodeURIComponent(templateMessage(messageBody || defaultTemplates[0].body, event, locale, { groupLink }))
         const href = `mailto:${first}?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(event.title)}&body=${body}`
         window.open(href, '_blank', 'noopener,noreferrer')
       }
@@ -193,7 +289,7 @@ export function EventInviteModal({
       window.open(links[0].link!, '_blank', 'noopener,noreferrer')
       setInviteFeedback(`${links.length} ${labels.addedToEvent}. ${links.length} ${labels.sentTo}.`)
     } else {
-      const announcement = buildBulkAnnouncement(locale, event)
+      const announcement = templateMessage(messageBody || defaultTemplates[0].body, event, locale, { groupLink })
       await navigator.clipboard.writeText(announcement)
       if (inviteChannel === 'whatsapp') {
         window.open('https://web.whatsapp.com/', '_blank', 'noopener,noreferrer')
@@ -212,6 +308,17 @@ export function EventInviteModal({
     if (closeAfter) {
       setSelectedInviteIds([])
     }
+
+    setHistoryItems((current) => [
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        eventId: event.id,
+        channel: inviteChannel,
+        contactIds,
+        createdAt: new Date().toISOString(),
+      },
+      ...current,
+    ].slice(0, 120))
   }
 
   const channelIcon =
@@ -250,8 +357,10 @@ export function EventInviteModal({
               <select
                 value={inviteChannel}
                 onChange={(event) => {
-                  setInviteChannel(event.target.value as InviteChannel)
+                  const nextChannel = event.target.value as InviteChannel
+                  setInviteChannel(nextChannel)
                   setInviteFeedback('')
+                  applyTemplate(activeTemplateId, nextChannel)
                 }}
                 className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50"
               >
@@ -276,11 +385,98 @@ export function EventInviteModal({
             <span className="text-text-tertiary">{labels.channelHint}</span>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label className="space-y-1.5 block">
+              <span className="text-xs font-medium text-text-secondary">
+                {locale === 'tr' ? 'WhatsApp Grup Davet Linki' : 'WhatsApp Group Invite Link'}
+              </span>
+              <input
+                value={whatsappGroupLink}
+                onChange={(event) => updateEventConfig({ whatsappGroupLink: event.target.value })}
+                placeholder="https://chat.whatsapp.com/..."
+                className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50"
+              />
+            </label>
+            <label className="space-y-1.5 block">
+              <span className="text-xs font-medium text-text-secondary">
+                {locale === 'tr' ? 'Telegram Grup Davet Linki' : 'Telegram Group Invite Link'}
+              </span>
+              <input
+                value={telegramGroupLink}
+                onChange={(event) => updateEventConfig({ telegramGroupLink: event.target.value })}
+                placeholder="https://t.me/..."
+                className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50"
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="ghost" size="sm" disabled={!whatsappGroupLink} onClick={() => window.open(whatsappGroupLink, '_blank', 'noopener,noreferrer')}>
+              <Link2 className="w-3.5 h-3.5" /> WhatsApp
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={!telegramGroupLink} onClick={() => window.open(telegramGroupLink, '_blank', 'noopener,noreferrer')}>
+              <Link2 className="w-3.5 h-3.5" /> Telegram
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)] gap-3 items-end">
+            <label className="space-y-1.5 block">
+              <span className="text-xs font-medium text-text-secondary">
+                {locale === 'tr' ? 'Toplu Mesaj Şablonu' : 'Bulk Message Template'}
+              </span>
+              <select
+                value={activeTemplateId}
+                onChange={(event) => applyTemplate(event.target.value, inviteChannel)}
+                className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50"
+              >
+                {allTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>{template.name}</option>
+                ))}
+              </select>
+            </label>
+            <Button type="button" variant="outline" size="sm" onClick={saveCurrentAsTemplate}>
+              {locale === 'tr' ? 'Metni Şablon Olarak Kaydet' : 'Save Text as Template'}
+            </Button>
+          </div>
+
+          <label className="space-y-1.5 block">
+            <span className="text-xs font-medium text-text-secondary">
+              {locale === 'tr'
+                ? 'Mesaj ({name}, {eventTitle}, {date}, {time}, {location}, {meetingUrl}, {groupLink})'
+                : 'Message ({name}, {eventTitle}, {date}, {time}, {location}, {meetingUrl}, {groupLink})'}
+            </span>
+            <textarea
+              value={messageBody}
+              onChange={(event) => setMessageBody(event.target.value)}
+              rows={4}
+              className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary/50"
+            />
+          </label>
+
           {inviteFeedback && (
             <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
               {inviteFeedback}
             </div>
           )}
+
+          <div className="rounded-xl border border-border-subtle bg-surface/40 p-3">
+            <p className="text-xs font-medium text-text-secondary flex items-center gap-1.5 mb-2">
+              <History className="w-3.5 h-3.5" />
+              {locale === 'tr' ? 'Davet Geçmişi' : 'Invite History'}
+            </p>
+            <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
+              {historyItems.filter((item) => item.eventId === event.id).slice(0, 8).map((entry) => (
+                <div key={entry.id} className="text-xs text-text-tertiary">
+                  {new Date(entry.createdAt).toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US')} • {entry.channel.toUpperCase()} • {entry.contactIds.length} {labels.selectedCount}
+                </div>
+              ))}
+              {historyItems.filter((item) => item.eventId === event.id).length === 0 && (
+                <p className="text-xs text-text-tertiary">
+                  {locale === 'tr' ? 'Henüz davet gönderimi yapılmadı.' : 'No invite send yet.'}
+                </p>
+              )}
+            </div>
+          </div>
 
           <div className="max-h-[360px] overflow-y-auto space-y-2 pr-1">
             {inviteableContacts.length === 0 ? (
