@@ -1,8 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { formatDistanceToNow } from 'date-fns'
-import { enUS, tr as trLocale } from 'date-fns/locale'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
@@ -10,47 +8,20 @@ import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Ca
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { useLanguage } from '@/components/common/LanguageProvider'
-import { ContactChannelRow } from '@/components/contacts/ContactChannelRow'
-import { ContactWarmthBar } from '@/components/contacts/ContactWarmthBar'
-import { PIPELINE_STAGE_OPTIONS, stageMeta } from '@/components/contacts/contactLabels'
+import { stageMeta } from '@/components/contacts/contactLabels'
 import { useAppStore } from '@/store/appStore'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { queueAIMessageDraftPreset } from '@/lib/clientStorage'
 import { addInteraction, deleteInteraction, fetchContacts, fetchInteractionsByContact, updateInteraction } from '@/lib/queries'
 import type { ContactRow, InteractionRow } from '@/lib/queries'
-import { Check, Copy, Crown, LayoutGrid, LayoutList, Pencil, Sparkles, Trash2, Users, ShoppingBag, Target, NotebookPen, Send } from 'lucide-react'
+import { Check, Copy, Crown, Pencil, Search, Sparkles, Trash2, Users, ShoppingBag, Target, NotebookPen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }
-const TAG_PASTEL_CLASSES = [
-  'bg-fuchsia-500/[0.2] text-text-primary border-fuchsia-400/35',
-  'bg-cyan-500/[0.2] text-text-primary border-cyan-400/35',
-  'bg-amber-500/[0.2] text-text-primary border-amber-400/35',
-  'bg-emerald-500/[0.2] text-text-primary border-emerald-400/35',
-  'bg-violet-500/[0.2] text-text-primary border-violet-400/35',
-  'bg-sky-500/[0.2] text-text-primary border-sky-400/35',
-  'bg-rose-500/[0.2] text-text-primary border-rose-400/35',
-]
 
 type LeaderListKey = 'contacts' | 'team' | 'customers' | null
 const LEADER_NOTE_PREFIX = '[LIDER_NOTU]'
-
-function tagSurfaceClass(index: number) {
-  return TAG_PASTEL_CLASSES[index % TAG_PASTEL_CLASSES.length]
-}
-
-function lastTouchLabel(iso: string | null | undefined, locale: 'tr' | 'en') {
-  if (!iso) return '—'
-  try {
-    return formatDistanceToNow(new Date(iso), {
-      addSuffix: true,
-      locale: locale === 'tr' ? trLocale : enUS,
-    })
-  } catch {
-    return '—'
-  }
-}
 
 export default function LeaderPage() {
   const { locale } = useLanguage()
@@ -65,10 +36,7 @@ export default function LeaderPage() {
   const [isEditingSavedNote, setIsEditingSavedNote] = useState(false)
   const [savedNoteDraft, setSavedNoteDraft] = useState('')
   const [copiedSavedNote, setCopiedSavedNote] = useState(false)
-  const [search, setSearch] = useState('')
-  const [selectedStage, setSelectedStage] = useState<string>('all')
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [listSearch, setListSearch] = useState('')
 
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -234,51 +202,52 @@ export default function LeaderPage() {
     ),
     [activeList, contacts, sortedCustomers, sortedTeamMembers],
   )
-  const filteredLeaderContacts = useMemo(() => {
-    const needle = search.trim().toLowerCase()
+  const filteredLeaderListContacts = useMemo(() => {
+    const needle = listSearch.trim().toLowerCase()
     const filtered = selectedPool.filter((contact) => {
-      const tagsJoined = (contact.tags ?? []).join(' ').toLowerCase()
-      const matchesSearch = !needle || (
+      if (!needle) return true
+      return (
         contact.full_name.toLowerCase().includes(needle) ||
-        (contact.nickname?.toLowerCase().includes(needle) ?? false) ||
-        (contact.email?.toLowerCase().includes(needle) ?? false) ||
         (contact.phone?.toLowerCase().includes(needle) ?? false) ||
-        (contact.whatsapp_username?.toLowerCase().includes(needle) ?? false) ||
-        (contact.telegram_username?.toLowerCase().includes(needle) ?? false) ||
-        (contact.instagram_username?.toLowerCase().includes(needle) ?? false) ||
-        (contact.location?.toLowerCase().includes(needle) ?? false) ||
-        (contact.profession?.toLowerCase().includes(needle) ?? false) ||
-        tagsJoined.includes(needle) ||
-        (contact.interests?.toLowerCase().includes(needle) ?? false)
+        (contact.email?.toLowerCase().includes(needle) ?? false)
       )
-      const matchesStage = selectedStage === 'all' || contact.pipeline_stage === selectedStage
-      return matchesSearch && matchesStage
     })
-    return filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  }, [search, selectedPool, selectedStage])
-  const allFilteredSelected = filteredLeaderContacts.length > 0
-    && filteredLeaderContacts.every((contact) => selectedIds.has(contact.id))
-
-  function toggleSelectAllFiltered() {
-    if (allFilteredSelected) {
-      setSelectedIds(new Set())
-      return
-    }
-    setSelectedIds(new Set(filteredLeaderContacts.map((contact) => contact.id)))
-  }
-
-  function toggleRowSelected(contactId: string) {
-    setSelectedIds((previous) => {
-      const next = new Set(previous)
-      if (next.has(contactId)) next.delete(contactId)
-      else next.add(contactId)
-      return next
-    })
-  }
+    return filtered.sort((a, b) => a.full_name.localeCompare(b.full_name, currentLocale === 'tr' ? 'tr' : 'en'))
+  }, [listSearch, selectedPool, currentLocale])
 
   function openLeaderContactDetail(contactId: string) {
+    if (!activeList) return
     const segment = activeList === 'team' ? 'team' : activeList === 'customers' ? 'customers' : 'all'
     router.push(`/contacts?segment=${segment}&contact=${contactId}&returnTo=%2Fteam%2Fleader`)
+  }
+
+  async function openAiForListContact(contact: ContactRow) {
+    let latestLeaderForContact = ''
+    try {
+      const rows = await fetchInteractionsByContact(contact.id)
+      const noteRows = rows
+        .filter((entry) => entry.type === 'note' && entry.content.startsWith(LEADER_NOTE_PREFIX))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      if (noteRows[0]) latestLeaderForContact = noteRows[0].content.replace(LEADER_NOTE_PREFIX, '').trim()
+    } catch {
+      // ignore: still open AI with contact fields
+    }
+    const context = [
+      `Kişi: ${contact.full_name}`,
+      contact.profession ? `Meslek: ${contact.profession}` : '',
+      contact.location ? `Lokasyon: ${contact.location}` : '',
+      contact.interests ? `İlgi alanları: ${contact.interests}` : '',
+      contact.pain_points ? `Sıkıntılar: ${contact.pain_points}` : '',
+      latestLeaderForContact ? `Lider Notu: ${latestLeaderForContact}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n')
+    queueAIMessageDraftPreset({
+      category: 'follow_up',
+      tone: 'friendly',
+      extraContext: context,
+    })
+    router.push('/ai')
   }
 
   return (
@@ -317,7 +286,10 @@ export default function LeaderPage() {
           <Card
             hover
             className={cn(activeList === 'contacts' && 'ring-1 ring-primary/35')}
-            onClick={() => setActiveList((current) => (current === 'contacts' ? null : 'contacts'))}
+            onClick={() => {
+              setListSearch('')
+              setActiveList((current) => (current === 'contacts' ? null : 'contacts'))
+            }}
           >
           <p className="text-xs text-text-tertiary">{currentLocale === 'tr' ? 'Toplam Kontak' : 'Total Contacts'}</p>
           <p className="mt-2 text-3xl font-bold text-text-primary">{contacts.length}</p>
@@ -325,7 +297,10 @@ export default function LeaderPage() {
         <Card
           hover
           className={cn(activeList === 'team' && 'ring-1 ring-primary/35')}
-          onClick={() => setActiveList((current) => (current === 'team' ? null : 'team'))}
+          onClick={() => {
+            setListSearch('')
+            setActiveList((current) => (current === 'team' ? null : 'team'))
+          }}
         >
           <p className="text-xs text-text-tertiary">{currentLocale === 'tr' ? 'Ekip Üyesi' : 'Team Members'}</p>
           <p className="mt-2 text-3xl font-bold text-text-primary">{totalTeam}</p>
@@ -333,7 +308,10 @@ export default function LeaderPage() {
         <Card
           hover
           className={cn(activeList === 'customers' && 'ring-1 ring-primary/35')}
-          onClick={() => setActiveList((current) => (current === 'customers' ? null : 'customers'))}
+          onClick={() => {
+            setListSearch('')
+            setActiveList((current) => (current === 'customers' ? null : 'customers'))
+          }}
         >
           <p className="text-xs text-text-tertiary">{currentLocale === 'tr' ? 'Müşteri' : 'Customers'}</p>
           <p className="mt-2 text-3xl font-bold text-text-primary">{totalCustomers}</p>
@@ -449,251 +427,91 @@ export default function LeaderPage() {
           </div>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Send className="w-4 h-4 text-secondary" />
-              {currentLocale === 'tr' ? 'Hızlı Lider Aksiyonları' : 'Leader Quick Actions'}
-            </CardTitle>
-          </CardHeader>
-
-          <div className="space-y-2">
-            <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/contacts')}>
-              {currentLocale === 'tr' ? 'Kontak sayfasına git ve kişi yönet' : 'Open Contacts and manage people'}
-            </Button>
-            <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/customers')}>
-              {currentLocale === 'tr' ? 'Müşteri tabanını yönet' : 'Manage customer base'}
-            </Button>
-            <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/team')}>
-              {currentLocale === 'tr' ? 'Organizasyon görünümüne dön' : 'Back to organization view'}
-            </Button>
-            <Button className="w-full justify-start" onClick={openAiForPerson} icon={<Sparkles className="w-4 h-4" />}>
-              {currentLocale === 'tr' ? 'Seçili kişi için AI mesaj üret' : 'Generate AI message for selected person'}
-            </Button>
-          </div>
-        </Card>
-      </motion.div>
-
-      {activeList && (
-        <motion.div variants={item} className="space-y-4">
-          <Card>
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-              <div className="relative flex-1">
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={
-                    currentLocale === 'tr'
-                      ? 'Ad, takma ad, telefon, kanal, etiket ara...'
-                      : 'Search name, nickname, phone, channels, tags...'
-                  }
-                  className="w-full h-11 rounded-xl border border-border bg-surface pl-4 pr-4 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-primary/30"
-                />
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <select
-                  value={selectedStage}
-                  onChange={(event) => setSelectedStage(event.target.value)}
-                  className="h-11 px-3 bg-surface border border-border rounded-xl text-sm text-text-primary outline-none"
-                >
-                  <option value="all">{currentLocale === 'tr' ? 'Tüm Aşamalar' : 'All Stages'}</option>
-                  {PIPELINE_STAGE_OPTIONS.map((stage) => (
-                    <option key={stage} value={stage}>{stageMeta(stage)[currentLocale]}</option>
-                  ))}
-                </select>
-                <div className="flex items-center bg-surface border border-border rounded-xl overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('table')}
-                    className={cn('h-11 px-3 text-text-secondary', viewMode === 'table' && 'bg-primary/15 text-primary')}
-                  >
-                    <LayoutList className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('cards')}
-                    className={cn('h-11 px-3 text-text-secondary', viewMode === 'cards' && 'bg-primary/15 text-primary')}
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+        <Card
+          className="flex min-h-0 max-h-[min(72vh,640px)] flex-col overflow-hidden xl:max-h-[min(80vh,720px)]"
+          padding="none"
+        >
+          <div className="border-b border-border p-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" aria-hidden />
+              <input
+                value={listSearch}
+                onChange={(event) => setListSearch(event.target.value)}
+                disabled={!activeList}
+                placeholder={
+                  currentLocale === 'tr'
+                    ? 'Ad, telefon, e-posta ara...'
+                    : 'Search name, phone, email...'
+                }
+                className="h-10 w-full rounded-xl border border-border bg-surface py-2 pl-10 pr-3 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+              />
             </div>
-          </Card>
-
-          {filteredLeaderContacts.length === 0 ? (
-            <Card>
-              <div className="py-12 text-center">
-                <p className="text-base font-semibold text-text-primary">
-                  {currentLocale === 'tr' ? 'Bu görünümde kontak bulunamadı.' : 'No contacts matched this view.'}
-                </p>
-                <p className="text-sm text-text-tertiary mt-2">
-                  {currentLocale === 'tr'
-                    ? 'Filtreleri sadeleştir veya başka bir kutu seç.'
-                    : 'Broaden the filters or choose a different box.'}
-                </p>
-              </div>
-            </Card>
-          ) : viewMode === 'table' ? (
-            <Card padding="none" className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-surface/40">
-                      <th className="w-10 px-2 py-3 text-left">
-                        <input
-                          type="checkbox"
-                          checked={allFilteredSelected}
-                          onChange={toggleSelectAllFiltered}
-                          onClick={(event) => event.stopPropagation()}
-                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40"
-                          aria-label={currentLocale === 'tr' ? 'Tümünü seç' : 'Select all'}
-                        />
-                      </th>
-                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'İsim' : 'Name'}</th>
-                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Kanallar' : 'Channels'}</th>
-                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Aşama' : 'Stage'}</th>
-                      <th className="px-4 py-3 text-left text-text-tertiary font-medium">{currentLocale === 'tr' ? 'Sıcaklık' : 'Warmth'}</th>
-                      <th className="px-4 py-3 text-left text-text-tertiary font-medium min-w-[140px]">
-                        {currentLocale === 'tr' ? 'Etiketler' : 'Tags'}
-                      </th>
-                      <th className="px-4 py-3 text-left text-text-tertiary font-medium whitespace-nowrap">
-                        {currentLocale === 'tr' ? 'Son Temas' : 'Last touch'}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredLeaderContacts.map((contact) => {
-                      const stage = stageMeta(contact.pipeline_stage)
-                      const tags = contact.tags ?? []
-                      return (
-                        <tr
-                          key={contact.id}
-                          onClick={() => openLeaderContactDetail(contact.id)}
-                          className="border-b border-border last:border-0 hover:bg-surface/30 cursor-pointer transition-colors"
-                        >
-                          <td className="px-2 py-4 align-middle" onClick={(event) => event.stopPropagation()}>
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.has(contact.id)}
-                              onChange={() => toggleRowSelected(contact.id)}
-                              className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40"
-                              aria-label={currentLocale === 'tr' ? 'Satırı seç' : 'Select row'}
-                            />
-                          </td>
-                          <td className="px-4 py-4 min-w-[220px]">
-                            <div className="flex items-center gap-3">
-                              <Avatar name={contact.full_name} size="sm" />
-                              <div className="min-w-0">
-                                <p className="font-semibold text-text-primary truncate">{contact.full_name}</p>
-                                <p className="text-xs text-text-tertiary truncate">
-                                  {(() => {
-                                    const meta = [contact.profession, contact.location].filter(Boolean).join(' · ')
-                                    const nick = contact.nickname?.trim()
-                                    if (nick) return meta ? `${nick} · ${meta}` : nick
-                                    return meta || (currentLocale === 'tr' ? 'Kontak kaydı' : 'Contact record')
-                                  })()}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 align-middle">
-                            <ContactChannelRow contact={contact} />
-                          </td>
-                          <td className="px-4 py-4 align-middle">
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {!activeList ? (
+              <p className="py-8 text-center text-sm text-text-tertiary">
+                {currentLocale === 'tr'
+                  ? 'Yukarıdaki sayaçlardan birine tıklayın; bu panelde o gruptaki kişileri göreceksiniz.'
+                  : 'Click one of the three counters above to load people in this panel.'}
+              </p>
+            ) : selectedPool.length === 0 ? (
+              <p className="py-8 text-center text-sm text-text-tertiary">
+                {currentLocale === 'tr' ? 'Bu grupta kayıt yok.' : 'No people in this group.'}
+              </p>
+            ) : filteredLeaderListContacts.length === 0 ? (
+              <p className="py-8 text-center text-sm text-text-tertiary">
+                {currentLocale === 'tr' ? 'Aramaya uyan kişi yok.' : 'No matches for your search.'}
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {filteredLeaderListContacts.map((contact) => {
+                  const stage = stageMeta(contact.pipeline_stage)
+                  return (
+                    <li
+                      key={contact.id}
+                      className="flex min-w-0 items-center gap-2 rounded-xl border border-border-subtle bg-surface/50 p-2.5 pl-3"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openLeaderContactDetail(contact.id)}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <Avatar name={contact.full_name} size="sm" className="shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-text-primary">{contact.full_name}</p>
+                          {contact.profession?.trim() && (
+                            <p className="truncate text-xs text-text-tertiary">{contact.profession}</p>
+                          )}
+                          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                             <span
                               className={cn(
-                                'inline-flex max-w-[11rem] items-center rounded-full border px-2.5 py-1 text-xs font-semibold truncate',
+                                'inline-flex max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold',
                                 stage.className,
                               )}
                             >
                               {stage[currentLocale]}
                             </span>
-                          </td>
-                          <td className="px-4 py-4 align-middle">
-                            <ContactWarmthBar score={contact.temperature_score} />
-                          </td>
-                          <td className="px-4 py-4 align-middle">
-                            {tags.length === 0 ? (
-                              <span className="text-xs text-text-muted">—</span>
-                            ) : (
-                              <div className="flex flex-wrap gap-1">
-                                {tags.map((tag, index) => (
-                                  <span
-                                    key={`${contact.id}-${tag}`}
-                                    className={cn(
-                                      'inline-flex max-w-[7rem] truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold',
-                                      tagSurfaceClass(index),
-                                    )}
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 text-xs text-text-secondary whitespace-nowrap">
-                            {lastTouchLabel(contact.last_contact_date, currentLocale)}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredLeaderContacts.map((contact) => {
-                const stage = stageMeta(contact.pipeline_stage)
-                return (
-                  <Card key={contact.id} hover onClick={() => openLeaderContactDetail(contact.id)}>
-                    <div className="flex items-start justify-between gap-3 mb-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar name={contact.full_name} size="md" />
-                        <div>
-                          <h3 className="text-sm font-semibold text-text-primary">{contact.full_name}</h3>
-                          <p className="text-xs text-text-tertiary">
-                            {[contact.profession, contact.location].filter(Boolean).join(' · ') || (currentLocale === 'tr' ? 'Kontak kaydı' : 'Contact record')}
-                          </p>
+                          </div>
                         </div>
-                      </div>
-                      <span className={cn('inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold', stage.className)}>
-                        {stage[currentLocale]}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                      <ContactChannelRow contact={contact} />
-                      <ContactWarmthBar score={contact.temperature_score} className="max-w-[10rem]" />
-                    </div>
-
-                    <div className="text-xs">
-                      <p className="text-text-tertiary">{currentLocale === 'tr' ? 'Son temas' : 'Last touch'}</p>
-                      <p className="text-text-primary mt-1">{lastTouchLabel(contact.last_contact_date, currentLocale)}</p>
-                    </div>
-                    {(contact.tags ?? []).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {(contact.tags ?? []).map((tag, index) => (
-                          <span
-                            key={`${contact.id}-card-${tag}`}
-                            className={cn(
-                              'inline-flex max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold',
-                              tagSurfaceClass(index),
-                            )}
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </Card>
-                )
-              })}
-            </div>
-          )}
-        </motion.div>
-      )}
+                      </button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void openAiForListContact(contact)}
+                        className="shrink-0 gap-1 border border-warning/30 bg-warning/10 px-2.5 text-[11px] font-semibold text-warning hover:bg-warning/20"
+                        icon={<Sparkles className="h-3.5 w-3.5" />}
+                      >
+                        {currentLocale === 'tr' ? 'YZ Mesajı Üret' : 'AI message'}
+                      </Button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        </Card>
+      </motion.div>
     </motion.div>
   )
 }
