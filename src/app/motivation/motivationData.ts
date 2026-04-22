@@ -186,6 +186,18 @@ export const DAILY_VIDEOS: DailyVideo[] = [
 ]
 
 export function getDailyVideoForDate(d = new Date()): DailyVideo {
+  if (!DAILY_VIDEOS.length) {
+    return {
+      id: 'M7lc1UVf-VE',
+      titleShort: 'Günlük disiplin ve istikrar',
+      titleLong: 'YouTube resmi test videosu (embed güvenli)',
+      durationShort: '~2 dk',
+      category: 'Test oynatıcı',
+      summaryTr: '',
+      summaryEn: '',
+      contextHint: 'genel',
+    }
+  }
   const t0 = Date.UTC(2000, 0, 1)
   const t = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
   const dayIndex = Math.floor((t - t0) / 86_400_000)

@@ -82,9 +82,17 @@ function filterBySegment(contacts: ContactRow[], segment: Segment, tag: string) 
 }
 
 function pickQuote(index: number, saved: string[]) {
+  if (!CELEBRITY_QUOTES.length) {
+    return {
+      text: '—',
+      author: '—',
+      role: '—',
+      category: 'Disiplin',
+    } as MotivationQuote
+  }
   const bySaved = CELEBRITY_QUOTES.filter((q) => !saved.includes(quoteKey(q)))
   const pool = bySaved.length ? bySaved : CELEBRITY_QUOTES
-  return pool[index % pool.length]
+  return pool[((index % pool.length) + pool.length) % pool.length]!
 }
 
 function quoteKey(q: MotivationQuote) {
@@ -97,7 +105,8 @@ export default function MotivationPage() {
   const tr = locale === 'tr'
   const { data: contacts = [] } = useQuery<ContactRow[]>({ queryKey: ['contacts'], queryFn: fetchContacts })
 
-  const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * CELEBRITY_QUOTES.length))
+  /** SSR/CSR eşleşmesi: ilk kare 0, mount sonrası rastgele (Math.random sadece effect içinde) */
+  const [quoteIndex, setQuoteIndex] = useState(0)
   const [favIds] = usePersistentState<string[]>('nmu-motivation-fav-quotes', [], { version: 1 })
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [videoThumbError, setVideoThumbError] = useState(false)
@@ -147,14 +156,14 @@ export default function MotivationPage() {
     [contacts],
   )
 
-  const toRecognize = useMemo(
-    () =>
-      [...contacts]
-        .filter((c) => c.pipeline_stage === 'first_contact' || c.temperature === 'warm' || c.temperature === 'hot')
-        .sort(() => 0.5 - Math.random())
-        .slice(0, 1)[0] ?? null,
-    [contacts],
-  )
+  const toRecognize = useMemo(() => {
+    const pool = contacts.filter(
+      (c) => c.pipeline_stage === 'first_contact' || c.temperature === 'warm' || c.temperature === 'hot',
+    )
+    if (!pool.length) return null
+    const loc = tr ? 'tr' : 'en'
+    return [...pool].sort((a, b) => a.full_name.localeCompare(b.full_name, loc))[0] ?? null
+  }, [contacts, tr])
 
   const insightLine = useMemo(() => {
     if (stagnant7.length) {
@@ -177,6 +186,11 @@ export default function MotivationPage() {
     () => getDailyVideoForDate(new Date(`${dateKey}T12:00:00`)),
     [dateKey],
   )
+
+  useEffect(() => {
+    if (!CELEBRITY_QUOTES.length) return
+    setQuoteIndex(Math.floor(Math.random() * CELEBRITY_QUOTES.length))
+  }, [])
 
   useEffect(() => {
     const id = setInterval(() => {
