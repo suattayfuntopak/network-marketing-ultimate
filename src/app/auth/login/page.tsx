@@ -22,6 +22,22 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  async function waitForSession(maxAttempts = 12, delayMs = 100) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (session?.user) {
+        return true
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+
+    return false
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -31,6 +47,13 @@ export default function LoginPage() {
 
     if (authError) {
       setError(authError.message)
+      setLoading(false)
+      return
+    }
+
+    const sessionReady = await waitForSession()
+    if (!sessionReady) {
+      setError(locale === 'tr' ? 'Oturum hazırlanamadı, lütfen tekrar dene.' : 'Session could not be initialized. Please try again.')
       setLoading(false)
       return
     }
