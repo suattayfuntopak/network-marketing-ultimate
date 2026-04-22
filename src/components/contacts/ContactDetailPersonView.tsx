@@ -52,11 +52,11 @@ function sliderWarmthFromServer(score: number | null | undefined) {
 }
 
 const TAG_PASTELS = [
-  'bg-fuchsia-500/[0.14] text-fuchsia-100/90 border-fuchsia-400/25',
-  'bg-cyan-500/[0.14] text-cyan-100/90 border-cyan-400/25',
-  'bg-amber-500/[0.14] text-amber-100/90 border-amber-400/25',
-  'bg-emerald-500/[0.14] text-emerald-100/90 border-emerald-400/25',
-  'bg-violet-500/[0.14] text-violet-100/90 border-violet-400/25',
+  'bg-fuchsia-500/[0.2] text-text-primary border-fuchsia-400/35',
+  'bg-cyan-500/[0.2] text-text-primary border-cyan-400/35',
+  'bg-amber-500/[0.2] text-text-primary border-amber-400/35',
+  'bg-emerald-500/[0.2] text-text-primary border-emerald-400/35',
+  'bg-violet-500/[0.2] text-text-primary border-violet-400/35',
 ]
 
 function tagClass(i: number) {

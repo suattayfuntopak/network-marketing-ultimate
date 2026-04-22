@@ -16,7 +16,7 @@ import {
   LayoutDashboard, Users, ShoppingBag, GitBranch, ListTodo,
   CalendarDays, GraduationCap, Calendar, BarChart3,
   Bot, ChevronLeft, ChevronRight,
-  Target, X
+  Target, X, Package
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -43,6 +43,7 @@ export function Sidebar() {
     { label: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
     { label: t.nav.contacts, href: '/contacts', icon: Users, badge: contactsCount?.toString() },
     { label: t.nav.customers, href: '/customers', icon: ShoppingBag },
+    { label: locale === 'tr' ? 'Ürün Kataloğu' : 'Product Catalog', href: '/products', icon: Package },
     { label: t.nav.pipeline, href: '/pipeline', icon: GitBranch },
     { label: t.nav.tasks, href: '/tasks', icon: ListTodo, badge: pendingTasksCount?.toString() },
     { label: t.nav.calendar, href: '/calendar', icon: CalendarDays },

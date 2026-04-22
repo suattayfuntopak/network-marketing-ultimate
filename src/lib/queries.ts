@@ -116,6 +116,7 @@ export async function addProduct(
     category: string
     description: string
     price_try: number
+    image_url?: string | null
     tags?: string[]
     reorder_cycle_days?: number
   }
@@ -128,6 +129,7 @@ export async function addProduct(
       category: input.category,
       description: input.description,
       price_try: input.price_try,
+      image_url: input.image_url ?? null,
       tags: input.tags ?? [],
       reorder_cycle_days: input.reorder_cycle_days ?? null,
     })
@@ -144,6 +146,7 @@ export async function updateProduct(
     category: string
     description: string
     price_try: number
+    image_url: string | null
     tags: string[]
     reorder_cycle_days: number | null
   }>

@@ -23,6 +23,7 @@ export function ProductModal({ onClose, userId, editProduct }: Props) {
     name: editProduct?.name ?? '',
     category: editProduct?.category ?? '',
     description: editProduct?.description ?? '',
+    image_url: editProduct?.image_url ?? '',
     price_try: editProduct ? String(editProduct.price_try) : '',
     tags: editProduct?.tags.join(', ') ?? '',
     reorder_cycle_days: editProduct?.reorder_cycle_days ? String(editProduct.reorder_cycle_days) : '',
@@ -36,6 +37,7 @@ export function ProductModal({ onClose, userId, editProduct }: Props) {
         name: form.name.trim(),
         category: form.category.trim(),
         description: form.description.trim(),
+        image_url: form.image_url.trim() || null,
         price_try: parseFloat(form.price_try) || 0,
         tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
         reorder_cycle_days: form.reorder_cycle_days ? parseInt(form.reorder_cycle_days) : undefined,
@@ -114,6 +116,15 @@ export function ProductModal({ onClose, userId, editProduct }: Props) {
               placeholder="Ürün hakkında kısa açıklama..."
               rows={2}
               className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all resize-none"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-text-secondary">Ürün Görseli URL</label>
+            <input
+              value={form.image_url}
+              onChange={(event) => setForm((current) => ({ ...current, image_url: event.target.value }))}
+              placeholder="https://.../product-image.jpg"
+              className="w-full h-10 bg-surface border border-border rounded-xl px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">

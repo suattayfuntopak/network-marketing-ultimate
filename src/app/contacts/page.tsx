@@ -209,13 +209,13 @@ function parseCsvRecords(text: string): string[][] {
 }
 
 const TAG_PASTEL_CLASSES = [
-  'bg-fuchsia-500/[0.14] text-fuchsia-100/90 border-fuchsia-400/25',
-  'bg-cyan-500/[0.14] text-cyan-100/90 border-cyan-400/25',
-  'bg-amber-500/[0.14] text-amber-100/90 border-amber-400/25',
-  'bg-emerald-500/[0.14] text-emerald-100/90 border-emerald-400/25',
-  'bg-violet-500/[0.14] text-violet-100/90 border-violet-400/25',
-  'bg-sky-500/[0.14] text-sky-100/90 border-sky-400/25',
-  'bg-rose-500/[0.14] text-rose-100/90 border-rose-400/25',
+  'bg-fuchsia-500/[0.2] text-text-primary border-fuchsia-400/35',
+  'bg-cyan-500/[0.2] text-text-primary border-cyan-400/35',
+  'bg-amber-500/[0.2] text-text-primary border-amber-400/35',
+  'bg-emerald-500/[0.2] text-text-primary border-emerald-400/35',
+  'bg-violet-500/[0.2] text-text-primary border-violet-400/35',
+  'bg-sky-500/[0.2] text-text-primary border-sky-400/35',
+  'bg-rose-500/[0.2] text-text-primary border-rose-400/35',
 ]
 
 function tagSurfaceClass(index: number) {

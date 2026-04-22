@@ -215,22 +215,22 @@ export function channelLabel(channel: string | null | undefined, locale: 'tr' | 
 
 export function stageMeta(stage: string) {
   const labels: Record<string, { tr: string; en: string; className: string }> = {
-    new: { tr: 'Yeni Potansiyel', en: 'New Lead', className: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20' },
-    contact_planned: { tr: 'İletişim Planlandı', en: 'Contact Planned', className: 'bg-blue-500/10 text-blue-300 border-blue-500/20' },
-    first_contact: { tr: 'İlk İletişim', en: 'First Contact', className: 'bg-violet-500/10 text-violet-300 border-violet-500/20' },
-    interested: { tr: 'İlgileniyor', en: 'Interested', className: 'bg-purple-500/10 text-purple-300 border-purple-500/20' },
-    invited: { tr: 'Davet Edildi', en: 'Invited', className: 'bg-amber-500/10 text-amber-300 border-amber-500/20' },
-    presentation_sent: { tr: 'Sunum Gönderildi', en: 'Presentation Sent', className: 'bg-orange-500/10 text-orange-300 border-orange-500/20' },
-    presentation_done: { tr: 'Sunum Yapıldı', en: 'Presentation Done', className: 'bg-orange-400/10 text-orange-200 border-orange-400/20' },
-    followup_pending: { tr: 'Takip Ediliyor', en: 'Follow-up Active', className: 'bg-red-500/10 text-red-300 border-red-500/20' },
-    objection_handling: { tr: 'İtiraz Yönetimi', en: 'Objection Handling', className: 'bg-rose-500/10 text-rose-300 border-rose-500/20' },
-    ready_to_buy: { tr: 'Karar Aşamasında', en: 'Decision Stage', className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' },
-    became_customer: { tr: 'Müşteri', en: 'Customer', className: 'bg-teal-500/10 text-teal-300 border-teal-500/20' },
-    ready_to_join: { tr: 'Katılmaya Hazır', en: 'Ready to Join', className: 'bg-sky-500/10 text-sky-300 border-sky-500/20' },
-    became_member: { tr: 'Ekip Üyesi', en: 'Team Member', className: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' },
-    nurture_later: { tr: 'Sonra İlgilen', en: 'Nurture Later', className: 'bg-slate-500/10 text-slate-300 border-slate-500/20' },
-    dormant: { tr: 'Pasif', en: 'Dormant', className: 'bg-slate-600/10 text-slate-300 border-slate-600/20' },
-    lost: { tr: 'Kaybedildi', en: 'Lost', className: 'bg-zinc-500/10 text-zinc-300 border-zinc-500/20' },
+    new: { tr: 'Yeni Potansiyel', en: 'New Lead', className: 'bg-cyan-500/12 text-text-primary border-cyan-500/30' },
+    contact_planned: { tr: 'İletişim Planlandı', en: 'Contact Planned', className: 'bg-blue-500/12 text-text-primary border-blue-500/30' },
+    first_contact: { tr: 'İlk İletişim', en: 'First Contact', className: 'bg-violet-500/12 text-text-primary border-violet-500/30' },
+    interested: { tr: 'İlgileniyor', en: 'Interested', className: 'bg-purple-500/12 text-text-primary border-purple-500/30' },
+    invited: { tr: 'Davet Edildi', en: 'Invited', className: 'bg-amber-500/12 text-text-primary border-amber-500/30' },
+    presentation_sent: { tr: 'Sunum Gönderildi', en: 'Presentation Sent', className: 'bg-orange-500/12 text-text-primary border-orange-500/30' },
+    presentation_done: { tr: 'Sunum Yapıldı', en: 'Presentation Done', className: 'bg-orange-400/12 text-text-primary border-orange-400/30' },
+    followup_pending: { tr: 'Takip Ediliyor', en: 'Follow-up Active', className: 'bg-red-500/12 text-text-primary border-red-500/30' },
+    objection_handling: { tr: 'İtiraz Yönetimi', en: 'Objection Handling', className: 'bg-rose-500/12 text-text-primary border-rose-500/30' },
+    ready_to_buy: { tr: 'Karar Aşamasında', en: 'Decision Stage', className: 'bg-emerald-500/12 text-text-primary border-emerald-500/30' },
+    became_customer: { tr: 'Müşteri', en: 'Customer', className: 'bg-teal-500/12 text-text-primary border-teal-500/30' },
+    ready_to_join: { tr: 'Katılmaya Hazır', en: 'Ready to Join', className: 'bg-sky-500/12 text-text-primary border-sky-500/30' },
+    became_member: { tr: 'Ekip Üyesi', en: 'Team Member', className: 'bg-indigo-500/12 text-text-primary border-indigo-500/30' },
+    nurture_later: { tr: 'Sonra İlgilen', en: 'Nurture Later', className: 'bg-slate-500/12 text-text-primary border-slate-500/30' },
+    dormant: { tr: 'Pasif', en: 'Dormant', className: 'bg-slate-600/12 text-text-primary border-slate-600/30' },
+    lost: { tr: 'Kaybedildi', en: 'Lost', className: 'bg-zinc-500/12 text-text-primary border-zinc-500/30' },
   }
 
   return labels[stage] ?? { tr: stage, en: stage, className: 'bg-surface-hover text-text-secondary border-border' }

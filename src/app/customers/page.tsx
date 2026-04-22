@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
@@ -12,16 +13,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   fetchContacts, type ContactRow,
   fetchCustomerContactIds,
-  fetchProducts, type ProductRow,
+  type ProductRow,
   fetchAllOrders, fetchOrdersByContact, updateOrderStatus, deleteOrder,
   type OrderRow, type OrderItem,
 } from '@/lib/queries'
-import { useAppStore } from '@/store/appStore'
 import {
   ShoppingBag, Plus, TrendingUp, Trash2, ArrowLeft,
-  ShoppingCart, Clock, Receipt, ChevronRight, Phone, MapPin, Users, CalendarRange, CalendarDays, Sun,
+  ShoppingCart, Clock, Receipt, ChevronRight, Phone, MapPin, Users, CalendarRange, CalendarDays, Sun, Package,
 } from 'lucide-react'
-import { AddCustomerModal } from '@/components/customers/AddCustomerModal'
 import { AddOrderModal } from '@/components/customers/AddOrderModal'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
@@ -45,7 +44,7 @@ const ORDER_STATUS_VARIANTS: Record<string, string> = {
   pending: 'warning', processing: 'primary', delivered: 'success', cancelled: 'error'
 }
 
-function CustomerDetail({ customer, products, userId, onBack }: {
+export function CustomerDetail({ customer, products, userId, onBack }: {
   customer: ContactRow; products: ProductRow[]; userId: string; onBack: () => void
 }) {
   const qc = useQueryClient()
@@ -213,10 +212,7 @@ function CustomerDetail({ customer, products, userId, onBack }: {
 export default function CustomersPage() {
   const { t, locale } = useLanguage()
   const h = useHeadingCase()
-  const { currentUser } = useAppStore()
-
-  const [showAddCustomer, setShowAddCustomer] = useState(false)
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
+  const router = useRouter()
 
   const { data: allContacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -233,13 +229,6 @@ export default function CustomersPage() {
     const idSet = new Set(customerContactIds)
     return allContacts.filter((contact) => idSet.has(contact.id))
   }, [allContacts, customerContactIds])
-  const selectedCustomer = selectedCustomerId ? customers.find(c => c.id === selectedCustomerId) ?? null : null
-
-  const { data: products = [] } = useQuery<ProductRow[]>({
-    queryKey: ['products'],
-    queryFn: fetchProducts,
-  })
-
   const { data: allOrders = [] } = useQuery<OrderRow[]>({
     queryKey: ['orders-all'],
     queryFn: fetchAllOrders,
@@ -330,20 +319,6 @@ export default function CustomersPage() {
     })
   }, [customers, validOrders])
 
-  const userId = currentUser?.id ?? ''
-
-  // Müşteri detay görünümü
-  if (selectedCustomer) {
-    return (
-      <CustomerDetail
-        customer={selectedCustomer}
-        products={products}
-        userId={userId}
-        onBack={() => setSelectedCustomerId(null)}
-      />
-    )
-  }
-
   return (
     <>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
@@ -353,9 +328,24 @@ export default function CustomersPage() {
             <h1 className="text-2xl font-bold text-text-primary">{h(t.customers.title)}</h1>
             <p className="text-sm text-text-secondary mt-0.5">{customers.length} {t.customers.subtitle}</p>
           </div>
-          <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setShowAddCustomer(true)} id="btn-add-customer">
-            {h(t.customers.addCustomer)}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Package className="w-3.5 h-3.5" />}
+              onClick={() => router.push('/products')}
+            >
+              {locale === 'tr' ? h('Ürün Kataloğu') : h('Product Catalog')}
+            </Button>
+            <Button
+              size="sm"
+              icon={<Plus className="w-3.5 h-3.5" />}
+              onClick={() => router.push('/contacts?segment=customers&new=1')}
+              id="btn-add-customer"
+            >
+              {h(t.customers.addCustomer)}
+            </Button>
+          </div>
         </motion.div>
 
         <motion.div variants={itemAnim} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -439,7 +429,7 @@ export default function CustomersPage() {
                     {customerRows.map(({ customer, orderCount, totalSpent, lastOrderDate }) => (
                       <tr
                         key={customer.id}
-                        onClick={() => setSelectedCustomerId(customer.id)}
+                        onClick={() => router.push(`/contacts?segment=customers&contact=${customer.id}`)}
                         className="cursor-pointer border-b border-border-subtle/70 hover:bg-surface/35 transition-colors"
                       >
                         <td className="px-4 py-3">
@@ -471,7 +461,7 @@ export default function CustomersPage() {
                   <button
                     type="button"
                     key={customer.id}
-                    onClick={() => setSelectedCustomerId(customer.id)}
+                    onClick={() => router.push(`/contacts?segment=customers&contact=${customer.id}`)}
                     className="w-full p-4 text-left hover:bg-surface/35 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -506,10 +496,7 @@ export default function CustomersPage() {
         </motion.div>
       </motion.div>
 
-      {/* Modals */}
-      {showAddCustomer && (
-        <AddCustomerModal userId={userId} onClose={() => setShowAddCustomer(false)} />
-      )}
+      {/* Customer add now uses shared Contacts modal flow via route params */}
     </>
   )
 }
