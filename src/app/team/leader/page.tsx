@@ -248,32 +248,6 @@ export default function LeaderPage() {
         </Card>
       </motion.div>
 
-      {activeList && (
-        <motion.div variants={item}>
-          <Card>
-            <p className="text-sm font-semibold text-text-primary">
-              {activeList === 'contacts'
-                ? (currentLocale === 'tr' ? 'Tüm Kişiler (A-Z)' : 'All People (A-Z)')
-                : activeList === 'team'
-                  ? (currentLocale === 'tr' ? 'Ekip Üyeleri (A-Z)' : 'Team Members (A-Z)')
-                  : (currentLocale === 'tr' ? 'Müşteriler (A-Z)' : 'Customers (A-Z)')}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {(activeList === 'contacts'
-                ? sortedContacts
-                : activeList === 'team'
-                  ? sortedTeamMembers
-                  : sortedCustomers
-              ).map((person) => (
-                <span key={person.id} className="rounded-full border border-border px-3 py-1 text-xs text-text-secondary">
-                  {person.full_name}
-                </span>
-              ))}
-            </div>
-          </Card>
-        </motion.div>
-      )}
-
       <motion.div variants={item} className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <Card>
           <CardHeader>
@@ -407,6 +381,49 @@ export default function LeaderPage() {
           </div>
         </Card>
       </motion.div>
+
+      {activeList && (
+        <motion.div variants={item}>
+          <Card padding="none" className="overflow-hidden">
+            <div className="border-b border-border bg-surface/40 px-4 py-3">
+              <p className="text-sm font-semibold text-text-primary">
+                {activeList === 'contacts'
+                  ? (currentLocale === 'tr' ? 'Toplam Kontak Listesi (A-Z)' : 'All Contacts (A-Z)')
+                  : activeList === 'team'
+                    ? (currentLocale === 'tr' ? 'Ekip Üyeleri Listesi (A-Z)' : 'Team Members (A-Z)')
+                    : (currentLocale === 'tr' ? 'Müşteri Listesi (A-Z)' : 'Customers (A-Z)')}
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surface/25 text-left text-xs uppercase tracking-[0.12em] text-text-tertiary">
+                    <th className="px-4 py-3">{currentLocale === 'tr' ? 'İsim' : 'Name'}</th>
+                    <th className="px-4 py-3">{currentLocale === 'tr' ? 'Meslek' : 'Profession'}</th>
+                    <th className="px-4 py-3">{currentLocale === 'tr' ? 'Konum' : 'Location'}</th>
+                    <th className="px-4 py-3">{currentLocale === 'tr' ? 'Aşama' : 'Stage'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(activeList === 'contacts'
+                    ? sortedContacts
+                    : activeList === 'team'
+                      ? sortedTeamMembers
+                      : sortedCustomers
+                  ).map((person) => (
+                    <tr key={person.id} className="border-b border-border-subtle/70 last:border-0">
+                      <td className="px-4 py-3 font-medium text-text-primary">{person.full_name}</td>
+                      <td className="px-4 py-3 text-text-secondary">{person.profession || '—'}</td>
+                      <td className="px-4 py-3 text-text-secondary">{person.location || '—'}</td>
+                      <td className="px-4 py-3 text-text-secondary">{person.pipeline_stage}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </motion.div>
+      )}
     </motion.div>
   )
 }
