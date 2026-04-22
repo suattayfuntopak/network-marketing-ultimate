@@ -20,7 +20,6 @@ import {
   Crown,
   ShoppingBag,
   Target,
-  UserPlus,
   Users,
 } from 'lucide-react'
 
@@ -149,7 +148,7 @@ function CategorySection({
 }
 
 export default function TeamPage() {
-  const { locale, t } = useLanguage()
+  const { locale } = useLanguage()
   const h = useHeadingCase()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const { currentUser } = useAppStore()
@@ -239,20 +238,23 @@ export default function TeamPage() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1500px] mx-auto">
       <motion.div variants={item} className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">{h(t.team.title)}</h1>
+          <h1 className="text-2xl font-bold text-text-primary">
+            {h(currentLocale === 'tr' ? 'Ekip & Organizasyon' : 'Team & Organization')}
+          </h1>
           <p className="mt-1 text-sm text-text-secondary">
             {currentLocale === 'tr'
               ? 'Tek ekranda lider, distribütör ve müşteri görünümü ile organizasyon fotoğrafı.'
               : 'A single-screen organization view for leaders, distributors, and customers.'}
           </p>
         </div>
-        <Button
-          size="sm"
-          icon={<UserPlus className="w-3.5 h-3.5" />}
-          onClick={() => router.push('/pipeline')}
-        >
-          {h(t.team.inviteMember)}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => router.push('/customers')}>
+            {h(currentLocale === 'tr' ? 'Müşterilere Göz At' : 'Browse Customers')}
+          </Button>
+          <Button size="sm" onClick={() => router.push('/contacts')}>
+            {h(currentLocale === 'tr' ? 'Kontaklara Göz At' : 'Browse Contacts')}
+          </Button>
+        </div>
       </motion.div>
 
       <motion.div variants={item} className="grid grid-cols-2 xl:grid-cols-5 gap-3">

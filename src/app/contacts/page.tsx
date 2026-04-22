@@ -272,6 +272,7 @@ export default function ContactsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [editingContact, setEditingContact] = useState<ContactRow | null>(null)
   const [aiModalOpen, setAiModalOpen] = useState(false)
+  const [aiAutoGenerate, setAiAutoGenerate] = useState(false)
   const [rowMenuContactId, setRowMenuContactId] = useState<string | null>(null)
 
   const { data: contacts = [], isLoading } = useQuery<ContactRow[]>({
@@ -641,6 +642,7 @@ export default function ContactsPage() {
   useEffect(() => {
     if (!selected) return
     if (!routeAiOpen) return
+    setAiAutoGenerate(true)
     setAiModalOpen(true)
   }, [routeAiOpen, selected])
 
@@ -649,6 +651,7 @@ export default function ContactsPage() {
   }
   function closeAiModal() {
     setAiModalOpen(false)
+    setAiAutoGenerate(false)
     if (!selectedId || !routeAiOpen) return
     router.push(buildContactsHref(activeSegment, { contactId: selectedId }))
   }
@@ -855,6 +858,31 @@ export default function ContactsPage() {
   ]
 
   if (selected) {
+    const recentInteractions = [...interactions]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 6)
+      .map((item) => `${item.type}: ${item.content}`)
+      .join('\n')
+    const recentTasks = [...contactTasks]
+      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+      .slice(0, 6)
+      .map((item) => `${item.title} (${item.status}) - ${item.due_date}`)
+      .join('\n')
+    const aiContext = [
+      selected.profession ? `Meslek: ${selected.profession}` : '',
+      selected.location ? `Lokasyon: ${selected.location}` : '',
+      selected.source ? `Kaynak: ${selected.source}` : '',
+      selected.interests ? `İlgi alanları: ${selected.interests}` : '',
+      selected.pain_points ? `Sıkıntılar: ${selected.pain_points}` : '',
+      selected.goals_notes ? `Hedef/notlar: ${selected.goals_notes}` : '',
+      selected.tags?.length ? `Etiketler: ${selected.tags.join(', ')}` : '',
+      recentInteractions ? `Son etkileşimler:\n${recentInteractions}` : '',
+      recentTasks ? `Açık/güncel görevler:\n${recentTasks}` : '',
+      'Amaç: Bir sonraki mantıklı adımı netleştiren, kısa ve uygulanabilir bir mesaj üret.',
+    ]
+      .filter(Boolean)
+      .join('\n\n')
+
     const contactFormModalOpen = showAdd || routeModalOpen || editingContact !== null
     return (
       <>
@@ -879,7 +907,10 @@ export default function ContactsPage() {
               if (!ok) return
               deleteMutation.mutate(selected.id)
             }}
-            onOpenAI={() => setAiModalOpen(true)}
+            onOpenAI={(autoGenerate = false) => {
+              setAiAutoGenerate(autoGenerate)
+              setAiModalOpen(true)
+            }}
             onEdit={() => {
               setEditingContact(selected)
               setFormError('')
@@ -941,7 +972,14 @@ export default function ContactsPage() {
           initialCategory="follow_up"
           initialChannel="whatsapp"
           initialTone="friendly"
-          initialExtraContext={[selected.pain_points, selected.interests, selected.goals_notes].filter(Boolean).join('\n')}
+          initialExtraContext={aiContext}
+          autoGenerate={aiAutoGenerate}
+          presetLabel={currentLocale === 'tr' ? 'Mikro Koçluk Mesajı' : 'Micro Coaching Message'}
+          presetReason={
+            currentLocale === 'tr'
+              ? 'Kontak detayları, etkileşim geçmişi ve mevcut takip durumuna göre otomatik oluşturuldu.'
+              : 'Auto-generated using contact details, interaction history, and current follow-up state.'
+          }
           onGenerated={(_record: MessageHistoryRecord) => undefined}
           onSaveTemplate={(_template: Omit<MessageTemplateRecord, 'id' | 'createdAt' | 'isFavorite'>) => undefined}
         />

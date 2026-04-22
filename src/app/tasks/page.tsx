@@ -7,14 +7,17 @@ import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { TaskComposerModal } from '@/components/tasks/TaskComposerModal'
+import { ContactTaskModal } from '@/components/contacts/ContactTaskModal'
+import type { ContactTaskFormValues } from '@/components/contacts/contactLabels'
 import { useAppStore } from '@/store/appStore'
-import { deleteTask, fetchContacts, fetchTasks, setTaskStatus } from '@/lib/queries'
+import { addTask, deleteTask, fetchContacts, fetchTasks, setTaskStatus } from '@/lib/queries'
 import type { ContactRow, TaskRow } from '@/lib/queries'
 import {
-  Plus, CheckCircle2, Circle, Clock, Phone, Users,
+  Plus, CheckCircle2, Circle, Clock, Phone, Users as UsersIcon,
   MessageCircle, GraduationCap, ListTodo, Pencil, Trash2,
 } from 'lucide-react'
 
@@ -24,9 +27,9 @@ const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 const TYPE_ICONS: Record<string, React.ElementType> = {
   follow_up: Clock,
   call: Phone,
-  meeting: Users,
+  meeting: UsersIcon,
   presentation: MessageCircle,
-  onboarding: Users,
+  onboarding: UsersIcon,
   training: GraduationCap,
   custom: Circle,
 }
@@ -49,7 +52,7 @@ const TYPE_KEY_MAP: Record<string, keyof typeof import('@/lib/i18n').translation
 }
 
 export default function TasksPage() {
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const h = useHeadingCase()
   const { currentUser } = useAppStore()
   const qc = useQueryClient()
@@ -58,6 +61,10 @@ export default function TasksPage() {
   const [filter, setFilter] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
   const [editingTask, setEditingTask] = useState<TaskRow | null>(null)
+  const [showFollowUpContactPicker, setShowFollowUpContactPicker] = useState(false)
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false)
+  const [selectedFollowUpContactId, setSelectedFollowUpContactId] = useState('')
+  const [followUpError, setFollowUpError] = useState('')
 
   const { data: tasks = [], isLoading } = useQuery<TaskRow[]>({
     queryKey: ['tasks'],
@@ -79,6 +86,26 @@ export default function TasksPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
   })
 
+  const addFollowUpMutation = useMutation({
+    mutationFn: (values: ContactTaskFormValues) => {
+      if (!currentUser) throw new Error(currentLocale === 'tr' ? 'Kullanıcı bulunamadı.' : 'User not found.')
+      return addTask(currentUser.id, {
+        ...values,
+        contact_id: selectedFollowUpContactId || undefined,
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      setShowFollowUpModal(false)
+      setFollowUpError('')
+    },
+    onError: (error) => {
+      setFollowUpError(error instanceof Error ? error.message : (currentLocale === 'tr' ? 'Takip eklenemedi.' : 'Follow-up could not be added.'))
+    },
+  })
+
+  const currentLocale = locale === 'tr' ? 'tr' : 'en'
+
   function openCreateModal() {
     setEditingTask(null)
     setShowAdd(true)
@@ -92,6 +119,19 @@ export default function TasksPage() {
   function closeTaskModal() {
     setShowAdd(false)
     setEditingTask(null)
+  }
+
+  function openFollowUpPicker() {
+    if (contacts.length === 0) return
+    setSelectedFollowUpContactId((current) => current || contacts[0]?.id || '')
+    setShowFollowUpContactPicker(true)
+  }
+
+  function openFollowUpModalFromPicker() {
+    if (!selectedFollowUpContactId) return
+    setShowFollowUpContactPicker(false)
+    setFollowUpError('')
+    setShowFollowUpModal(true)
   }
 
   const filtered = tasks.filter((task) => {
@@ -113,9 +153,20 @@ export default function TasksPage() {
           <h1 className="text-2xl font-bold text-text-primary">{h(t.tasks.title)}</h1>
           <p className="text-sm text-text-secondary mt-0.5">{pending} {t.tasks.subtitle}</p>
         </div>
-        <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreateModal}>
-          {h(t.tasks.createTask)}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            icon={<UsersIcon className="w-3.5 h-3.5" />}
+            onClick={openFollowUpPicker}
+            disabled={contacts.length === 0}
+          >
+            {currentLocale === 'tr' ? 'Takip Ekle' : 'Add Follow-up'}
+          </Button>
+          <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreateModal}>
+            {h(t.tasks.createTask)}
+          </Button>
+        </div>
       </motion.div>
 
       <motion.div variants={item} className="flex gap-2 flex-wrap">
@@ -253,6 +304,51 @@ export default function TasksPage() {
         tasks={tasks}
         editingTask={editingTask}
       />
+
+      <Modal
+        open={showFollowUpContactPicker}
+        onClose={() => setShowFollowUpContactPicker(false)}
+        title={currentLocale === 'tr' ? 'Takip Ekle' : 'Add Follow-up'}
+        description={currentLocale === 'tr' ? 'Takip eklenecek kişiyi seç.' : 'Select the contact for the follow-up.'}
+        className="max-w-md"
+      >
+        <div className="space-y-4 p-5">
+          <label className="block text-xs font-medium text-text-secondary">
+            {currentLocale === 'tr' ? 'Kişi' : 'Contact'}
+          </label>
+          <select
+            value={selectedFollowUpContactId}
+            onChange={(event) => setSelectedFollowUpContactId(event.target.value)}
+            className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary/50"
+          >
+            {contacts.map((contact) => (
+              <option key={contact.id} value={contact.id}>{contact.full_name}</option>
+            ))}
+          </select>
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1" onClick={() => setShowFollowUpContactPicker(false)}>
+              {currentLocale === 'tr' ? 'İptal' : 'Cancel'}
+            </Button>
+            <Button className="flex-1" onClick={openFollowUpModalFromPicker} disabled={!selectedFollowUpContactId}>
+              {currentLocale === 'tr' ? 'Devam Et' : 'Continue'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {showFollowUpModal && (
+        <ContactTaskModal
+          currentLocale={currentLocale}
+          contactName={contacts.find((contact) => contact.id === selectedFollowUpContactId)?.full_name ?? (currentLocale === 'tr' ? 'Seçili kişi' : 'Selected contact')}
+          onClose={() => {
+            setShowFollowUpModal(false)
+            setFollowUpError('')
+          }}
+          onSubmit={(values) => addFollowUpMutation.mutate(values)}
+          loading={addFollowUpMutation.isPending}
+          error={followUpError}
+        />
+      )}
     </motion.div>
   )
 }

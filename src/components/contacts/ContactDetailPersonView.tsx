@@ -113,51 +113,6 @@ function lastTouchLabel(iso: string | null | undefined, locale: 'tr' | 'en') {
   }
 }
 
-function microCoachingBlock(contact: ContactRow, locale: 'tr' | 'en') {
-  const tr = locale === 'tr'
-  const rawLast = contact.last_contact_date
-  const sinceDays = rawLast
-    ? differenceInCalendarDays(
-        startOfDay(new Date()),
-        startOfDay(new Date(rawLast.includes('T') ? rawLast : `${rawLast}T12:00:00`)),
-      )
-    : null
-  const pain = (contact.pain_points ?? '').toLowerCase()
-  const hasTimePain = pain.includes('zaman') || pain.includes('time') || pain.includes('meşgul')
-  const stage = contact.pipeline_stage
-
-  let headline = tr
-    ? 'Sıradaki en mantıklı adım: kısa bir check-in mesajı.'
-    : 'Next best step: send a short check-in message.'
-  if (sinceDays !== null && sinceDays > 14) {
-    headline = tr
-      ? 'Uzun süredir temas yok; nazikçe yeniden köprü kur.'
-      : 'No touch for a while; reopen the conversation softly.'
-  } else if (stage === 'objection_handling') {
-    headline = tr
-      ? 'İtirazları netleştir; tek bir soruyla ilerle.'
-      : 'Clarify objections; advance with one focused question.'
-  } else if (['presentation_done', 'followup_pending'].includes(stage)) {
-    headline = tr
-      ? 'Sunum sonrası: tek cümlelik değer özeti + net tarih teklifi.'
-      : 'After the deck: one-line value recap plus a clear time proposal.'
-  }
-
-  const suggested = tr
-    ? `${contact.full_name.split(' ')[0] || 'Merhaba'}, kısaca nasılsın? Son konuşmamızdan sonra aklımda kaldı; uygun olunca 2 dakikalık bir ses notu veya mesaj atsan yeter.`
-    : `${contact.full_name.split(' ')[0] || 'Hi'}, quick check-in — when you have two minutes, a short voice note or text works great.`
-
-  const objection =
-    hasTimePain || stage === 'objection_handling'
-      ? {
-          label: tr ? 'Yakın çekince' : 'Likely hurdle',
-          text: tr ? '“Zamanım yok” itirazı' : '“I don’t have time” objection',
-        }
-      : null
-
-  return { headline, suggested, objection }
-}
-
 export interface ContactDetailPersonViewProps {
   locale: 'tr' | 'en'
   contact: ContactRow
@@ -170,7 +125,7 @@ export interface ContactDetailPersonViewProps {
   formatDateTime: (value: string, locale: 'tr' | 'en') => string
   onBack: () => void
   onDelete: () => void
-  onOpenAI: () => void
+  onOpenAI: (autoGenerate?: boolean) => void
   onEdit: () => void
   onArchive: () => void
   onOpenInteractionModal: () => void
@@ -246,8 +201,6 @@ export function ContactDetailPersonView({
   }
 
   const stage = stageMeta(contact.pipeline_stage)
-  const coaching = useMemo(() => microCoachingBlock(contact, locale), [contact, locale])
-
   const visibleInteractions = useMemo(() => {
     const sorted = [...interactions].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -297,7 +250,7 @@ export function ContactDetailPersonView({
             size="sm"
             className="border-warning/30 bg-warning/15 text-warning hover:bg-warning/25"
             icon={<Sparkles className="h-3.5 w-3.5" />}
-            onClick={onOpenAI}
+            onClick={() => onOpenAI(false)}
           >
             {tr ? 'AI Mesaj Üret' : 'AI message'}
           </Button>
@@ -503,9 +456,6 @@ export function ContactDetailPersonView({
           <Card padding="none" className="overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border px-4 py-3">
               <CardTitle className="text-base">{tr ? 'Etkileşim Geçmişi' : 'Interaction History'}</CardTitle>
-              <Button size="sm" onClick={onOpenInteractionModal} icon={<Plus className="h-3.5 w-3.5" />}>
-                {tr ? 'Ekle' : 'Add'}
-              </Button>
             </CardHeader>
             <div className="p-4">
               <div className="mb-4 flex gap-2">
@@ -653,30 +603,24 @@ export function ContactDetailPersonView({
               <p className="text-xs font-semibold uppercase tracking-wider text-warning">
                 {toHeadingCase(tr ? 'Şimdi ne yapmalı?' : 'What to do now?', locale)}
               </p>
-              <p className="mt-1 text-sm text-text-secondary">{coaching.headline}</p>
+              <p className="mt-1 text-sm text-text-secondary">
+                {tr
+                  ? 'Sıradaki en mantıklı adım için aşağıdaki Mesajı Hazırla butonuna bas!'
+                  : 'Press Prepare Message below for the most logical next step!'}
+              </p>
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
                 {toHeadingCase(tr ? 'Önerilen mesaj' : 'Suggested message', locale)}
               </p>
-              <p className="mt-2 rounded-xl border border-border bg-surface/60 p-3 text-sm text-text-primary">{coaching.suggested}</p>
+              <p className="mt-2 rounded-xl border border-border bg-surface/60 p-3 text-sm text-text-secondary">
+                {tr
+                  ? 'Kişinin şu anki sürecine göre sıradaki adım bağlamında sana önerilen mesajı burada görebilirsin...'
+                  : 'You can see the AI suggested message for the next step based on this contact’s current journey here...'}
+              </p>
             </div>
-            {coaching.objection && (
-              <div className="rounded-xl border border-border bg-surface/40 p-3">
-                <p className="text-xs font-semibold text-text-tertiary">
-                  {toHeadingCase(coaching.objection.label, locale)}
-                </p>
-                <p className="mt-1 text-sm text-text-secondary">{coaching.objection.text}</p>
-                <Link
-                  href="/academy?tab=objections"
-                  className="mt-3 inline-flex text-xs font-semibold text-primary hover:underline"
-                >
-                  {tr ? 'İtiraz bankasına git →' : 'Open objection bank →'}
-                </Link>
-              </div>
-            )}
-            <Button size="sm" className="w-full bg-warning/20 text-warning hover:bg-warning/30" onClick={onOpenAI}>
-              {tr ? 'Mesajı hazırla' : 'Prepare message'}
+            <Button size="sm" className="w-full bg-warning/20 text-warning hover:bg-warning/30" onClick={() => onOpenAI(true)}>
+              {tr ? 'Mesajı Hazırla' : 'Prepare Message'}
             </Button>
             <Link
               href="/academy?tab=objections"

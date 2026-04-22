@@ -28,6 +28,7 @@ export function ContactTaskModal({ currentLocale, contactName, onClose, onSubmit
     type: 'follow_up' as TaskRow['type'],
     priority: 'medium' as TaskRow['priority'],
     due_date: new Date().toISOString().split('T')[0],
+    due_time: '09:00',
     description: '',
   })
 
@@ -38,7 +39,7 @@ export function ContactTaskModal({ currentLocale, contactName, onClose, onSubmit
       type: form.type,
       priority: form.priority,
       due_date: form.due_date,
-      description: form.description.trim() || undefined,
+      description: [`Saat: ${form.due_time}`, form.description.trim()].filter(Boolean).join('\n') || undefined,
     })
   }
 
@@ -60,7 +61,7 @@ export function ContactTaskModal({ currentLocale, contactName, onClose, onSubmit
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
             <h2 className="text-base font-semibold text-text-primary">
-              {h(currentLocale === 'tr' ? 'Kontağa görev ekle' : 'Add task for contact')}
+              {h(currentLocale === 'tr' ? 'Takip ekle' : 'Add follow-up')}
             </h2>
             <p className="text-xs text-text-tertiary mt-0.5">{contactName}</p>
           </div>
@@ -118,7 +119,8 @@ export function ContactTaskModal({ currentLocale, contactName, onClose, onSubmit
             </div>
           </div>
 
-          <div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
             <label className="block text-xs font-medium text-text-secondary mb-1.5">
               {currentLocale === 'tr' ? 'Son Tarih' : 'Due Date'}
             </label>
@@ -128,6 +130,18 @@ export function ContactTaskModal({ currentLocale, contactName, onClose, onSubmit
               onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))}
               className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
             />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                {currentLocale === 'tr' ? 'Saat' : 'Time'}
+              </label>
+              <input
+                type="time"
+                value={form.due_time}
+                onChange={(event) => setForm((current) => ({ ...current, due_time: event.target.value }))}
+                className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+              />
+            </div>
           </div>
 
           <div>
@@ -148,7 +162,7 @@ export function ContactTaskModal({ currentLocale, contactName, onClose, onSubmit
             {currentLocale === 'tr' ? 'İptal' : 'Cancel'}
           </Button>
           <Button className="flex-1" loading={loading} disabled={!form.title.trim()} onClick={handleSubmit}>
-            {currentLocale === 'tr' ? 'Görevi Ekle' : 'Add Task'}
+            {currentLocale === 'tr' ? 'Takip Ekle' : 'Add Follow-up'}
           </Button>
         </div>
       </motion.div>
