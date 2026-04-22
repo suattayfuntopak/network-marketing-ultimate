@@ -51,7 +51,9 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarRange,
+  Archive,
   Contact,
+  Pencil,
   MoreVertical,
   Download,
   Flame,
@@ -60,10 +62,10 @@ import {
   ListChecks,
   Plus,
   ShoppingBag,
+  Trash2,
   Upload,
   UserPlus,
   Users,
-  X,
 } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
@@ -267,6 +269,7 @@ export default function ContactsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [editingContact, setEditingContact] = useState<ContactRow | null>(null)
   const [aiModalOpen, setAiModalOpen] = useState(false)
+  const [rowMenuContactId, setRowMenuContactId] = useState<string | null>(null)
 
   const { data: contacts = [], isLoading } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -637,6 +640,12 @@ export default function ContactsPage() {
 
   function closeContactDetail() {
     router.push(buildContactsHref(activeSegment))
+  }
+
+  function openEditContact(contact: ContactRow) {
+    setEditingContact(contact)
+    setFormError('')
+    setShowAdd(false)
   }
 
   function closeAddModal() {
@@ -1264,15 +1273,52 @@ export default function ContactsPage() {
                           <td className="px-4 py-4 text-xs text-text-secondary whitespace-nowrap">
                             {lastTouchLabel(contact.last_contact_date, currentLocale)}
                           </td>
-                          <td className="px-2 py-4 text-right align-middle" onClick={(event) => event.stopPropagation()}>
+                          <td className="relative px-2 py-4 text-right align-middle" onClick={(event) => event.stopPropagation()}>
                             <button
                               type="button"
-                              onClick={() => openContactDetail(contact.id)}
+                              onClick={() => setRowMenuContactId((current) => (current === contact.id ? null : contact.id))}
                               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border-subtle bg-surface/50 text-text-secondary transition-colors hover:border-primary/25 hover:bg-primary/5 hover:text-primary"
                               aria-label={currentLocale === 'tr' ? 'Menü' : 'Menu'}
                             >
                               <MoreVertical className="h-4 w-4" />
                             </button>
+                            {rowMenuContactId === contact.id && (
+                              <div className="absolute right-2 top-14 z-20 w-36 rounded-xl border border-border bg-card p-1.5 shadow-xl">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRowMenuContactId(null)
+                                    openEditContact(contact)
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  {currentLocale === 'tr' ? 'Düzenle' : 'Edit'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRowMenuContactId(null)
+                                    archiveContactMutation.mutate(contact.id)
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                                >
+                                  <Archive className="h-3.5 w-3.5" />
+                                  {currentLocale === 'tr' ? 'Arşivle' : 'Archive'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRowMenuContactId(null)
+                                    deleteMutation.mutate(contact.id)
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-error hover:bg-error/10"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  {currentLocale === 'tr' ? 'Sil' : 'Delete'}
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       )
@@ -1341,14 +1387,15 @@ export default function ContactsPage() {
       </motion.div>
 
       <AnimatePresence>
-        {(showAdd || routeModalOpen) && (
+        {(showAdd || routeModalOpen || editingContact !== null) && (
           <ContactCreateModal
-            open={showAdd || routeModalOpen}
+            open={showAdd || routeModalOpen || editingContact !== null}
             currentLocale={currentLocale}
+            editingContact={editingContact}
             form={form}
             setForm={setForm}
             error={formError}
-            loading={addMutation.isPending}
+            loading={editingContact ? updateContactMutation.isPending : addMutation.isPending}
             onClose={closeAddModal}
             onSubmit={handleAddContact}
           />

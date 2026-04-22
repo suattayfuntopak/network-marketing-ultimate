@@ -7,7 +7,7 @@ function clampScore(value: number) {
   return Math.min(100, Math.max(0, value))
 }
 
-/** Pastel gradient warmth bar (0–100) for contact tables. */
+/** Neon warmth bar (0–100) for contact tables. */
 export function ContactWarmthBar({
   score,
   className,
@@ -21,10 +21,10 @@ export function ContactWarmthBar({
   const pct = clampScore(score ?? 0)
   const gradient =
     pct < 35
-      ? 'from-sky-400/70 via-cyan-400/60 to-teal-400/50'
+      ? 'from-cyan-400 via-sky-500 to-blue-500'
       : pct < 70
-        ? 'from-amber-400/70 via-orange-400/55 to-rose-400/45'
-        : 'from-fuchsia-400/65 via-rose-400/60 to-orange-400/50'
+        ? 'from-yellow-300 via-amber-500 to-orange-500'
+        : 'from-fuchsia-500 via-rose-500 to-red-500'
 
   return (
     <div className={cn('w-full min-w-[7rem] max-w-[9rem] space-y-1', className)}>
@@ -33,10 +33,10 @@ export function ContactWarmthBar({
           <span className="text-text-muted">{pct}</span>
         </div>
       )}
-      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-hover/80 ring-1 ring-primary/10">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-hover/80 ring-1 ring-primary/15">
         <div
           className={cn(
-            'h-full rounded-full bg-gradient-to-r',
+            'h-full rounded-full bg-gradient-to-r shadow-[0_0_10px_rgba(56,189,248,0.35)]',
             hideNumeric ? '' : 'transition-[width] duration-300',
             gradient,
           )}

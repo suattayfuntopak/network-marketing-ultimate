@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, CheckCircle2, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -19,6 +19,7 @@ interface Props {
 export function ProductModal({ onClose, userId, editProduct }: Props) {
   const h = useHeadingCase()
   const qc = useQueryClient()
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
     name: editProduct?.name ?? '',
     category: editProduct?.category ?? '',
@@ -30,6 +31,27 @@ export function ProductModal({ onClose, userId, editProduct }: Props) {
   })
   const [error, setError] = useState('')
   const isEdit = Boolean(editProduct)
+
+  function onPickLocalImage(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Lütfen geçerli bir görsel dosyası seçin.')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Görsel boyutu 2MB altında olmalı.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      setForm((current) => ({ ...current, image_url: result }))
+      setError('')
+    }
+    reader.onerror = () => setError('Görsel okunamadı, lütfen tekrar deneyin.')
+    reader.readAsDataURL(file)
+  }
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -126,6 +148,40 @@ export function ProductModal({ onClose, userId, editProduct }: Props) {
               placeholder="https://.../product-image.jpg"
               className="w-full h-10 bg-surface border border-border rounded-xl px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
             />
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={onPickLocalImage}
+            />
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => imageInputRef.current?.click()}
+              >
+                Görsel İçin Gözat
+              </Button>
+              {form.image_url && (
+                <button
+                  type="button"
+                  onClick={() => setForm((current) => ({ ...current, image_url: '' }))}
+                  className="text-xs text-text-tertiary hover:text-text-primary"
+                >
+                  Görseli temizle
+                </button>
+              )}
+            </div>
+            {form.image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={form.image_url}
+                alt="Ürün önizleme"
+                className="h-24 w-24 rounded-xl border border-border object-cover"
+              />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

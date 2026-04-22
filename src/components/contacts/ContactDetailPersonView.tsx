@@ -289,7 +289,9 @@ export function ContactDetailPersonView({
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack} className="-ml-1 gap-2">
             <span aria-hidden>←</span>
-            <span className="font-semibold text-text-primary">{contact.full_name}</span>
+            <span className="font-semibold text-text-primary">
+              {tr ? 'Listeye Geri Dön' : 'Back to list'}
+            </span>
           </Button>
         </div>
         <div className="flex flex-wrap gap-2">
