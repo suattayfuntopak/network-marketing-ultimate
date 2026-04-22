@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated bundles / legacy app outputs:
+    "dist/**",
+    "network-marketing-master/**",
+    "network-marketing-master/dist/**",
   ]),
 ]);
 

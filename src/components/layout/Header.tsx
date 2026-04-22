@@ -17,6 +17,7 @@ import {
   HelpCircle, MessageSquare, LogOut, ChevronDown
 } from 'lucide-react'
 import { useTheme } from '@/components/common/ThemeProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 
 export function Header() {
   const {
@@ -25,6 +26,7 @@ export function Header() {
     currentUser, notifications, markAllNotificationsRead, markNotificationRead, unreadCount, setCurrentUser,
   } = useAppStore()
   const { t, locale } = useLanguage()
+  const h = useHeadingCase()
   const { theme, setTheme } = useTheme()
   const router = useRouter()
   const [notifOpen, setNotifOpen] = useState(false)
@@ -165,8 +167,8 @@ export function Header() {
                       className="absolute right-0 top-full mt-2 w-[min(360px,calc(100vw-1rem))] bg-elevated border border-border rounded-2xl shadow-float z-50 overflow-hidden"
                     >
                       <div className="flex items-center justify-between p-4 border-b border-border">
-                        <h3 className="text-sm font-semibold text-text-primary">{t.notificationsPage.title}</h3>
-                        <button onClick={() => markAllNotificationsRead()} className="text-xs text-primary hover:text-primary-dim">{t.common.markAllRead}</button>
+                        <h3 className="text-sm font-semibold text-text-primary">{h(t.notificationsPage.title)}</h3>
+                        <button onClick={() => markAllNotificationsRead()} className="text-xs text-primary hover:text-primary-dim">{h(t.common.markAllRead)}</button>
                       </div>
                       <div className="max-h-[400px] overflow-y-auto">
                         {notifications.length === 0 ? (

@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { useAppStore } from '@/store/appStore'
 import type { Notification } from '@/types'
 import { Bell, Bot, Users, Calendar, Award, Target, Settings } from 'lucide-react'
@@ -35,6 +36,7 @@ const typeColors: Record<string, string> = {
 export default function NotificationsPage() {
   const router = useRouter()
   const { t, locale } = useLanguage()
+  const h = useHeadingCase()
   const { notifications, markNotificationRead, markAllNotificationsRead } = useAppStore()
 
   const unread = notifications.filter((notification) => !notification.isRead)
@@ -51,11 +53,11 @@ export default function NotificationsPage() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[900px] mx-auto">
       <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">{t.notificationsPage.title}</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{h(t.notificationsPage.title)}</h1>
           <p className="text-sm text-text-secondary mt-0.5">{unread.length} {t.notificationsPage.subtitle}</p>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={() => markAllNotificationsRead()}>
-          {t.notificationsPage.markAllRead}
+          {h(t.notificationsPage.markAllRead)}
         </Button>
       </motion.div>
 
@@ -67,7 +69,9 @@ export default function NotificationsPage() {
                 <Bell className="w-5 h-5 text-text-tertiary" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-text-primary">{locale === 'tr' ? 'Yeni bildirim yok' : 'No new notifications'}</p>
+                <p className="text-sm font-semibold text-text-primary">
+                  {h(locale === 'tr' ? 'Yeni bildirim yok' : 'No new notifications')}
+                </p>
                 <p className="text-xs text-text-tertiary">{locale === 'tr' ? 'Sistem yeni aksiyon olustugunda buraya dusurur.' : 'The system will surface new actions here.'}</p>
               </div>
             </div>
@@ -77,7 +81,7 @@ export default function NotificationsPage() {
 
       {unread.length > 0 && (
         <motion.div variants={item}>
-          <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-3">{t.notificationsPage.unread}</p>
+          <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-3">{h(t.notificationsPage.unread)}</p>
           <div className="space-y-2">
             {unread.map((notification, index) => {
               const Icon = typeIcons[notification.type] || Bell

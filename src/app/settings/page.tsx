@@ -8,6 +8,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Input'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { useTheme } from '@/components/common/ThemeProvider'
 import { useAppStore } from '@/store/appStore'
 import { supabase } from '@/lib/supabase'
@@ -18,6 +19,7 @@ const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
 export default function SettingsPage() {
   const { t } = useLanguage()
+  const h = useHeadingCase()
   const { currentUser, setCurrentUser } = useAppStore()
   const { theme, setTheme } = useTheme()
 
@@ -62,7 +64,7 @@ export default function SettingsPage() {
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[900px] mx-auto">
       <motion.div variants={item}>
-        <h1 className="text-2xl font-bold text-text-primary">{t.settings.title}</h1>
+        <h1 className="text-2xl font-bold text-text-primary">{h(t.settings.title)}</h1>
         <p className="text-sm text-text-secondary mt-0.5">{t.settings.subtitle}</p>
       </motion.div>
 
@@ -71,7 +73,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <User className="w-4 h-4 text-primary" /> {t.settings.profile}
+              <User className="w-4 h-4 text-primary" /> {h(t.settings.profile)}
             </CardTitle>
           </CardHeader>
           <div className="flex flex-col sm:flex-row items-start gap-6">
@@ -82,7 +84,7 @@ export default function SettingsPage() {
             <div className="flex-1 space-y-4 w-full">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">{t.settings.fullName}</label>
+                  <label className="block text-xs font-medium text-text-secondary mb-1.5">{h(t.settings.fullName)}</label>
                   <input
                     value={name}
                     onChange={e => setName(e.target.value)}
@@ -91,7 +93,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">{t.settings.email}</label>
+                  <label className="block text-xs font-medium text-text-secondary mb-1.5">{h(t.settings.email)}</label>
                   <input
                     value={currentUser?.email ?? ''}
                     readOnly
@@ -106,7 +108,7 @@ export default function SettingsPage() {
                   disabled={saving || !name.trim() || name.trim() === currentUser?.name}
                   onClick={handleSaveProfile}
                 >
-                  {saving ? 'Kaydediliyor...' : t.settings.saveChanges}
+                  {saving ? 'Kaydediliyor...' : h(t.settings.saveChanges)}
                 </Button>
                 {saveStatus === 'success' && (
                   <span className="flex items-center gap-1.5 text-sm text-success">
@@ -129,12 +131,12 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Palette className="w-4 h-4 text-secondary" /> {t.settings.appearance}
+              <Palette className="w-4 h-4 text-secondary" /> {h(t.settings.appearance)}
             </CardTitle>
           </CardHeader>
           <div className="space-y-4">
             <div>
-              <p className="text-xs font-medium text-text-secondary mb-3">{t.settings.theme}</p>
+              <p className="text-xs font-medium text-text-secondary mb-3">{h(t.settings.theme)}</p>
               <div className="grid grid-cols-3 gap-3">
                 {[
                   { label: t.settings.dark,   icon: Moon,    value: 'dark'   as const },
@@ -146,7 +148,7 @@ export default function SettingsPage() {
                   return (
                     <button key={opt.value} onClick={() => handleTheme(opt.value)} className={`p-4 rounded-xl border text-center transition-all ${active ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-surface border-border text-text-secondary hover:border-border-strong'}`}>
                       <Icon className="w-5 h-5 mx-auto mb-1.5" />
-                      <span className="text-xs font-medium">{opt.label}</span>
+                      <span className="text-xs font-medium">{h(opt.label)}</span>
                     </button>
                   )
                 })}
@@ -154,7 +156,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex items-center justify-between p-3 rounded-xl bg-surface/50 border border-border-subtle">
               <div>
-                <p className="text-sm font-medium text-text-primary">{t.settings.reducedMotion}</p>
+                <p className="text-sm font-medium text-text-primary">{h(t.settings.reducedMotion)}</p>
                 <p className="text-xs text-text-tertiary">{t.settings.reducedMotionDesc}</p>
               </div>
               <button onClick={() => setReducedMotion(v => !v)} className={`w-10 h-6 rounded-full relative transition-colors ${reducedMotion ? 'bg-primary' : 'bg-surface-hover'}`}>
@@ -170,7 +172,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Bell className="w-4 h-4 text-warning" /> {t.settings.notifications}
+              <Bell className="w-4 h-4 text-warning" /> {h(t.settings.notifications)}
             </CardTitle>
           </CardHeader>
           <div className="space-y-3">
@@ -184,7 +186,7 @@ export default function SettingsPage() {
             ].map((notif, i) => (
               <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-surface/50 border border-border-subtle">
                 <div>
-                  <p className="text-sm font-medium text-text-primary">{notif.label}</p>
+                  <p className="text-sm font-medium text-text-primary">{h(notif.label)}</p>
                   <p className="text-xs text-text-tertiary">{notif.desc}</p>
                 </div>
                 <button
@@ -204,13 +206,13 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-accent" /> {t.settings.aiPreferences}
+              <Sparkles className="w-4 h-4 text-accent" /> {h(t.settings.aiPreferences)}
             </CardTitle>
           </CardHeader>
           <div className="space-y-3">
             <div className="flex items-center justify-between p-3 rounded-xl bg-surface/50 border border-border-subtle">
               <div>
-                <p className="text-sm font-medium text-text-primary">{t.settings.aiSuggestionsToggle}</p>
+                <p className="text-sm font-medium text-text-primary">{h(t.settings.aiSuggestionsToggle)}</p>
                 <p className="text-xs text-text-tertiary">{t.settings.aiSuggestionsToggleDesc}</p>
               </div>
               <button onClick={() => setAiSuggestions(v => !v)} className={`w-10 h-6 rounded-full relative transition-colors ${aiSuggestions ? 'bg-primary' : 'bg-surface-hover'}`}>
@@ -219,7 +221,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex items-center justify-between p-3 rounded-xl bg-surface/50 border border-border-subtle">
               <div>
-                <p className="text-sm font-medium text-text-primary">{t.settings.dailyGoalReminders}</p>
+                <p className="text-sm font-medium text-text-primary">{h(t.settings.dailyGoalReminders)}</p>
                 <p className="text-xs text-text-tertiary">{t.settings.dailyGoalRemindersDesc}</p>
               </div>
               <button onClick={() => setDailyGoals(v => !v)} className={`w-10 h-6 rounded-full relative transition-colors ${dailyGoals ? 'bg-primary' : 'bg-surface-hover'}`}>
@@ -227,11 +229,11 @@ export default function SettingsPage() {
               </button>
             </div>
             <Select
-              label={t.settings.aiCoachingStyle}
+              label={h(t.settings.aiCoachingStyle)}
               options={[
-                { value: 'encouraging', label: t.settings.encouraging },
-                { value: 'direct', label: t.settings.direct },
-                { value: 'analytical', label: t.settings.analytical },
+                { value: 'encouraging', label: h(t.settings.encouraging) },
+                { value: 'direct', label: h(t.settings.direct) },
+                { value: 'analytical', label: h(t.settings.analytical) },
               ]}
               value={coachingStyle}
               onChange={e => setCoachingStyle(e.target.value)}
@@ -245,18 +247,18 @@ export default function SettingsPage() {
         <Card glow="primary">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-success" /> {t.settings.subscription}
+              <CreditCard className="w-4 h-4 text-success" /> {h(t.settings.subscription)}
             </CardTitle>
           </CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <p className="text-base font-semibold text-text-primary">{t.settings.proPlan}</p>
+                <p className="text-base font-semibold text-text-primary">{h(t.settings.proPlan)}</p>
                 <Badge variant="success" size="sm">{t.common.active}</Badge>
               </div>
               <p className="text-xs text-text-tertiary mt-0.5">{t.settings.planFeatures}</p>
             </div>
-            <Button variant="outline" size="sm">{t.settings.managePlan}</Button>
+            <Button variant="outline" size="sm">{h(t.settings.managePlan)}</Button>
           </div>
         </Card>
       </motion.div>

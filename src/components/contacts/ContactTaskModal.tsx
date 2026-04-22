@@ -10,6 +10,7 @@ import {
   TASK_TYPE_LABELS,
   type ContactTaskFormValues,
 } from '@/components/contacts/contactLabels'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 
 interface Props {
   currentLocale: 'tr' | 'en'
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function ContactTaskModal({ currentLocale, contactName, onClose, onSubmit, loading, error }: Props) {
+  const h = useHeadingCase()
   const [form, setForm] = useState({
     title: '',
     type: 'follow_up' as TaskRow['type'],
@@ -58,7 +60,7 @@ export function ContactTaskModal({ currentLocale, contactName, onClose, onSubmit
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
             <h2 className="text-base font-semibold text-text-primary">
-              {currentLocale === 'tr' ? 'Kontağa Görev Ekle' : 'Add Task for Contact'}
+              {h(currentLocale === 'tr' ? 'Kontağa görev ekle' : 'Add task for contact')}
             </h2>
             <p className="text-xs text-text-tertiary mt-0.5">{contactName}</p>
           </div>

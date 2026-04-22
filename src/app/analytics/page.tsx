@@ -31,6 +31,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Ca
 import { Badge } from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import {
   fetchAllInteractions,
   fetchAllOrders,
@@ -125,6 +126,7 @@ const CustomTooltip = ({ active, payload, label }: TooltipContentProps<TooltipVa
 
 export default function AnalyticsPage() {
   const { t, locale } = useLanguage()
+  const h = useHeadingCase()
   const [range, setRange] = useState<RangeOption>('30d')
 
   const contactsQuery = useQuery<ContactRow[]>({
@@ -345,7 +347,7 @@ export default function AnalyticsPage() {
           />
           <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
             <div className="max-w-3xl">
-              <h1 className="text-xl sm:text-2xl font-bold text-text-primary lg:text-4xl">{t.analytics.title}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-text-primary lg:text-4xl">{h(t.analytics.title)}</h1>
               <p className="mt-2 sm:mt-3 text-[13px] sm:text-sm leading-6 text-text-secondary lg:text-base">
                 {locale === 'tr'
                   ? `${periodLabel(range, locale)} için gelir, süreç kalitesi, dönüşüm motoru ve ekip performansını tek ekranda gör.`
@@ -359,7 +361,7 @@ export default function AnalyticsPage() {
       <motion.div variants={item} className="flex flex-wrap items-center gap-2">
         <div className="mr-1 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-xs text-text-secondary">
           <Filter className="h-3.5 w-3.5" />
-          {locale === 'tr' ? 'Görünüm aralığı' : 'View range'}
+          {h(locale === 'tr' ? 'Görünüm aralığı' : 'View range')}
         </div>
         {RANGE_OPTIONS.map((option) => (
           <button

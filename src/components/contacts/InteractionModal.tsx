@@ -10,6 +10,7 @@ import {
   OUTCOME_LABELS,
   type InteractionFormValues,
 } from '@/components/contacts/contactLabels'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 
 interface Props {
   currentLocale: 'tr' | 'en'
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function InteractionModal({ currentLocale, contactName, onClose, onSubmit, loading, error }: Props) {
+  const h = useHeadingCase()
   const [form, setForm] = useState({
     type: 'call' as InteractionRow['type'],
     channel: 'phone',
@@ -65,7 +67,7 @@ export function InteractionModal({ currentLocale, contactName, onClose, onSubmit
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
             <h2 className="text-base font-semibold text-text-primary">
-              {currentLocale === 'tr' ? 'İletişim Kaydı' : 'Interaction Log'}
+              {h(currentLocale === 'tr' ? 'İletişim kaydı' : 'Interaction log')}
             </h2>
             <p className="text-xs text-text-tertiary mt-0.5">{contactName}</p>
           </div>

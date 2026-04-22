@@ -20,6 +20,7 @@ import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { useAppStore } from '@/store/appStore'
 import { completeTask, fetchAllOrders, fetchContacts, fetchEvents, fetchTasks } from '@/lib/queries'
 import type { ContactRow, OrderRow, TaskRow } from '@/lib/queries'
@@ -120,6 +121,7 @@ type RiskItem = {
 
 export default function DashboardPage() {
   const { t, locale } = useLanguage()
+  const h = useHeadingCase()
   const { currentUser } = useAppStore()
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -330,7 +332,8 @@ export default function DashboardPage() {
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
               <h1 className="text-xl sm:text-2xl font-bold text-text-primary lg:text-4xl">
-                {t.dashboard.greeting}{fullName ? `, ${fullName}` : ''}
+                {h(t.dashboard.greeting)}
+                {fullName ? `, ${fullName}` : ''}
               </h1>
               <p className="mt-2 sm:mt-3 max-w-2xl text-[13px] sm:text-sm leading-6 text-text-secondary lg:text-base">
                 {focusTasks.length > 0
@@ -344,7 +347,7 @@ export default function DashboardPage() {
               <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-text-tertiary">
                 <span className="rounded-full border border-border-subtle bg-surface/40 px-3 py-1 font-semibold">{heroDateLabel}</span>
                 <span className="rounded-full border border-border-subtle bg-surface/40 px-3 py-1">
-                  {locale === 'tr' ? 'Öncelik' : 'Priority'}:{' '}
+                  {h(locale === 'tr' ? 'Öncelik' : 'Priority')}:{' '}
                   <span className="font-semibold text-text-primary">
                     {focusTasks[0]?.title ?? (locale === 'tr' ? 'Ritmi koru' : 'Protect momentum')}
                   </span>
@@ -382,7 +385,7 @@ export default function DashboardPage() {
             >
               <div className="flex items-start justify-between gap-3 sm:gap-4">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm font-medium text-text-tertiary line-clamp-1">{kpi.label}</p>
+                  <p className="text-xs sm:text-sm font-medium text-text-tertiary line-clamp-1">{h(kpi.label)}</p>
                   <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-bold text-text-primary">{kpi.value}</p>
                   <p className="mt-1.5 sm:mt-2 text-[11px] sm:text-xs leading-5 text-text-secondary line-clamp-2">{kpi.hint}</p>
                 </div>

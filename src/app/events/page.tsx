@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge'
 import { AvatarGroup } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { EventInviteModal } from '@/components/events/EventInviteModal'
 import { EventCreateModal } from '@/components/events/EventCreateModal'
 import { EventDetailsModal } from '@/components/events/EventDetailsModal'
@@ -43,6 +44,7 @@ export default function EventsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { t, locale } = useLanguage()
+  const h = useHeadingCase()
   const { currentUser } = useAppStore()
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
@@ -342,7 +344,7 @@ export default function EventsPage() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
       <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">{t.events.title}</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{h(t.events.title)}</h1>
           <p className="text-sm text-text-secondary mt-0.5">{t.events.subtitle}</p>
         </div>
         <Button type="button" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openCreateModal()}>

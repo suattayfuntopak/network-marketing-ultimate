@@ -8,6 +8,7 @@ import { CONTACT_ACTIVITY_LOG_CHANNEL, serializeContactActivity } from './contac
 import type { ContactActivityPayload } from './contactActivityLog'
 
 export type ContactRow = Database['public']['Tables']['nmu_contacts']['Row']
+export type CustomerRegistryRow = Database['public']['Tables']['nmu_customers']['Row']
 export type TaskRow = Database['public']['Tables']['nmu_tasks']['Row']
 export type InteractionRow = Database['public']['Tables']['nmu_interactions']['Row']
 export type ProductRow = Database['public']['Tables']['nmu_products']['Row']
@@ -31,6 +32,49 @@ async function requireSessionUserId() {
   }
 
   return userId
+}
+
+function isMissingRelationError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const code = 'code' in error ? String(error.code) : ''
+  const message = 'message' in error ? String(error.message) : ''
+  return code === '42P01' || message.toLowerCase().includes('nmu_customers')
+}
+
+async function syncCustomerRegistry(userId: string, contactId: string, stage: string | null | undefined): Promise<void> {
+  try {
+    if (stage === 'became_customer') {
+      const { error } = await supabase
+        .from('nmu_customers')
+        .upsert(
+          {
+            user_id: userId,
+            contact_id: contactId,
+            is_active: true,
+            became_customer_at: new Date().toISOString(),
+            left_customer_at: null,
+          },
+          { onConflict: 'user_id,contact_id' },
+        )
+      if (error) throw error
+      return
+    }
+
+    const { error } = await supabase
+      .from('nmu_customers')
+      .update({
+        is_active: false,
+        left_customer_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .eq('contact_id', contactId)
+      .eq('is_active', true)
+    if (error) throw error
+  } catch (error) {
+    // Backward compatibility: workspace may still use only nmu_contacts stage.
+    if (isMissingRelationError(error)) return
+    throw error
+  }
 }
 
 function normalizeTaskStatus(task: TaskRow): TaskRow {
@@ -134,6 +178,23 @@ export async function fetchContacts(): Promise<ContactRow[]> {
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as ContactRow[]
+}
+
+export async function fetchCustomerContactIds(): Promise<string[] | null> {
+  const userId = await requireSessionUserId()
+  const { data, error } = await supabase
+    .from('nmu_customers')
+    .select('contact_id')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('became_customer_at', { ascending: false })
+
+  if (error) {
+    if (isMissingRelationError(error)) return null
+    throw error
+  }
+
+  return (data ?? []).map((row) => row.contact_id)
 }
 
 function clampTemperatureScore(value: number) {
@@ -247,6 +308,7 @@ export async function addContact(userId: string, input: AddContactInput): Promis
     .select()
     .single()
   if (error) throw error
+  await syncCustomerRegistry(userId, data.id, data.pipeline_stage)
   return data as ContactRow
 }
 
@@ -258,6 +320,7 @@ export async function updateContactRecord(id: string, input: AddContactInput): P
     .eq('id', id)
     .eq('user_id', userId)
   if (error) throw error
+  await syncCustomerRegistry(userId, id, input.pipeline_stage ?? null)
 }
 
 export async function patchContact(id: string, patch: Database['public']['Tables']['nmu_contacts']['Update']): Promise<void> {
@@ -284,6 +347,7 @@ export async function updateContactStage(id: string, stage: string): Promise<voi
     .eq('id', id)
     .eq('user_id', userId)
   if (error) throw error
+  await syncCustomerRegistry(userId, id, stage)
 }
 
 export async function updateContactTemperature(

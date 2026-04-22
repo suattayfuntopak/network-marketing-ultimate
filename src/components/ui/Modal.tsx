@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 
 interface ModalProps {
   open: boolean
@@ -15,6 +16,7 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, description, children, className }: ModalProps) {
+  const h = useHeadingCase()
   useEffect(() => {
     if (!open) return
 
@@ -52,7 +54,7 @@ export function Modal({ open, onClose, title, description, children, className }
             {(title || description) && (
               <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border p-4 sm:p-5">
                 <div>
-                  {title && <h2 className="text-base font-semibold text-text-primary">{title}</h2>}
+                  {title && <h2 className="text-base font-semibold text-text-primary">{h(title)}</h2>}
                   {description && <p className="mt-1 text-sm text-text-secondary">{description}</p>}
                 </div>
                 <button

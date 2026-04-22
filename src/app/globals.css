@@ -104,8 +104,8 @@
 
   --color-text-primary: #0f172a;
   --color-text-secondary: #334155;
-  --color-text-tertiary: #64748b;
-  --color-text-muted: #94a3b8;
+  --color-text-tertiary: #475569;
+  --color-text-muted: #64748b;
 
   --color-border: rgba(15, 23, 42, 0.14);
   --color-border-subtle: rgba(15, 23, 42, 0.09);
@@ -128,6 +128,25 @@
 [data-theme="light"] .text-slate-300,
 [data-theme="light"] .text-slate-400 {
   color: var(--color-text-secondary) !important;
+}
+
+/* Boost semantic/tag readability in light theme */
+[data-theme="light"] .text-cyan-300,
+[data-theme="light"] .text-blue-300,
+[data-theme="light"] .text-violet-300,
+[data-theme="light"] .text-purple-300,
+[data-theme="light"] .text-amber-300,
+[data-theme="light"] .text-orange-300,
+[data-theme="light"] .text-orange-200,
+[data-theme="light"] .text-red-300,
+[data-theme="light"] .text-rose-300,
+[data-theme="light"] .text-emerald-300,
+[data-theme="light"] .text-teal-300,
+[data-theme="light"] .text-sky-300,
+[data-theme="light"] .text-indigo-300,
+[data-theme="light"] .text-slate-300,
+[data-theme="light"] .text-zinc-300 {
+  color: #334155 !important;
 }
 
 [data-theme="light"] * {

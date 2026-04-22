@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { getSafeRedirectTarget, syncAuthSessionCookie } from '@/lib/auth'
 import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react'
 
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { t, locale } = useLanguage()
+  const h = useHeadingCase()
   const a = t.auth
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -63,7 +65,7 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-card border border-border rounded-2xl p-5 sm:p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-          <h2 className="text-xl font-semibold text-text-primary mb-1">{a.login}</h2>
+          <h2 className="text-xl font-semibold text-text-primary mb-1">{h(a.login)}</h2>
           <p className="text-text-tertiary text-sm mb-6">
             {locale === 'tr'
               ? 'Hesabına giriş yap ve işini yönet.'

@@ -6,6 +6,7 @@ import { AlertCircle, Briefcase, MapPin, Phone, Plus, Tag, User, X } from 'lucid
 import { Button } from '@/components/ui/Button'
 import { addContact } from '@/lib/queries'
 import { ModalOverlay } from './ModalOverlay'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 
 interface Props {
   onClose: () => void
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function AddCustomerModal({ onClose, userId }: Props) {
+  const h = useHeadingCase()
   const qc = useQueryClient()
   const [form, setForm] = useState({ full_name: '', phone: '', email: '', location: '', profession: '', source: '' })
   const [error, setError] = useState('')
@@ -48,7 +50,7 @@ export function AddCustomerModal({ onClose, userId }: Props) {
       <form onSubmit={handleSubmit}>
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
-            <h2 className="text-base font-semibold text-text-primary">Müşteri Ekle</h2>
+            <h2 className="text-base font-semibold text-text-primary">{h('Müşteri ekle')}</h2>
             <p className="text-xs text-text-tertiary mt-0.5">Kişi doğrudan müşteri olarak kaydedilir</p>
           </div>
           <button type="button" onClick={onClose} className="text-text-tertiary hover:text-text-primary p-1 rounded-lg hover:bg-surface-hover">

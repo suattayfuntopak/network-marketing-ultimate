@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { fetchContacts, updateContactStage } from '@/lib/queries'
 import type { ContactRow } from '@/lib/queries'
 import { Plus, GripVertical } from 'lucide-react'
@@ -34,6 +35,7 @@ const PIPELINE_STAGES = [
 
 export default function PipelinePage() {
   const { t, locale } = useLanguage()
+  const h = useHeadingCase()
   const qc = useQueryClient()
   const router = useRouter()
   const [draggedId, setDraggedId] = useState<string | null>(null)
@@ -98,7 +100,7 @@ export default function PipelinePage() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1700px] mx-auto">
       <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">{t.pipeline.title}</h1>
+          <h1 className="text-3xl font-bold text-text-primary">{h(t.pipeline.title)}</h1>
           <p className="text-base text-text-secondary mt-1">{totalVisible} {t.contacts.subtitle}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

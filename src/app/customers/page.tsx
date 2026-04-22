@@ -1,27 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   fetchContacts, type ContactRow,
-  fetchProducts, deleteProduct, type ProductRow,
+  fetchCustomerContactIds,
+  fetchProducts, type ProductRow,
   fetchAllOrders, fetchOrdersByContact, updateOrderStatus, deleteOrder,
   type OrderRow, type OrderItem,
 } from '@/lib/queries'
 import { useAppStore } from '@/store/appStore'
 import {
-  ShoppingBag, Plus, RefreshCw, TrendingUp, Package,
-  Pencil, Trash2, ArrowLeft,
-  ShoppingCart, Clock, Receipt, ChevronRight, Phone, MapPin,
+  ShoppingBag, Plus, TrendingUp, Trash2, ArrowLeft,
+  ShoppingCart, Clock, Receipt, ChevronRight, Phone, MapPin, Users, CalendarRange, CalendarDays, Sun,
 } from 'lucide-react'
 import { AddCustomerModal } from '@/components/customers/AddCustomerModal'
-import { ProductModal } from '@/components/customers/ProductModal'
 import { AddOrderModal } from '@/components/customers/AddOrderModal'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
@@ -50,6 +50,7 @@ function CustomerDetail({ customer, products, userId, onBack }: {
 }) {
   const qc = useQueryClient()
   const { locale } = useLanguage()
+  const h = useHeadingCase()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const [showAddOrder, setShowAddOrder] = useState(false)
 
@@ -81,10 +82,10 @@ function CustomerDetail({ customer, products, userId, onBack }: {
       {/* Toolbar */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-3.5 h-3.5" />} onClick={onBack}>
-          Müşterilere Dön
+          {currentLocale === 'tr' ? h('Müşterilere Dön') : h('Back to customers')}
         </Button>
         <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setShowAddOrder(true)}>
-          Sipariş Ekle
+          {currentLocale === 'tr' ? h('Sipariş Ekle') : h('Add order')}
         </Button>
       </div>
 
@@ -104,15 +105,15 @@ function CustomerDetail({ customer, products, userId, onBack }: {
           <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border">
             <div className="text-center">
               <p className="text-xl font-bold text-text-primary">{orders.filter(o => o.status !== 'cancelled').length}</p>
-              <p className="text-[10px] text-text-tertiary mt-0.5">Sipariş</p>
+              <p className="text-[10px] text-text-tertiary mt-0.5">{h('Sipariş')}</p>
             </div>
             <div className="text-center">
               <p className="text-base font-bold text-success truncate">{formatTRY(totalSpent)}</p>
-              <p className="text-[10px] text-text-tertiary mt-0.5">Toplam</p>
+              <p className="text-[10px] text-text-tertiary mt-0.5">{h('Toplam')}</p>
             </div>
             <div className="text-center">
               <p className="text-xl font-bold text-text-primary">{customer.relationship_strength}%</p>
-              <p className="text-[10px] text-text-tertiary mt-0.5">Sadakat</p>
+              <p className="text-[10px] text-text-tertiary mt-0.5">{h('Sadakat')}</p>
             </div>
           </div>
           {customer.phone && (
@@ -127,7 +128,7 @@ function CustomerDetail({ customer, products, userId, onBack }: {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-primary" /> Sipariş Geçmişi
+                <Receipt className="w-4 h-4 text-primary" /> {h('Sipariş Geçmişi')}
               </CardTitle>
               <Badge variant="default">{orders.length} sipariş</Badge>
             </CardHeader>
@@ -210,24 +211,31 @@ function CustomerDetail({ customer, products, userId, onBack }: {
 
 // ─── ANA SAYFA ────────────────────────────────────────────────
 export default function CustomersPage() {
-  const { t } = useLanguage()
-  const qc = useQueryClient()
+  const { t, locale } = useLanguage()
+  const h = useHeadingCase()
   const { currentUser } = useAppStore()
 
   const [showAddCustomer, setShowAddCustomer] = useState(false)
-  const [showProductModal, setShowProductModal] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null)
-  const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
 
   const { data: allContacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
     queryFn: fetchContacts,
   })
-  const customers = allContacts.filter(c => c.pipeline_stage === 'became_customer')
+  const { data: customerContactIds = null } = useQuery<string[] | null>({
+    queryKey: ['customer-contact-ids'],
+    queryFn: fetchCustomerContactIds,
+  })
+  const customers = useMemo(() => {
+    if (!customerContactIds) {
+      return allContacts.filter((contact) => contact.pipeline_stage === 'became_customer')
+    }
+    const idSet = new Set(customerContactIds)
+    return allContacts.filter((contact) => idSet.has(contact.id))
+  }, [allContacts, customerContactIds])
   const selectedCustomer = selectedCustomerId ? customers.find(c => c.id === selectedCustomerId) ?? null : null
 
-  const { data: products = [], isLoading: productsLoading } = useQuery<ProductRow[]>({
+  const { data: products = [] } = useQuery<ProductRow[]>({
     queryKey: ['products'],
     queryFn: fetchProducts,
   })
@@ -237,23 +245,90 @@ export default function CustomersPage() {
     queryFn: fetchAllOrders,
   })
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const startOfToday = useMemo(() => {
+    const value = new Date()
+    value.setHours(0, 0, 0, 0)
+    return value
+  }, [])
 
-  const totalRevenue = allOrders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + o.total_try, 0)
-  const avgOrder = allOrders.filter(o => o.status !== 'cancelled').length > 0
-    ? totalRevenue / allOrders.filter(o => o.status !== 'cancelled').length : 0
-  const reordersDue = allOrders.filter(order => {
-    if (order.status === 'cancelled' || !order.next_reorder_date) return false
-    const reorderDate = new Date(order.next_reorder_date)
-    reorderDate.setHours(0, 0, 0, 0)
-    return reorderDate <= today
-  }).length
+  const startOfWeek = useMemo(() => {
+    const value = new Date(startOfToday)
+    const day = value.getDay()
+    const diff = day === 0 ? -6 : 1 - day
+    value.setDate(value.getDate() + diff)
+    value.setHours(0, 0, 0, 0)
+    return value
+  }, [startOfToday])
 
-  const deleteProductMutation = useMutation({
-    mutationFn: (id: string) => deleteProduct(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); setDeletingProductId(null) },
-  })
+  const startOfMonth = useMemo(() => {
+    const value = new Date(startOfToday.getFullYear(), startOfToday.getMonth(), 1)
+    value.setHours(0, 0, 0, 0)
+    return value
+  }, [startOfToday])
+
+  const customerKpis = useMemo(() => {
+    let total = 0
+    let month = 0
+    let week = 0
+    let today = 0
+    for (const customer of customers) {
+      total += 1
+      const createdAt = new Date(customer.created_at)
+      if (Number.isNaN(createdAt.getTime())) continue
+      if (createdAt >= startOfMonth) month += 1
+      if (createdAt >= startOfWeek) week += 1
+      if (createdAt >= startOfToday) today += 1
+    }
+    return { total, month, week, today }
+  }, [customers, startOfMonth, startOfWeek, startOfToday])
+
+  const validOrders = useMemo(() => allOrders.filter((order) => order.status !== 'cancelled'), [allOrders])
+
+  const revenueKpis = useMemo(() => {
+    let total = 0
+    let month = 0
+    let week = 0
+    let today = 0
+    for (const order of validOrders) {
+      const amount = Number(order.total_try) || 0
+      total += amount
+      const orderDate = new Date(order.order_date)
+      if (Number.isNaN(orderDate.getTime())) continue
+      if (orderDate >= startOfMonth) month += amount
+      if (orderDate >= startOfWeek) week += amount
+      if (orderDate >= startOfToday) today += amount
+    }
+    return { total, month, week, today }
+  }, [startOfMonth, startOfWeek, startOfToday, validOrders])
+
+  const orderKpis = useMemo(() => {
+    let total = 0
+    let month = 0
+    let week = 0
+    let today = 0
+    for (const order of validOrders) {
+      total += 1
+      const orderDate = new Date(order.order_date)
+      if (Number.isNaN(orderDate.getTime())) continue
+      if (orderDate >= startOfMonth) month += 1
+      if (orderDate >= startOfWeek) week += 1
+      if (orderDate >= startOfToday) today += 1
+    }
+    return { total, month, week, today }
+  }, [startOfMonth, startOfWeek, startOfToday, validOrders])
+
+  const customerRows = useMemo(() => {
+    return customers.map((customer) => {
+      const orders = validOrders.filter((order) => order.contact_id === customer.id)
+      const totalSpent = orders.reduce((sum, order) => sum + (Number(order.total_try) || 0), 0)
+      return {
+        customer,
+        orderCount: orders.length,
+        totalSpent,
+        lastOrderDate: orders[0]?.order_date ?? null,
+      }
+    })
+  }, [customers, validOrders])
 
   const userId = currentUser?.id ?? ''
 
@@ -275,38 +350,68 @@ export default function CustomersPage() {
         {/* Header */}
         <motion.div variants={itemAnim} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">{t.customers.title}</h1>
+            <h1 className="text-2xl font-bold text-text-primary">{h(t.customers.title)}</h1>
             <p className="text-sm text-text-secondary mt-0.5">{customers.length} {t.customers.subtitle}</p>
           </div>
           <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setShowAddCustomer(true)} id="btn-add-customer">
-            {t.customers.addCustomer}
+            {h(t.customers.addCustomer)}
           </Button>
         </motion.div>
 
-        {/* KPI Cards */}
-        <motion.div variants={itemAnim} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <motion.div variants={itemAnim} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           {[
-            { label: t.customers.activeCustomers, value: customers.length, icon: ShoppingBag, color: 'text-success' },
-            { label: 'Toplam Gelir', value: formatTRY(totalRevenue), icon: TrendingUp, color: 'text-primary' },
-            { label: 'Ort. Sipariş', value: formatTRY(avgOrder), icon: TrendingUp, color: 'text-secondary' },
-            { label: t.customers.reordersDue, value: reordersDue, icon: RefreshCw, color: 'text-warning' },
-          ].map((s, i) => {
+            { label: locale === 'tr' ? 'AKTİF MÜŞTERİLER' : 'ACTIVE CUSTOMERS', value: customerKpis.total, icon: Users },
+            { label: locale === 'tr' ? 'BU AYKİ MÜŞTERİLER' : 'CUSTOMERS THIS MONTH', value: customerKpis.month, icon: CalendarRange },
+            { label: locale === 'tr' ? 'BU HAFTAKİ MÜŞTERİLER' : 'CUSTOMERS THIS WEEK', value: customerKpis.week, icon: CalendarDays },
+            { label: locale === 'tr' ? 'BUGÜNKÜ MÜŞTERİLER' : 'CUSTOMERS TODAY', value: customerKpis.today, icon: Sun },
+          ].map((s) => {
             const Icon = s.icon
             return (
-              <div key={i} className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-surface-hover flex items-center justify-center">
-                  <Icon className={`w-5 h-5 ${s.color}`} />
+              <Card key={s.label} className="p-4">
+                <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-tertiary">
+                  <Icon className="h-3.5 w-3.5 text-primary" />
+                  <span>{s.label}</span>
                 </div>
-                <div>
-                  <p className="text-xl font-bold text-text-primary kpi-number">{s.value}</p>
-                  <p className="text-xs text-text-tertiary">{s.label}</p>
-                </div>
-              </div>
+                <p className="text-3xl font-semibold text-text-primary kpi-number">{s.value}</p>
+              </Card>
             )
           })}
         </motion.div>
 
-        {/* Customer List */}
+        <motion.div variants={itemAnim} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          {[
+            { label: locale === 'tr' ? 'TOPLAM GELİR' : 'TOTAL REVENUE', value: formatTRY(revenueKpis.total) },
+            { label: locale === 'tr' ? 'BU AYKİ GELİR' : 'REVENUE THIS MONTH', value: formatTRY(revenueKpis.month) },
+            { label: locale === 'tr' ? 'BU HAFTAKİ GELİR' : 'REVENUE THIS WEEK', value: formatTRY(revenueKpis.week) },
+            { label: locale === 'tr' ? 'BUGÜNKÜ GELİR' : 'REVENUE TODAY', value: formatTRY(revenueKpis.today) },
+          ].map((s) => (
+            <Card key={s.label} className="p-4">
+              <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-tertiary">
+                <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                <span>{s.label}</span>
+              </div>
+              <p className="text-3xl font-semibold text-text-primary kpi-number">{s.value}</p>
+            </Card>
+          ))}
+        </motion.div>
+
+        <motion.div variants={itemAnim} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          {[
+            { label: locale === 'tr' ? 'TOPLAM SİPARİŞ' : 'TOTAL ORDERS', value: orderKpis.total },
+            { label: locale === 'tr' ? 'BU AYKİ SİPARİŞ' : 'ORDERS THIS MONTH', value: orderKpis.month },
+            { label: locale === 'tr' ? 'BU HAFTAKİ SİPARİŞ' : 'ORDERS THIS WEEK', value: orderKpis.week },
+            { label: locale === 'tr' ? 'BUGÜNKÜ SİPARİŞ' : 'ORDERS TODAY', value: orderKpis.today },
+          ].map((s) => (
+            <Card key={s.label} className="p-4">
+              <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-tertiary">
+                <Receipt className="h-3.5 w-3.5 text-primary" />
+                <span>{s.label}</span>
+              </div>
+              <p className="text-3xl font-semibold text-text-primary kpi-number">{s.value}</p>
+            </Card>
+          ))}
+        </motion.div>
+
         <motion.div variants={itemAnim}>
           {customers.length === 0 ? (
             <div className="text-center py-16 text-text-tertiary">
@@ -315,134 +420,95 @@ export default function CustomersPage() {
               <p className="text-xs mt-1">Sağ üstteki &quot;Müşteri Ekle&quot; butonunu kullan.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {customers.map(c => {
-                const cOrders = allOrders.filter(o => o.contact_id === c.id && o.status !== 'cancelled')
-                const spent = cOrders.reduce((s, o) => s + o.total_try, 0)
-                return (
-                  <motion.div key={c.id} whileHover={{ y: -2 }} transition={{ duration: 0.15 }}>
-                    <Card hover className="cursor-pointer group" onClick={() => setSelectedCustomerId(c.id)}>
-                      <div className="flex items-start gap-4">
-                        <Avatar name={c.full_name} size="lg" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold text-text-primary">{c.full_name}</h3>
-                            <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-text-secondary transition-colors" />
+            <Card className="p-0 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full hidden md:table">
+                  <thead className="bg-surface/60 border-b border-border">
+                    <tr className="text-left text-xs uppercase tracking-[0.14em] text-text-tertiary">
+                      <th className="px-4 py-3">{locale === 'tr' ? 'Müşteri' : 'Customer'}</th>
+                      <th className="px-4 py-3">{locale === 'tr' ? 'Telefon' : 'Phone'}</th>
+                      <th className="px-4 py-3">{locale === 'tr' ? 'Konum' : 'Location'}</th>
+                      <th className="px-4 py-3">{locale === 'tr' ? 'Son sipariş' : 'Last order'}</th>
+                      <th className="px-4 py-3">{locale === 'tr' ? 'Toplam harcama' : 'Total spent'}</th>
+                      <th className="px-4 py-3">{locale === 'tr' ? 'Sipariş' : 'Orders'}</th>
+                      <th className="px-4 py-3">{locale === 'tr' ? 'Sadakat' : 'Loyalty'}</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customerRows.map(({ customer, orderCount, totalSpent, lastOrderDate }) => (
+                      <tr
+                        key={customer.id}
+                        onClick={() => setSelectedCustomerId(customer.id)}
+                        className="cursor-pointer border-b border-border-subtle/70 hover:bg-surface/35 transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <Avatar name={customer.full_name} size="sm" />
+                            <div>
+                              <p className="text-sm font-semibold text-text-primary">{customer.full_name}</p>
+                              <p className="text-xs text-text-secondary">{customer.profession || (locale === 'tr' ? 'Meslek belirtilmedi' : 'No profession')}</p>
+                            </div>
                           </div>
-                          <p className="text-xs text-text-tertiary mt-0.5">
-                            {[c.profession, c.location].filter(Boolean).join(' · ')}
-                          </p>
-                          <div className="grid grid-cols-3 gap-3 mt-3">
-                            <div>
-                              <p className="text-lg font-bold text-text-primary kpi-number">{cOrders.length}</p>
-                              <p className="text-[10px] text-text-tertiary">{t.customers.orders}</p>
-                            </div>
-                            <div>
-                              <p className="text-base font-bold text-success kpi-number truncate">{formatTRY(spent)}</p>
-                              <p className="text-[10px] text-text-tertiary">{t.customers.totalSpent}</p>
-                            </div>
-                            <div>
-                              <p className="text-lg font-bold text-text-primary kpi-number">{c.relationship_strength}%</p>
-                              <p className="text-[10px] text-text-tertiary">{t.customers.loyalty}</p>
-                            </div>
-                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-text-secondary">{customer.phone || '—'}</td>
+                        <td className="px-4 py-3 text-sm text-text-secondary">{customer.location || '—'}</td>
+                        <td className="px-4 py-3 text-sm text-text-secondary">{lastOrderDate ? formatDate(lastOrderDate) : '—'}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-success">{formatTRY(totalSpent)}</td>
+                        <td className="px-4 py-3 text-sm text-text-primary">{orderCount}</td>
+                        <td className="px-4 py-3 text-sm text-text-primary">{customer.relationship_strength}%</td>
+                        <td className="px-4 py-3 text-right">
+                          <ChevronRight className="w-4 h-4 text-text-muted" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden divide-y divide-border-subtle">
+                {customerRows.map(({ customer, orderCount, totalSpent, lastOrderDate }) => (
+                  <button
+                    type="button"
+                    key={customer.id}
+                    onClick={() => setSelectedCustomerId(customer.id)}
+                    className="w-full p-4 text-left hover:bg-surface/35 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar name={customer.full_name} size="sm" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-text-primary">{customer.full_name}</p>
+                          <p className="truncate text-xs text-text-secondary">{customer.phone || '—'}</p>
                         </div>
                       </div>
-                    </Card>
-                  </motion.div>
-                )
-              })}
-            </div>
+                      <ChevronRight className="w-4 h-4 text-text-muted" />
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <p className="text-text-tertiary">{locale === 'tr' ? 'Sipariş' : 'Orders'}</p>
+                        <p className="font-semibold text-text-primary">{orderCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-text-tertiary">{locale === 'tr' ? 'Toplam' : 'Total'}</p>
+                        <p className="font-semibold text-success">{formatTRY(totalSpent)}</p>
+                      </div>
+                      <div>
+                        <p className="text-text-tertiary">{locale === 'tr' ? 'Son sipariş' : 'Last order'}</p>
+                        <p className="font-semibold text-text-primary">{lastOrderDate ? formatDate(lastOrderDate) : '—'}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </Card>
           )}
-        </motion.div>
-
-        {/* Ürün Kataloğu */}
-        <motion.div variants={itemAnim}>
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <CardTitle className="flex items-center gap-2 flex-wrap">
-                  <Package className="w-4 h-4 text-primary shrink-0" />
-                  <span>{t.common.productCatalog}</span>
-                  <Badge variant="default" size="sm">{products.length} ürün</Badge>
-                </CardTitle>
-                <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />}
-                  className="sm:ml-auto shrink-0"
-                  onClick={() => { setEditingProduct(null); setShowProductModal(true) }} id="btn-add-product">
-                  Ürün Ekle
-                </Button>
-              </div>
-            </CardHeader>
-
-            {productsLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="p-3 rounded-xl bg-surface/50 border border-border-subtle h-32 animate-pulse" />
-                ))}
-              </div>
-            ) : products.length === 0 ? (
-              <div className="text-center py-12 text-text-tertiary">
-                <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">Henüz ürün eklenmedi.</p>
-                <p className="text-xs mt-1">Yukarıdaki &quot;Ürün Ekle&quot; butonunu kullan.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-                {products.map(p => (
-                  <div key={p.id}
-                    onClick={() => { setEditingProduct(p); setShowProductModal(true) }}
-                    className="group relative p-3 rounded-xl bg-surface/50 border border-border-subtle hover:border-border cursor-pointer transition-all hover:shadow-lg">
-                    {/* Edit/Delete */}
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                      <button onClick={e => { e.stopPropagation(); setEditingProduct(p); setShowProductModal(true) }}
-                        className="p-1 rounded-lg bg-card/90 border border-border hover:bg-primary/10 hover:text-primary transition-colors">
-                        <Pencil className="w-3 h-3" />
-                      </button>
-                      <button onClick={e => { e.stopPropagation(); setDeletingProductId(p.id) }}
-                        className="p-1 rounded-lg bg-card/90 border border-border hover:bg-error/10 hover:text-error transition-colors">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                    {/* Confirm Delete */}
-                    {deletingProductId === p.id && (
-                      <div className="absolute inset-0 z-20 rounded-xl bg-card/95 border border-error/30 flex flex-col items-center justify-center p-2 gap-2">
-                        <p className="text-[10px] text-error font-medium text-center">Silinsin mi?</p>
-                        <div className="flex gap-1.5">
-                          <button onClick={() => deleteProductMutation.mutate(p.id)}
-                            className="px-2 py-0.5 rounded-lg bg-error text-white text-[10px] font-medium hover:bg-error/80 transition-colors">
-                            {deleteProductMutation.isPending ? '...' : 'Evet'}
-                          </button>
-                          <button onClick={() => setDeletingProductId(null)}
-                            className="px-2 py-0.5 rounded-lg bg-surface border border-border text-text-secondary text-[10px] font-medium hover:bg-surface-hover transition-colors">
-                            İptal
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center mx-auto mb-2">
-                      <Package className="w-5 h-5 text-primary/60" />
-                    </div>
-                    <p className="text-xs font-medium text-text-primary truncate text-center leading-tight" title={p.name}>{p.name}</p>
-                    {p.category && <p className="text-[10px] text-text-tertiary text-center mt-0.5 truncate">{p.category}</p>}
-                    <p className="text-sm font-bold text-primary mt-1.5 text-center">{formatTRY(p.price_try)}</p>
-                    {p.reorder_cycle_days && (
-                      <p className="text-[9px] text-text-muted text-center mt-0.5">{p.reorder_cycle_days}g yenile</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
         </motion.div>
       </motion.div>
 
       {/* Modals */}
       {showAddCustomer && (
         <AddCustomerModal userId={userId} onClose={() => setShowAddCustomer(false)} />
-      )}
-      {showProductModal && (
-        <ProductModal userId={userId} editProduct={editingProduct}
-          onClose={() => { setShowProductModal(false); setEditingProduct(null) }} />
       )}
     </>
   )

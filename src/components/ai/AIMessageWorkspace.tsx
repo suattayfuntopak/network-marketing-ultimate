@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { stageMeta } from '@/components/contacts/contactLabels'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { consumeAIMessageDraftPreset } from '@/lib/clientStorage'
 import { fetchContacts, type ContactRow } from '@/lib/queries'
@@ -137,6 +138,7 @@ function daysSince(dateValue: string | null | undefined) {
 export function AIMessageWorkspace() {
   const searchParams = useSearchParams()
   const { locale } = useLanguage()
+  const h = useHeadingCase()
   const currentLocale: 'tr' | 'en' = locale === 'tr' ? 'tr' : 'en'
   const currentUser = useAppStore((state) => state.currentUser)
 
@@ -328,7 +330,7 @@ export function AIMessageWorkspace() {
               })}
             </p>
             <h1 className="mt-2 text-2xl font-bold text-text-primary sm:text-[1.75rem]">
-              {currentLocale === 'tr' ? 'Mesajlar' : 'Messages'}
+              {h(currentLocale === 'tr' ? 'Mesajlar' : 'Messages')}
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -338,10 +340,10 @@ export function AIMessageWorkspace() {
               icon={<Save className="h-4 w-4" />}
               onClick={() => setShowSavedMessages(true)}
             >
-              {currentLocale === 'tr' ? 'Kaydedilen Mesajlar' : 'Saved Messages'}
+              {h(currentLocale === 'tr' ? 'Kaydedilen mesajlar' : 'Saved messages')}
             </Button>
             <Button size="sm" icon={<Sparkles className="h-4 w-4" />} onClick={() => openGenerator()}>
-              {currentLocale === 'tr' ? 'YZ Mesajı Üret' : 'Generate AI Message'}
+              {h(currentLocale === 'tr' ? 'YZ mesajı üret' : 'Generate AI message')}
             </Button>
           </div>
         </div>
@@ -384,7 +386,7 @@ export function AIMessageWorkspace() {
                   </div>
                   <span className="text-2xl font-semibold text-text-primary">{card.value}</span>
                 </div>
-                <p className="mt-4 text-base font-semibold text-text-primary">{getSegmentLabel(currentLocale, card.key)}</p>
+                <p className="mt-4 text-base font-semibold text-text-primary">{h(getSegmentLabel(currentLocale, card.key))}</p>
                 <p className="mt-2 text-xs leading-5 text-text-secondary">{getSegmentDescription(currentLocale, card.key)}</p>
               </button>
             )
@@ -429,7 +431,7 @@ export function AIMessageWorkspace() {
                   </div>
                   <span className="text-2xl font-semibold text-text-primary">{card.value}</span>
                 </div>
-                <p className="mt-4 text-base font-semibold text-text-primary">{getSegmentLabel(currentLocale, card.key)}</p>
+                <p className="mt-4 text-base font-semibold text-text-primary">{h(getSegmentLabel(currentLocale, card.key))}</p>
                 <p className="mt-2 text-xs leading-5 text-text-secondary">{getSegmentDescription(currentLocale, card.key)}</p>
               </button>
             )
@@ -440,8 +442,8 @@ export function AIMessageWorkspace() {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <p className="text-sm text-text-secondary">
               {currentLocale === 'tr'
-                ? `${getSegmentLabel(currentLocale, segment)} filtresi aktif.`
-                : `${getSegmentLabel(currentLocale, segment)} filter is active.`}
+                ? h(`${getSegmentLabel(currentLocale, segment)} filtresi aktif.`)
+                : h(`${getSegmentLabel(currentLocale, segment)} filter is active.`)}
             </p>
             <p className="text-xs text-text-muted">
               {currentLocale === 'tr'
@@ -490,7 +492,7 @@ export function AIMessageWorkspace() {
                           icon={<Sparkles className="h-3.5 w-3.5" />}
                           onClick={() => openGenerator({ contact })}
                         >
-                          {currentLocale === 'tr' ? 'YZ Mesajı Üret' : 'Generate AI Message'}
+                          {h(currentLocale === 'tr' ? 'YZ mesajı üret' : 'Generate AI message')}
                         </Button>
                       </div>
                     </div>
@@ -520,7 +522,7 @@ export function AIMessageWorkspace() {
       <Modal
         open={showSavedMessages}
         onClose={() => setShowSavedMessages(false)}
-        title={currentLocale === 'tr' ? 'Kaydedilen Mesajlar' : 'Saved Messages'}
+        title={currentLocale === 'tr' ? 'Kaydedilen mesajlar' : 'Saved messages'}
         description={currentLocale === 'tr' ? 'Kaydettiğin mesaj şablonları burada listelenir.' : 'Your saved message templates are listed here.'}
         className="max-w-3xl"
       >

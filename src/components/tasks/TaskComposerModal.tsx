@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { addTask, updateTask } from '@/lib/queries'
 import type { ContactRow, TaskRow } from '@/lib/queries'
 
@@ -54,6 +55,7 @@ export function TaskComposerModal({
   initialDueDate?: string
 }) {
   const { t } = useLanguage()
+  const h = useHeadingCase()
   const qc = useQueryClient()
   const [form, setForm] = useState<AddForm>(buildEmptyForm)
   const [activeEditingTask, setActiveEditingTask] = useState<TaskRow | null>(null)
@@ -149,7 +151,7 @@ export function TaskComposerModal({
             <div className="flex items-center justify-between p-5 border-b border-border">
               <div>
                 <h2 className="text-base font-semibold text-text-primary">
-                  {isEditing ? 'Görevi Düzenle' : t.tasks.createTask}
+                  {isEditing ? h('Görevi düzenle') : h(t.tasks.createTask)}
                 </h2>
                 <p className="text-xs text-text-tertiary mt-0.5">
                   {isEditing

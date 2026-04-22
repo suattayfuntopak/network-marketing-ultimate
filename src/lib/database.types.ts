@@ -154,6 +154,28 @@ export interface Database {
         Relationships: []
       }
 
+      nmu_customers: {
+        Row: {
+          id: string
+          user_id: string
+          contact_id: string
+          is_active: boolean
+          became_customer_at: string
+          left_customer_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          contact_id: string
+          is_active?: boolean
+          became_customer_at?: string
+          left_customer_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['nmu_customers']['Insert']>
+        Relationships: []
+      }
+
       // ─── GÖREVLER ────────────────────────────────────────
       nmu_tasks: {
         Row: {

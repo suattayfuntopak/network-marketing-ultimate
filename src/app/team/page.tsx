@@ -9,6 +9,7 @@ import { Badge, TemperatureBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { useAppStore } from '@/store/appStore'
 import { fetchContacts, fetchTasks } from '@/lib/queries'
 import type { ContactRow, TaskRow } from '@/lib/queries'
@@ -149,6 +150,7 @@ function CategorySection({
 
 export default function TeamPage() {
   const { locale, t } = useLanguage()
+  const h = useHeadingCase()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const { currentUser } = useAppStore()
   const router = useRouter()
@@ -237,7 +239,7 @@ export default function TeamPage() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1500px] mx-auto">
       <motion.div variants={item} className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">{t.team.title}</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{h(t.team.title)}</h1>
           <p className="mt-1 text-sm text-text-secondary">
             {currentLocale === 'tr'
               ? 'Tek ekranda lider, distribütör ve müşteri görünümü ile organizasyon fotoğrafı.'
@@ -249,7 +251,7 @@ export default function TeamPage() {
           icon={<UserPlus className="w-3.5 h-3.5" />}
           onClick={() => router.push('/pipeline')}
         >
-          {t.team.inviteMember}
+          {h(t.team.inviteMember)}
         </Button>
       </motion.div>
 
@@ -264,7 +266,7 @@ export default function TeamPage() {
                 </div>
                 <div>
                   <p className="text-xl font-bold text-text-primary">{stat.value}</p>
-                  <p className="text-xs text-text-tertiary">{stat.label}</p>
+                  <p className="text-xs text-text-tertiary">{h(stat.label)}</p>
                 </div>
               </div>
             </div>
@@ -277,7 +279,7 @@ export default function TeamPage() {
           <div className="border-b border-border px-5 py-4">
             <CardTitle className="flex items-center gap-2">
               <Users className="w-4 h-4 text-primary" />
-              {currentLocale === 'tr' ? 'Organizasyon Görünümü' : 'Organization View'}
+              {h(currentLocale === 'tr' ? 'Organizasyon Görünümü' : 'Organization view')}
             </CardTitle>
             <CardDescription>
               {currentLocale === 'tr'
@@ -288,7 +290,7 @@ export default function TeamPage() {
 
           <div className="grid gap-4 p-5 lg:grid-cols-3">
             <CategorySection
-              title={currentLocale === 'tr' ? 'Lider' : 'Leader'}
+              title={h(currentLocale === 'tr' ? 'Lider' : 'Leader')}
               description={currentLocale === 'tr' ? 'Organizasyonu yöneten çekirdek görünüm.' : 'Core leadership visibility.'}
               count={leaderCards.length}
               cards={leaderCards}
@@ -296,7 +298,7 @@ export default function TeamPage() {
               emptyLabel={currentLocale === 'tr' ? 'Henüz lider görünümü yok.' : 'No leader view yet.'}
             />
             <CategorySection
-              title={currentLocale === 'tr' ? 'Distribütör' : 'Distributor'}
+              title={h(currentLocale === 'tr' ? 'Distribütör' : 'Distributor')}
               description={currentLocale === 'tr' ? 'Takip ve ivme isteyen ekip üyeleri.' : 'Members who need momentum and follow-up.'}
               count={distributorCards.length}
               cards={distributorCards}
@@ -304,7 +306,7 @@ export default function TeamPage() {
               emptyLabel={currentLocale === 'tr' ? 'Henüz distribütör yok.' : 'No distributors yet.'}
             />
             <CategorySection
-              title={currentLocale === 'tr' ? 'Müşteri' : 'Customer'}
+              title={h(currentLocale === 'tr' ? 'Müşteri' : 'Customer')}
               description={currentLocale === 'tr' ? 'Korunması ve büyütülmesi gereken müşteri tabanı.' : 'Customer relationships to retain and grow.'}
               count={customerCards.length}
               cards={customerCards}
@@ -319,20 +321,20 @@ export default function TeamPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-secondary" />
-                {currentLocale === 'tr' ? 'Bugünün Operasyon Özeti' : 'Today’s Operating Snapshot'}
+                {h(currentLocale === 'tr' ? 'Bugünün operasyon özeti' : 'Today’s operating snapshot')}
               </CardTitle>
             </CardHeader>
             <div className="space-y-3 text-sm">
               <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-surface/40 px-3 py-3">
-                <span className="text-text-secondary">{currentLocale === 'tr' ? 'Açık takipler' : 'Open follow-ups'}</span>
+                <span className="text-text-secondary">{h(currentLocale === 'tr' ? 'Açık takipler' : 'Open follow-ups')}</span>
                 <strong className="text-text-primary">{openFollowUps}</strong>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-surface/40 px-3 py-3">
-                <span className="text-text-secondary">{currentLocale === 'tr' ? 'Distribütör havuzu' : 'Distributor pool'}</span>
+                <span className="text-text-secondary">{h(currentLocale === 'tr' ? 'Distribütör havuzu' : 'Distributor pool')}</span>
                 <strong className="text-text-primary">{distributorCards.length}</strong>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-surface/40 px-3 py-3">
-                <span className="text-text-secondary">{currentLocale === 'tr' ? 'Müşteri tabanı' : 'Customer base'}</span>
+                <span className="text-text-secondary">{h(currentLocale === 'tr' ? 'Müşteri tabanı' : 'Customer base')}</span>
                 <strong className="text-text-primary">{customerCards.length}</strong>
               </div>
             </div>
@@ -342,7 +344,7 @@ export default function TeamPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-warning" />
-                {currentLocale === 'tr' ? 'Yakın Destek Gerektirenler' : 'Needs Support Soon'}
+                {h(currentLocale === 'tr' ? 'Yakın destek gerektirenler' : 'Needs support soon')}
               </CardTitle>
             </CardHeader>
             <div className="space-y-3">

@@ -6,6 +6,7 @@ import { AlertCircle, Plus, ShoppingCart, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { addOrder, type ContactRow, type OrderItem, type OrderRow, type ProductRow } from '@/lib/queries'
 import { ModalOverlay } from './ModalOverlay'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 
 interface AddOrderItem {
   product_id: string
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export function AddOrderModal({ onClose, userId, contact, products }: Props) {
+  const h = useHeadingCase()
   const qc = useQueryClient()
   const [items, setItems] = useState<AddOrderItem[]>([
     { product_id: '', product_name: '', quantity: 1, unit_price_try: 0 },
@@ -91,7 +93,7 @@ export function AddOrderModal({ onClose, userId, contact, products }: Props) {
       <form onSubmit={handleSubmit}>
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
-            <h2 className="text-base font-semibold text-text-primary">Sipariş Ekle</h2>
+            <h2 className="text-base font-semibold text-text-primary">{h('Sipariş ekle')}</h2>
             <p className="text-xs text-text-tertiary mt-0.5">{contact.full_name} için yeni sipariş</p>
           </div>
           <button type="button" onClick={onClose} className="text-text-tertiary hover:text-text-primary p-1 rounded-lg hover:bg-surface-hover">

@@ -14,6 +14,7 @@ import {
   type ObjectionResource,
 } from '@/components/academy/ResourcePreviewModal'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import {
   academyLibraryCategories,
@@ -173,6 +174,7 @@ export default function AcademyPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { t, locale } = useLanguage()
+  const h = useHeadingCase()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const requestedTab = searchParams.get('tab')
   const activeTab: AcademyTab = requestedTab && validTabs.includes(requestedTab as AcademyTab)
@@ -513,7 +515,7 @@ export default function AcademyPage() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
       <motion.div variants={item} className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">{t.academy.title}</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{h(t.academy.title)}</h1>
           <p className="text-sm text-text-secondary mt-0.5">
             {currentLocale === 'tr'
               ? 'Master projedeki zengin kütüphane artık burada: içerikler, itirazlar ve kendi eklemelerin tek merkezde.'

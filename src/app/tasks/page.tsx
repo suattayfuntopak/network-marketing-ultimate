@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { TaskComposerModal } from '@/components/tasks/TaskComposerModal'
 import { useAppStore } from '@/store/appStore'
 import { deleteTask, fetchContacts, fetchTasks, setTaskStatus } from '@/lib/queries'
@@ -49,6 +50,7 @@ const TYPE_KEY_MAP: Record<string, keyof typeof import('@/lib/i18n').translation
 
 export default function TasksPage() {
   const { t } = useLanguage()
+  const h = useHeadingCase()
   const { currentUser } = useAppStore()
   const qc = useQueryClient()
   const router = useRouter()
@@ -108,11 +110,11 @@ export default function TasksPage() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
       <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">{t.tasks.title}</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{h(t.tasks.title)}</h1>
           <p className="text-sm text-text-secondary mt-0.5">{pending} {t.tasks.subtitle}</p>
         </div>
         <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreateModal}>
-          {t.tasks.createTask}
+          {h(t.tasks.createTask)}
         </Button>
       </motion.div>
 
@@ -132,7 +134,7 @@ export default function TasksPage() {
                 : 'bg-surface border border-border text-text-secondary hover:text-text-primary hover:border-border-strong'
             }`}
           >
-            {option.label} <span className="ml-1 text-xs opacity-70">{option.count}</span>
+            {h(option.label)} <span className="ml-1 text-xs opacity-70">{option.count}</span>
           </button>
         ))}
       </motion.div>

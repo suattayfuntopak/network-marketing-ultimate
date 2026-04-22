@@ -13,6 +13,7 @@ import {
 } from '@/components/contacts/contactLabels'
 import type { ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 
 type TabId = 'basic' | 'detail' | 'network' | 'notes'
 
@@ -86,6 +87,7 @@ export function ContactCreateModal({
   }, [open])
 
   const tr = currentLocale === 'tr'
+  const h = useHeadingCase()
 
   return (
     <motion.div
@@ -110,7 +112,7 @@ export function ContactCreateModal({
               </div>
               <div>
                 <h2 className="text-xl font-semibold text-text-primary">
-                  {isEdit ? (tr ? 'Kontağı Düzenle' : 'Edit contact') : tr ? 'Yeni Kontak' : 'New contact'}
+                  {isEdit ? h(tr ? 'Kontağı düzenle' : 'Edit contact') : h(tr ? 'Yeni kontak' : 'New contact')}
                 </h2>
                 <p className="mt-0.5 text-base text-text-tertiary">
                   {isEdit
@@ -144,7 +146,7 @@ export function ContactCreateModal({
                     tab === item.id ? 'text-primary' : 'text-text-tertiary hover:text-text-secondary',
                   )}
                 >
-                  {tr ? item.tr : item.en}
+                  {h(tr ? item.tr : item.en)}
                   {tab === item.id && (
                     <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary/90" />
                   )}

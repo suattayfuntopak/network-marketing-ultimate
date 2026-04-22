@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { useAppStore } from '@/store/appStore'
 import { AIMessageGeneratorModal } from '@/components/ai/AIMessageGeneratorModal'
 import { ContactChannelRow } from '@/components/contacts/ContactChannelRow'
@@ -236,6 +237,7 @@ function lastTouchLabel(iso: string | null | undefined, locale: 'tr' | 'en') {
 export default function ContactsPage() {
   const { t, locale } = useLanguage()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
+  const h = useHeadingCase()
   const { currentUser } = useAppStore()
   const qc = useQueryClient()
   const router = useRouter()
@@ -964,7 +966,7 @@ export default function ContactsPage() {
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
         <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">{t.contacts.title}</h1>
+            <h1 className="text-2xl font-bold text-text-primary">{h(t.contacts.title)}</h1>
             <p className="text-sm text-text-secondary mt-0.5">{contacts.length} {t.contacts.subtitle}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -1021,7 +1023,7 @@ export default function ContactsPage() {
                     </div>
                     <p className="text-3xl font-bold text-text-primary kpi-number">{stat.value}</p>
                   </div>
-                  <p className="mt-4 text-sm font-medium text-text-secondary leading-snug">{stat.label}</p>
+                  <p className="mt-4 text-sm font-medium text-text-secondary leading-snug">{h(stat.label)}</p>
                 </Card>
               )
             })}
@@ -1045,7 +1047,7 @@ export default function ContactsPage() {
                     </div>
                     <p className="text-3xl font-bold text-text-primary kpi-number">{stat.value}</p>
                   </div>
-                  <p className="mt-4 text-sm font-medium text-text-secondary leading-snug">{stat.label}</p>
+                  <p className="mt-4 text-sm font-medium text-text-secondary leading-snug">{h(stat.label)}</p>
                 </Card>
               )
             })}
@@ -1071,7 +1073,7 @@ export default function ContactsPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-text-primary">{card.count}</p>
-                <p className="text-xs text-text-tertiary">{card.label}</p>
+                <p className="text-xs text-text-tertiary">{h(card.label)}</p>
               </div>
             </div>
           ))}
@@ -1091,7 +1093,7 @@ export default function ContactsPage() {
                     : 'bg-surface border-border text-text-secondary hover:text-text-primary',
                 )}
               >
-                {segment.label} <span className="ml-1 text-xs opacity-75">{segment.count}</span>
+                {h(segment.label)} <span className="ml-1 text-xs opacity-75">{segment.count}</span>
               </button>
             ))}
           </div>

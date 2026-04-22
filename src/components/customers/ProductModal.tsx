@@ -6,6 +6,7 @@ import { AlertCircle, CheckCircle2, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { addProduct, updateProduct, type ProductRow } from '@/lib/queries'
 import { ModalOverlay } from './ModalOverlay'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 
 const CATEGORIES = ['Cilt Bakımı', 'Beslenme', 'Wellness', 'Başlangıç Seti', 'Kişisel Bakım', 'Diğer']
 
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function ProductModal({ onClose, userId, editProduct }: Props) {
+  const h = useHeadingCase()
   const qc = useQueryClient()
   const [form, setForm] = useState({
     name: editProduct?.name ?? '',
@@ -57,7 +59,9 @@ export function ProductModal({ onClose, userId, editProduct }: Props) {
       <form onSubmit={handleSubmit}>
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
-            <h2 className="text-base font-semibold text-text-primary">{isEdit ? 'Ürünü Düzenle' : 'Yeni Ürün Ekle'}</h2>
+            <h2 className="text-base font-semibold text-text-primary">
+              {isEdit ? h('Ürünü düzenle') : h('Yeni ürün ekle')}
+            </h2>
             <p className="text-xs text-text-tertiary mt-0.5">Fiyatı Türk Lirası (₺) olarak girin</p>
           </div>
           <button type="button" onClick={onClose} className="text-text-tertiary hover:text-text-primary p-1 rounded-lg hover:bg-surface-hover">

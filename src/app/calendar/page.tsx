@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { ActionCalendarPanel } from '@/components/tasks/ActionCalendarPanel'
 import type { CalendarContext, CalendarViewMode } from '@/components/tasks/ActionCalendarPanel'
 import { TaskComposerModal } from '@/components/tasks/TaskComposerModal'
@@ -18,6 +19,7 @@ const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
 export default function CalendarPage() {
   const { t, locale } = useLanguage()
+  const h = useHeadingCase()
   const { currentUser } = useAppStore()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -96,7 +98,7 @@ export default function CalendarPage() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
       <motion.div variants={item}>
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">{t.calendar.title}</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{h(t.calendar.title)}</h1>
           <p className="text-sm text-text-secondary mt-0.5">
             {locale === 'tr'
               ? `Ortak akışta bekleyen ${actionCount} aksiyon var.`

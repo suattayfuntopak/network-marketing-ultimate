@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { getSafeRedirectTarget, syncAuthSessionCookie } from '@/lib/auth'
 import { Mail, Lock, User, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react'
 
@@ -14,6 +15,7 @@ export default function SignupPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { t, locale } = useLanguage()
+  const h = useHeadingCase()
   const a = t.auth
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -64,7 +66,7 @@ export default function SignupPage() {
             <CheckCircle2 className="w-8 h-8 text-success" />
           </div>
           <h2 className="text-xl font-semibold text-text-primary mb-2">
-            {locale === 'tr' ? 'Hesabın oluşturuldu!' : 'Your account is ready!'}
+            {h(locale === 'tr' ? 'Hesabın oluşturuldu!' : 'Your account is ready!')}
           </h2>
           <p className="text-text-tertiary text-sm mb-6">
             {locale === 'tr'
@@ -108,7 +110,7 @@ export default function SignupPage() {
 
         {/* Card */}
         <div className="bg-card border border-border rounded-2xl p-5 sm:p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-          <h2 className="text-xl font-semibold text-text-primary mb-1">{a.signup}</h2>
+          <h2 className="text-xl font-semibold text-text-primary mb-1">{h(a.signup)}</h2>
           <p className="text-text-tertiary text-sm mb-6">
             {locale === 'tr'
               ? 'Ücretsiz hesabını oluştur ve başla.'

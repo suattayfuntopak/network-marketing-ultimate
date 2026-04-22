@@ -5,6 +5,7 @@ import { ChevronRight, RefreshCcw } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { formatTRY, type ReorderDueEntry } from './dashboardMetrics'
 
 type ReorderDueCardProps = {
@@ -13,6 +14,7 @@ type ReorderDueCardProps = {
 
 export function ReorderDueCard({ entries }: ReorderDueCardProps) {
   const { locale } = useLanguage()
+  const h = useHeadingCase()
   const router = useRouter()
   const overdueCount = entries.filter((entry) => entry.status === 'overdue').length
   const todayCount = entries.filter((entry) => entry.status === 'today').length
@@ -34,7 +36,7 @@ export function ReorderDueCard({ entries }: ReorderDueCardProps) {
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
             <RefreshCcw className="h-4 w-4 text-warning" />
-            {locale === 'tr' ? 'Yeniden Sipariş Bekleyen' : 'Reorder Due'}
+            {h(locale === 'tr' ? 'Yeniden sipariş bekleyen' : 'Reorder due')}
           </CardTitle>
           <CardDescription className="mt-1">
             {locale === 'tr'
@@ -72,7 +74,7 @@ export function ReorderDueCard({ entries }: ReorderDueCardProps) {
                   <Badge variant={variant(entry)}>{dueLabel(entry)}</Badge>
                 </div>
                 <p className="mt-1 text-xs text-text-secondary">
-                  {locale === 'tr' ? 'Son sipariş' : 'Last order'}: <span className="font-semibold text-text-primary">{formatTRY(entry.lastOrderTry, locale)}</span>
+                  {h(locale === 'tr' ? 'Son sipariş' : 'Last order')}: <span className="font-semibold text-text-primary">{formatTRY(entry.lastOrderTry, locale)}</span>
                 </p>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-text-muted transition-colors group-hover:text-text-primary" />
