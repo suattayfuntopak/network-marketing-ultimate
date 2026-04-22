@@ -93,6 +93,9 @@ export function Header() {
       { id: 'page-tasks', kind: 'page', title: isTurkish ? 'Görevler ve Takipler' : 'Tasks & Follow-ups', subtitle: isTurkish ? 'Bugünkü aksiyonlar' : 'Action list', route: '/tasks', keywords: 'task görev follow up takip aksiyon todo' },
       { id: 'page-events', kind: 'page', title: isTurkish ? 'Etkinlikler' : 'Events', subtitle: isTurkish ? 'Sunumlar ve toplantılar' : 'Meetings and presentations', route: '/events', keywords: 'event etkinlik toplantı zoom webinar sunum presentation' },
       { id: 'page-academy', kind: 'page', title: isTurkish ? 'Akademi' : 'Academy', subtitle: isTurkish ? 'Eğitim kütüphanesi' : 'Learning library', route: '/academy', keywords: 'academy eğitim kurs içerik lesson training script' },
+      { id: 'page-motivation', kind: 'page', title: isTurkish ? 'Motivasyon' : 'Motivation', subtitle: isTurkish ? 'YZ ile motive edici mesaj ve gönder' : 'AI motivation drafts and send', route: '/motivation', keywords: 'motivasyon motivasyonel mesaj ekip teşvik ai motivation inspire' },
+      { id: 'page-products', kind: 'page', title: isTurkish ? 'Ürün Kataloğu' : 'Product catalog', subtitle: isTurkish ? 'Ürünler ve satış' : 'Products and performance', route: '/products', keywords: 'ürün katalog product catalog stok order sipariş' },
+      { id: 'page-team-leader', kind: 'page', title: isTurkish ? 'Takım Lideri' : 'Team leader', subtitle: isTurkish ? 'Lider kontrol merkezi' : 'Leader control center', route: '/team/leader', keywords: 'takım lider leader kontrol lider ekip lideri organization' },
     ]
 
     const contactItems: SearchResultItem[] = searchContacts.map((contact) => ({

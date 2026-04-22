@@ -16,13 +16,19 @@ import {
   LayoutDashboard, Users, ShoppingBag, GitBranch, ListTodo,
   CalendarDays, GraduationCap, Calendar, BarChart3,
   Bot, ChevronLeft, ChevronRight,
-  Target, X
+  Target, X, Package, Crown, Flame
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 type NavDividerItem = { divider: true }
 type NavLinkItem = { divider?: false; label: string; href: string; icon: LucideIcon; badge?: string; highlight?: boolean }
 type NavItem = NavDividerItem | NavLinkItem
+
+function isSidebarLinkActive(pathname: string | null, href: string) {
+  if (!pathname) return false
+  if (href === '/team') return pathname === '/team'
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -43,14 +49,17 @@ export function Sidebar() {
     { label: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
     { label: t.nav.contacts, href: '/contacts', icon: Users, badge: contactsCount?.toString() },
     { label: t.nav.customers, href: '/customers', icon: ShoppingBag },
+    { label: t.nav.productCatalog, href: '/products', icon: Package },
     { label: t.nav.pipeline, href: '/pipeline', icon: GitBranch },
     { label: t.nav.tasks, href: '/tasks', icon: ListTodo, badge: pendingTasksCount?.toString() },
     { label: t.nav.calendar, href: '/calendar', icon: CalendarDays },
     { divider: true },
     { label: t.nav.academy, href: '/academy', icon: GraduationCap },
     { label: t.nav.events, href: '/events', icon: Calendar },
+    { label: t.nav.motivation, href: '/motivation', icon: Flame },
     { divider: true },
     { label: t.nav.team, href: '/team', icon: Target },
+    { label: t.nav.teamLeader, href: '/team/leader', icon: Crown },
     { label: t.nav.analytics, href: '/analytics', icon: BarChart3 },
     { label: t.nav.aiCoach, href: '/ai', icon: Bot, highlight: true },
   ]
@@ -95,7 +104,7 @@ export function Sidebar() {
           }
 
           const navItem = item
-          const isActive = pathname === navItem.href || pathname?.startsWith(navItem.href + '/')
+          const isActive = isSidebarLinkActive(pathname, navItem.href)
           const Icon = navItem.icon
 
           return (
