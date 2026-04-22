@@ -83,6 +83,25 @@ function contactLink(contact: ContactRow, event: Event, channel: InviteChannel, 
   return `https://t.me/share/url?url=${encodeURIComponent(event.meetingUrl || window.location.href)}&text=${encodedMessage}`
 }
 
+function buildBulkAnnouncement(locale: 'tr' | 'en', event: Event) {
+  const eventDate = new Date(event.startDate).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+  const eventTime = `${new Date(event.startDate).toLocaleTimeString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })} - ${new Date(event.endDate).toLocaleTimeString(locale === 'tr' ? 'tr-TR' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`
+
+  return locale === 'tr'
+    ? `Duyuru: "${event.title}" etkinliği ${eventDate} tarihinde ${eventTime} saatlerinde ${event.location || 'online'} gerçekleşecek.${event.meetingUrl ? ` Katılım linki: ${event.meetingUrl}` : ''}`
+    : `Announcement: "${event.title}" will take place on ${eventDate}, ${eventTime}, at ${event.location || 'online'}.${event.meetingUrl ? ` Join link: ${event.meetingUrl}` : ''}`
+}
+
 export function EventInviteModal({
   open,
   onClose,
@@ -105,18 +124,15 @@ export function EventInviteModal({
     setLastOpenedFor(openToken)
     if (openToken) {
       setInviteSearch('')
-      setSelectedInviteIds([])
+      setSelectedInviteIds(event?.attendees.map((attendee) => attendee.contactId) ?? [])
       setInviteFeedback('')
     }
   }
 
   const inviteableContacts = useMemo(() => {
-    if (!event) return []
-    const attendeeIds = new Set(event.attendees.map((attendee) => attendee.contactId))
     const query = inviteSearch.trim().toLocaleLowerCase(locale === 'tr' ? 'tr-TR' : 'en-US')
 
     return contacts
-      .filter((contact) => !attendeeIds.has(contact.id))
       .filter((contact) => {
         if (!query) return true
         const haystack = [contact.full_name, contact.location, contact.profession, contact.source]
@@ -126,7 +142,7 @@ export function EventInviteModal({
         return haystack.includes(query)
       })
       .sort((left, right) => left.full_name.localeCompare(right.full_name))
-  }, [contacts, event, inviteSearch, locale])
+  }, [contacts, inviteSearch, locale])
 
   function toggleInvite(contactId: string) {
     setSelectedInviteIds((current) =>
@@ -163,14 +179,34 @@ export function EventInviteModal({
 
     await onSyncAttendees(contactIds, true)
 
-    if (inviteChannel === 'telegram') {
-      window.open(links[0].link!, '_blank', 'noopener,noreferrer')
-      setInviteFeedback(`${links.length} ${labels.addedToEvent}. ${labels.telegramNotice}`)
-    } else {
-      links.forEach((entry) => {
-        window.open(entry.link!, '_blank', 'noopener,noreferrer')
-      })
+    if (inviteChannel === 'email') {
+      const recipients = selectedContacts.map((contact) => contact.email).filter(Boolean)
+      if (recipients.length > 0) {
+        const first = recipients[0]
+        const bcc = recipients.slice(1).join(',')
+        const body = encodeURIComponent(buildBulkAnnouncement(locale, event))
+        const href = `mailto:${first}?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(event.title)}&body=${body}`
+        window.open(href, '_blank', 'noopener,noreferrer')
+      }
       setInviteFeedback(`${links.length} ${labels.addedToEvent}. ${links.length} ${labels.sentTo}.`)
+    } else if (links.length === 1) {
+      window.open(links[0].link!, '_blank', 'noopener,noreferrer')
+      setInviteFeedback(`${links.length} ${labels.addedToEvent}. ${links.length} ${labels.sentTo}.`)
+    } else {
+      const announcement = buildBulkAnnouncement(locale, event)
+      await navigator.clipboard.writeText(announcement)
+      if (inviteChannel === 'whatsapp') {
+        window.open('https://web.whatsapp.com/', '_blank', 'noopener,noreferrer')
+      } else if (inviteChannel === 'telegram') {
+        window.open('https://web.telegram.org/', '_blank', 'noopener,noreferrer')
+      } else {
+        window.open('sms:', '_blank', 'noopener,noreferrer')
+      }
+      setInviteFeedback(
+        locale === 'tr'
+          ? `${links.length} kişi etkinliğe eklendi. Toplu metin panoya kopyalandı; açılan ${inviteChannel === 'telegram' ? 'Telegram' : inviteChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'} ekranında tek seferde paylaşabilirsin.`
+          : `${links.length} contacts were added. The bulk message was copied to clipboard so you can send it in one pass from ${inviteChannel === 'telegram' ? 'Telegram' : inviteChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}.`
+      )
     }
 
     if (closeAfter) {
@@ -273,15 +309,9 @@ export function EventInviteModal({
                         <Badge variant={selected ? 'primary' : 'default'} size="sm">
                           {selected ? labels.selected : stageLabel(contact)}
                         </Badge>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => sendInvites([contact.id])}
-                          icon={channelIcon}
-                        >
-                          {labels.inviteNow}
-                        </Button>
+                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-subtle bg-surface/60 text-text-tertiary">
+                          {channelIcon}
+                        </span>
                       </div>
                     </div>
                   </div>

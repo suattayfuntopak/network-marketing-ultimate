@@ -292,6 +292,7 @@ export default function EventsPage() {
       id: activeEvent.id,
       input: formToInput(editForm, fallback),
     })
+    closeDetailsModal()
     navigateBackIfNeeded()
   }
 
@@ -400,7 +401,8 @@ export default function EventsPage() {
                     <Button
                       type="button"
                       size="sm"
-                      variant="ghost"
+                      variant="secondary"
+                      className="border border-secondary/30 bg-secondary/15 text-secondary hover:bg-secondary/20"
                       onClick={(eventElement) => {
                         eventElement.stopPropagation()
                         openDetails(event)
@@ -453,10 +455,10 @@ export default function EventsPage() {
           manageHint: labels.manageHint,
           attendees: labels.attendees,
           attendeesEmpty: labels.attendeesEmpty,
-          invite: labels.invite,
+          invite: locale === 'tr' ? 'Kişilere Gönder' : 'Notify Participants',
           openMeeting: labels.openMeeting,
           openMap: labels.openMap,
-          viewContacts: labels.viewContacts,
+          viewContacts: locale === 'tr' ? 'Katılımcı Ekle' : 'Add Participants',
           delete: labels.delete,
           cancel: t.common.cancel,
           saveChanges: t.common.saveChanges,
@@ -466,7 +468,7 @@ export default function EventsPage() {
         onSave={saveEvent}
         onDelete={deleteEvent}
         onOpenInvite={openInviteModal}
-        onOpenContacts={() => router.push('/contacts')}
+        onOpenContacts={openInviteModal}
         isSaving={updateMutation.isPending}
         isDeleting={deleteMutation.isPending}
       />

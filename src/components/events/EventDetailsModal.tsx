@@ -56,6 +56,12 @@ export function EventDetailsModal({
   isSaving,
   isDeleting,
 }: Props) {
+  function attendeesSummary(names: string[]) {
+    if (names.length <= 4) return names.join(', ')
+    const visible = names.slice(0, 4).join(', ')
+    return `${visible} + ${names.length - 4} kişi daha`
+  }
+
   function resolveAttendeeName(contactId: string, fallback: string) {
     return contacts.find((contact) => contact.id === contactId)?.full_name ?? fallback
   }
@@ -161,15 +167,9 @@ export function EventDetailsModal({
             </div>
             <div className="flex flex-wrap gap-2">
               {event.attendees.length > 0 ? (
-                event.attendees.map((attendee) => (
-                  <Badge
-                    key={attendee.contactId}
-                    variant={attendee.rsvpStatus === 'confirmed' || attendee.rsvpStatus === 'attended' ? 'success' : 'default'}
-                    size="md"
-                  >
-                    {resolveAttendeeName(attendee.contactId, attendee.name)}
-                  </Badge>
-                ))
+                <p className="text-sm text-text-secondary">
+                  {attendeesSummary(event.attendees.map((attendee) => resolveAttendeeName(attendee.contactId, attendee.name)))}
+                </p>
               ) : (
                 <p className="text-sm text-text-tertiary">{labels.attendeesEmpty}</p>
               )}
