@@ -46,8 +46,8 @@ export const MOTIVATION_QUOTES: MotivationQuote[] = [
   },
   {
     text: 'Durduramayacağın şey, ritmini; ritmini kontrol edersen yönü de kontrol edersin.',
-    author: 'Suat Tayfun Topak NMU ekip tavsiyesi',
-    role: 'NMU lider notu (örnek ifade; kişiselleştirilebilir)',
+    author: 'Suat Tayfun Topak',
+    role: 'Ekip tavsiyesi',
     category: 'Odak',
   },
   {
@@ -58,7 +58,7 @@ export const MOTIVATION_QUOTES: MotivationQuote[] = [
   },
   {
     text: 'Her “hayır”, bir hikâyenin sadece cümle sonu. Paragraf sende devam ediyor.',
-    author: 'NMU stüdyo çerçevesi',
+    author: 'Ekip stüdyosu',
     role: 'Reddedilmeyi normalize eden sakin bir geri bildirim',
     category: 'Cesaret',
   },
@@ -76,8 +76,8 @@ export const MOTIVATION_QUOTES: MotivationQuote[] = [
   },
   {
     text: 'Dürüst küçük adım, abartılı vaatten daha çok lider inşa eder.',
-    author: 'NMU uyum rehberi',
-    role: 'Etik & güven sınırı',
+    author: 'Takım liderliği notu',
+    role: 'Dürüst iletişim ve net adımlar',
     category: 'Liderlik',
   },
 ]
