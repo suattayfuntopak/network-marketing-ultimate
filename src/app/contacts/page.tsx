@@ -44,7 +44,6 @@ import {
   updateContactRecord,
   updateContactStage,
 } from '@/lib/queries'
-import type { MessageHistoryRecord, MessageTemplateRecord } from '@/components/ai/AIMessageGeneratorModal'
 import { cn } from '@/lib/utils'
 import type { ContactRow, InteractionRow, TaskRow } from '@/lib/queries'
 import {
@@ -975,8 +974,8 @@ export default function ContactsPage() {
               ? 'Kontak detayları, etkileşim geçmişi ve mevcut takip durumuna göre otomatik oluşturuldu.'
               : 'Auto-generated using contact details, interaction history, and current follow-up state.'
           }
-          onGenerated={(_record: MessageHistoryRecord) => undefined}
-          onSaveTemplate={(_template: Omit<MessageTemplateRecord, 'id' | 'createdAt' | 'isFavorite'>) => undefined}
+          onGenerated={() => undefined}
+          onSaveTemplate={() => undefined}
         />
 
         <AnimatePresence>
