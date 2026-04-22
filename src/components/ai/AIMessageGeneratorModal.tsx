@@ -152,11 +152,37 @@ function getLabel<T extends string>(
 }
 
 function splitVariants(text: string, maxVariants: number) {
-  return text
+  const byDivider = text
     .split(/\n?---+\n?/g)
     .map((chunk) => chunk.trim())
     .filter(Boolean)
-    .slice(0, maxVariants)
+  if (byDivider.length > 1) return byDivider.slice(0, maxVariants)
+
+  const byHeading = text
+    .split(/(?:^|\n)\s*(?:varyasyon|variant)\s*\d+\s*:?\s*/gim)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+
+  if (byHeading.length > 1) return byHeading.slice(0, maxVariants)
+
+  return byDivider.slice(0, maxVariants)
+}
+
+function normalizeVariantCount(
+  parsedVariants: string[],
+  variantCount: number,
+  fallbackFactory: (variant: number) => string,
+) {
+  const normalized = parsedVariants
+    .map((variant) => variant.trim())
+    .filter(Boolean)
+    .slice(0, variantCount)
+
+  while (normalized.length < variantCount) {
+    normalized.push(fallbackFactory(normalized.length))
+  }
+
+  return normalized
 }
 
 function buildFallbackVariant(options: {
@@ -365,12 +391,25 @@ function AIMessageGeneratorModalContent({
 
       const text = await response.text()
       const parsedVariants = splitVariants(text, variantCount)
+      const normalizedVariants = normalizeVariantCount(
+        parsedVariants,
+        variantCount,
+        (variant) =>
+          buildFallbackVariant({
+            locale,
+            contact: selectedContact,
+            category,
+            tone,
+            extraContext,
+            variant,
+          }),
+      )
 
-      if (parsedVariants.length === 0) {
+      if (normalizedVariants.length === 0) {
         throw new Error('empty-response')
       }
 
-      setVariants(parsedVariants)
+      setVariants(normalizedVariants)
       setSendChannelsByVariant({})
       setOpenSendMenuIndex(null)
       onGenerated({
@@ -381,8 +420,8 @@ function AIMessageGeneratorModalContent({
         category,
         channel: defaultSendChannel,
         tone,
-        generatedContent: parsedVariants.join('\n---\n'),
-        variants: parsedVariants,
+        generatedContent: normalizedVariants.join('\n---\n'),
+        variants: normalizedVariants,
         finalContent: null,
         wasEdited: false,
         createdAt: new Date().toISOString(),

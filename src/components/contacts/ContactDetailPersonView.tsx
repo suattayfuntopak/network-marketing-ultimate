@@ -31,6 +31,7 @@ import {
   stageMeta,
 } from '@/components/contacts/contactLabels'
 import { formatActivityInteractionCopy } from '@/lib/contactActivityLog'
+import { postAiChat } from '@/lib/aiClient'
 import { toHeadingCase } from '@/lib/headingCase'
 import { cn } from '@/lib/utils'
 import type { ContactRow, InteractionRow, TaskRow } from '@/lib/queries'
@@ -176,6 +177,13 @@ export function ContactDetailPersonView({
   const [noteDraft, setNoteDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
   const [duePreset, setDuePreset] = useState<TaskDuePreset>('all')
+  const [coachingMessage, setCoachingMessage] = useState(
+    tr
+      ? 'Kişinin şu anki sürecine göre sıradaki adım bağlamında sana önerilen mesajı burada görebilirsin...'
+      : 'You can see the AI suggested message for the next step based on this contact’s current journey here...',
+  )
+  const [coachingLoading, setCoachingLoading] = useState(false)
+  const [coachingError, setCoachingError] = useState('')
   const tagInputRef = useRef<HTMLInputElement>(null)
 
   const rawServerWarmth = rawTemperatureFromServer(contact.temperature_score)
@@ -217,6 +225,65 @@ export function ContactDetailPersonView({
     const anchor = new Date()
     return openTasks.filter((task) => taskMatchesDuePreset(task, duePreset, anchor))
   }, [openTasks, duePreset])
+
+  useEffect(() => {
+    setCoachingMessage(
+      tr
+        ? 'Kişinin şu anki sürecine göre sıradaki adım bağlamında sana önerilen mesajı burada görebilirsin...'
+        : 'You can see the AI suggested message for the next step based on this contact’s current journey here...',
+    )
+    setCoachingError('')
+  }, [contact.id, tr])
+
+  async function handleGenerateCoachingMessage() {
+    setCoachingLoading(true)
+    setCoachingError('')
+
+    const interactionSummary = interactions
+      .slice(0, 6)
+      .map((item) => `${item.type}: ${item.content}`)
+      .join('\n')
+    const taskSummary = tasks
+      .slice(0, 6)
+      .map((task) => `${task.title} (${task.status}) - ${task.due_date}`)
+      .join('\n')
+
+    const prompt = [
+      tr
+        ? 'Sen network marketing için kısa ve etkili takip mesajları yazan uzman bir asistansın.'
+        : 'You are an expert assistant writing short and effective follow-up messages for network marketing.',
+      tr
+        ? 'Tek bir mesaj üret. Kısa olsun (en fazla 2-3 cümle), doğal olsun, sonraki adımı netleştirsin.'
+        : 'Generate exactly one message. Keep it short (max 2-3 sentences), natural, and action-oriented.',
+      tr
+        ? 'Başlık, numaralandırma veya açıklama yazma. Sadece gönderilecek mesaj metnini ver.'
+        : 'Do not add titles, numbering, or explanations. Return only the send-ready message text.',
+      `${tr ? 'Kişi' : 'Contact'}: ${contact.full_name}`,
+      `${tr ? 'Aşama' : 'Stage'}: ${stage[locale]}`,
+      `${tr ? 'Sıcaklık' : 'Warmth'}: ${Math.round(localWarmth)}`,
+      contact.profession ? `${tr ? 'Meslek' : 'Profession'}: ${contact.profession}` : '',
+      contact.location ? `${tr ? 'Lokasyon' : 'Location'}: ${contact.location}` : '',
+      contact.interests ? `${tr ? 'İlgi alanları' : 'Interests'}: ${contact.interests}` : '',
+      contact.pain_points ? `${tr ? 'Sıkıntılar' : 'Pain points'}: ${contact.pain_points}` : '',
+      contact.goals_notes ? `${tr ? 'Hedef/notlar' : 'Goals/notes'}: ${contact.goals_notes}` : '',
+      interactionSummary ? `${tr ? 'Son etkileşimler' : 'Recent interactions'}:\n${interactionSummary}` : '',
+      taskSummary ? `${tr ? 'Takipler/görevler' : 'Open tasks/follow-ups'}:\n${taskSummary}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n')
+
+    try {
+      const response = await postAiChat([{ role: 'user', content: prompt }])
+      if (!response.ok) throw new Error('ai-route-error')
+      const text = (await response.text()).trim()
+      if (!text) throw new Error('empty-ai-response')
+      setCoachingMessage(text)
+    } catch {
+      setCoachingError(tr ? 'Mesaj üretilemedi, lütfen tekrar dene.' : 'Could not generate the message, please try again.')
+    } finally {
+      setCoachingLoading(false)
+    }
+  }
 
   async function submitQuickNote() {
     const text = noteDraft.trim()
@@ -613,13 +680,17 @@ export function ContactDetailPersonView({
               <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
                 {toHeadingCase(tr ? 'Önerilen mesaj' : 'Suggested message', locale)}
               </p>
-              <p className="mt-2 rounded-xl border border-border bg-surface/60 p-3 text-sm text-text-secondary">
-                {tr
-                  ? 'Kişinin şu anki sürecine göre sıradaki adım bağlamında sana önerilen mesajı burada görebilirsin...'
-                  : 'You can see the AI suggested message for the next step based on this contact’s current journey here...'}
+              <p className="mt-2 rounded-xl border border-border bg-surface/60 p-3 text-sm text-text-secondary whitespace-pre-wrap">
+                {coachingMessage}
               </p>
+              {coachingError ? <p className="mt-2 text-xs text-warning">{coachingError}</p> : null}
             </div>
-            <Button size="sm" className="w-full bg-warning/20 text-warning hover:bg-warning/30" onClick={() => onOpenAI(true)}>
+            <Button
+              size="sm"
+              className="w-full bg-warning/20 text-warning hover:bg-warning/30"
+              onClick={() => void handleGenerateCoachingMessage()}
+              loading={coachingLoading}
+            >
               {tr ? 'Mesajı Hazırla' : 'Prepare Message'}
             </Button>
             <Link

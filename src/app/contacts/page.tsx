@@ -391,20 +391,15 @@ export default function ContactsPage() {
   })
 
   const contactTaskMutation = useMutation({
-    mutationFn: async (values: ContactTaskFormValues & { contact_id: string }) => {
-      const row = await addTask(currentUser!.id, {
+    mutationFn: (values: ContactTaskFormValues & { contact_id: string }) =>
+      addTask(currentUser!.id, {
         title: values.title,
         type: values.type,
         priority: values.priority,
         due_date: values.due_date,
         description: values.description,
         contact_id: values.contact_id,
-      })
-      if (currentUser?.id) {
-        await addContactActivityLog(currentUser.id, values.contact_id, { kind: 'task_added', title: values.title })
-      }
-      return row
-    },
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['contact-tasks', selectedId] })

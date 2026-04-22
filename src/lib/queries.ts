@@ -515,7 +515,16 @@ export async function addTask(
     .select()
     .single()
   if (error) throw error
-  return data as TaskRow
+  const inserted = data as TaskRow
+
+  if (input.contact_id) {
+    await addContactActivityLog(userId, input.contact_id, {
+      kind: 'task_added',
+      title: input.title,
+    })
+  }
+
+  return inserted
 }
 
 export async function completeTask(id: string): Promise<void> {
