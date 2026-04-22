@@ -16,7 +16,6 @@ import type { ContactRow, TaskRow } from '@/lib/queries'
 import {
   Activity,
   AlertTriangle,
-  ArrowRight,
   Crown,
   ShoppingBag,
   Target,
@@ -38,13 +37,6 @@ type DirectoryCard = {
   openTasks: number
   overdueTasks: number
   route: string
-}
-
-function formatDate(value: string, locale: 'tr' | 'en') {
-  return new Date(value).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-    month: 'short',
-    day: 'numeric',
-  })
 }
 
 function daysSince(value: string) {
@@ -111,11 +103,8 @@ function CategorySection({
               <div className="flex items-start gap-3">
                 <Avatar name={card.name} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-semibold text-text-primary">{card.name}</p>
-                    <ArrowRight className="w-3.5 h-3.5 text-text-tertiary" />
-                  </div>
-                  <p className="mt-0.5 truncate text-xs text-text-tertiary">{card.headline}</p>
+                  <p className="text-sm font-semibold text-text-primary leading-5 break-words">{card.name}</p>
+                  <p className="mt-0.5 text-xs text-text-tertiary break-words">{card.headline}</p>
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {card.temperature && (
@@ -127,15 +116,6 @@ function CategorySection({
                     {card.openTasks > 0 && (
                       <Badge>{card.openTasks} {locale === 'tr' ? 'açık görev' : 'open tasks'}</Badge>
                     )}
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-3 text-[11px] text-text-tertiary">
-                    <span>
-                      {locale === 'tr' ? 'İlişki gücü' : 'Relationship'}: <strong className="text-text-secondary">{card.relationshipStrength}</strong>
-                    </span>
-                    <span>
-                      {locale === 'tr' ? 'Son temas' : 'Last touch'}: <strong className="text-text-secondary">{formatDate(card.lastActive, locale)}</strong>
-                    </span>
                   </div>
                 </div>
               </div>
@@ -184,7 +164,7 @@ export default function TeamPage() {
         relationshipStrength: currentUser.momentumScore,
         openTasks: tasks.filter((task) => !task.contact_id && task.status !== 'completed' && task.status !== 'skipped').length,
         overdueTasks: tasks.filter((task) => !task.contact_id && task.status === 'overdue').length,
-        route: '/settings',
+        route: '/team/leader',
       }]
     : []
 
@@ -290,7 +270,7 @@ export default function TeamPage() {
             </CardDescription>
           </div>
 
-          <div className="grid gap-4 p-5 lg:grid-cols-3">
+          <div className="grid gap-4 p-5 lg:grid-cols-1 xl:grid-cols-3">
             <CategorySection
               title={h(currentLocale === 'tr' ? 'Lider' : 'Leader')}
               description={currentLocale === 'tr' ? 'Organizasyonu yöneten çekirdek görünüm.' : 'Core leadership visibility.'}
