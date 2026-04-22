@@ -11,6 +11,7 @@ import { useLanguage } from '@/components/common/LanguageProvider'
 import { stageMeta } from '@/components/contacts/contactLabels'
 import { useAppStore } from '@/store/appStore'
 import { usePersistentState } from '@/hooks/usePersistentState'
+import { AIMessageGeneratorModal } from '@/components/ai/AIMessageGeneratorModal'
 import { queueAIMessageDraftPreset } from '@/lib/clientStorage'
 import { addInteraction, deleteInteraction, fetchContacts, fetchInteractionsByContact, updateInteraction } from '@/lib/queries'
 import type { ContactRow, InteractionRow } from '@/lib/queries'
@@ -37,6 +38,9 @@ export default function LeaderPage() {
   const [savedNoteDraft, setSavedNoteDraft] = useState('')
   const [copiedSavedNote, setCopiedSavedNote] = useState(false)
   const [listSearch, setListSearch] = useState('')
+  const [listAiModalOpen, setListAiModalOpen] = useState(false)
+  const [listAiContact, setListAiContact] = useState<ContactRow | null>(null)
+  const [listAiExtraContext, setListAiExtraContext] = useState('')
 
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -243,16 +247,19 @@ export default function LeaderPage() {
     ]
       .filter(Boolean)
       .join('\n')
-    queueAIMessageDraftPreset({
-      category: 'follow_up',
-      tone: 'friendly',
-      extraContext: context,
-      contactId: contact.id,
-    })
-    router.push('/ai')
+    setListAiContact(contact)
+    setListAiExtraContext(context)
+    setListAiModalOpen(true)
+  }
+
+  function closeListAiModal() {
+    setListAiModalOpen(false)
+    setListAiContact(null)
+    setListAiExtraContext('')
   }
 
   return (
+    <>
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1400px] mx-auto">
       <motion.div variants={item} className="rounded-2xl border border-border bg-card p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -515,5 +522,23 @@ export default function LeaderPage() {
         </Card>
       </motion.div>
     </motion.div>
+
+    <AIMessageGeneratorModal
+      key={listAiContact?.id ?? 'leader-list-ai'}
+      open={listAiModalOpen}
+      onClose={closeListAiModal}
+      locale={currentLocale}
+      contact={listAiContact}
+      initialCategory="follow_up"
+      initialChannel="whatsapp"
+      initialTone="friendly"
+      initialExtraContext={listAiExtraContext}
+      autoGenerate={false}
+      presetLabel={null}
+      presetReason={listAiExtraContext}
+      onGenerated={() => undefined}
+      onSaveTemplate={() => undefined}
+    />
+    </>
   )
 }
