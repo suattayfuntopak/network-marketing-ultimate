@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -10,27 +10,30 @@ import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { queueAIMessageDraftPreset } from '@/lib/clientStorage'
-import { fetchContacts } from '@/lib/queries'
-import type { ContactRow } from '@/lib/queries'
-import { Crown, Sparkles, Users, ShoppingBag, Target, NotebookPen, Send } from 'lucide-react'
+import { addInteraction, deleteInteraction, fetchContacts, fetchInteractionsByContact, updateInteraction } from '@/lib/queries'
+import type { ContactRow, InteractionRow } from '@/lib/queries'
+import { Check, Copy, Crown, Pencil, Sparkles, Trash2, Users, ShoppingBag, Target, NotebookPen, Send } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }
 
-type PersonNote = {
-  contactId: string
-  note: string
-  updatedAt: string
-}
+type LeaderListKey = 'contacts' | 'team' | 'customers' | null
+const LEADER_NOTE_PREFIX = '[LIDER_NOTU]'
 
 export default function LeaderPage() {
   const { locale } = useLanguage()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const { currentUser } = useAppStore()
   const router = useRouter()
+  const qc = useQueryClient()
   const [selectedContactId, setSelectedContactId] = useState<string>('self')
   const [draftNote, setDraftNote] = useState('')
-  const [savedNotes, setSavedNotes] = usePersistentState<PersonNote[]>('nmu-leader-person-notes', [], { version: 1 })
+  const [generalLeaderNote, setGeneralLeaderNote] = usePersistentState<string>('nmu-leader-general-note', '', { version: 1 })
+  const [activeList, setActiveList] = useState<LeaderListKey>(null)
+  const [isEditingSavedNote, setIsEditingSavedNote] = useState(false)
+  const [savedNoteDraft, setSavedNoteDraft] = useState('')
+  const [copiedSavedNote, setCopiedSavedNote] = useState(false)
 
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
@@ -39,19 +42,121 @@ export default function LeaderPage() {
 
   const selectedContact = contacts.find((contact) => contact.id === selectedContactId) ?? null
   const selectedPersonName = selectedContact?.full_name ?? (currentUser?.name || 'Leader')
+  const sortedContacts = useMemo(
+    () => [...contacts].sort((a, b) => a.full_name.localeCompare(b.full_name, currentLocale === 'tr' ? 'tr' : 'en')),
+    [contacts, currentLocale],
+  )
+  const sortedTeamMembers = useMemo(
+    () => sortedContacts.filter((contact) => contact.pipeline_stage === 'became_member'),
+    [sortedContacts],
+  )
+  const sortedCustomers = useMemo(
+    () => sortedContacts.filter((contact) => contact.pipeline_stage === 'became_customer'),
+    [sortedContacts],
+  )
 
-  const noteMap = useMemo(() => new Map(savedNotes.map((entry) => [entry.contactId, entry])), [savedNotes])
-  const selectedSavedNote = selectedContact ? noteMap.get(selectedContact.id)?.note ?? '' : ''
+  const { data: selectedLeaderNotes = [] } = useQuery<InteractionRow[]>({
+    queryKey: ['leader-contact-notes', selectedContact?.id],
+    queryFn: () => fetchInteractionsByContact(selectedContact!.id),
+    enabled: Boolean(selectedContact?.id),
+  })
+
+  const latestLeaderNote = useMemo(() => {
+    if (!selectedContact) return generalLeaderNote.trim()
+    const rows = selectedLeaderNotes
+      .filter((entry) => entry.type === 'note' && entry.content.startsWith(LEADER_NOTE_PREFIX))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    if (!rows.length) return ''
+    return rows[0].content.replace(LEADER_NOTE_PREFIX, '').trim()
+  }, [selectedContact, selectedLeaderNotes, generalLeaderNote])
+
+  const latestLeaderNoteRow = useMemo(() => {
+    const rows = selectedLeaderNotes
+      .filter((entry) => entry.type === 'note' && entry.content.startsWith(LEADER_NOTE_PREFIX))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    return rows[0] ?? null
+  }, [selectedLeaderNotes])
+
+  const addLeaderNoteMutation = useMutation({
+    mutationFn: (payload: { contactId: string; note: string }) =>
+      addInteraction(currentUser!.id, {
+        contact_id: payload.contactId,
+        type: 'note',
+        channel: 'manual',
+        content: `${LEADER_NOTE_PREFIX} ${payload.note}`,
+        date: new Date().toISOString(),
+      }),
+    onSuccess: () => {
+      if (selectedContact?.id) {
+        qc.invalidateQueries({ queryKey: ['leader-contact-notes', selectedContact.id] })
+      }
+    },
+  })
+
+  const updateLeaderNoteMutation = useMutation({
+    mutationFn: (payload: { interactionId: string; note: string }) =>
+      updateInteraction(payload.interactionId, { content: `${LEADER_NOTE_PREFIX} ${payload.note}` }),
+    onSuccess: () => {
+      if (selectedContact?.id) {
+        qc.invalidateQueries({ queryKey: ['leader-contact-notes', selectedContact.id] })
+      }
+    },
+  })
+
+  const deleteLeaderNoteMutation = useMutation({
+    mutationFn: (interactionId: string) => deleteInteraction(interactionId),
+    onSuccess: () => {
+      if (selectedContact?.id) {
+        qc.invalidateQueries({ queryKey: ['leader-contact-notes', selectedContact.id] })
+      }
+    },
+  })
 
   function saveNote() {
-    if (!selectedContact || !draftNote.trim()) return
-    const next: PersonNote = {
-      contactId: selectedContact.id,
-      note: draftNote.trim(),
-      updatedAt: new Date().toISOString(),
+    const note = draftNote.trim()
+    if (!note) return
+    if (!selectedContact) {
+      setGeneralLeaderNote(note)
+      setDraftNote('')
+      return
     }
-    setSavedNotes((prev) => [next, ...prev.filter((item) => item.contactId !== selectedContact.id)])
+    addLeaderNoteMutation.mutate({ contactId: selectedContact.id, note })
     setDraftNote('')
+  }
+
+  function beginEditSavedNote() {
+    if (!latestLeaderNote) return
+    setSavedNoteDraft(latestLeaderNote)
+    setIsEditingSavedNote(true)
+  }
+
+  function saveEditedNote() {
+    const note = savedNoteDraft.trim()
+    if (!note) return
+    if (!selectedContact) {
+      setGeneralLeaderNote(note)
+      setIsEditingSavedNote(false)
+      return
+    }
+    if (!latestLeaderNoteRow) return
+    updateLeaderNoteMutation.mutate({ interactionId: latestLeaderNoteRow.id, note })
+    setIsEditingSavedNote(false)
+  }
+
+  async function copySavedNote() {
+    if (!latestLeaderNote) return
+    await navigator.clipboard.writeText(latestLeaderNote)
+    setCopiedSavedNote(true)
+    window.setTimeout(() => setCopiedSavedNote(false), 1200)
+  }
+
+  function deleteSavedNote() {
+    if (!selectedContact) {
+      setGeneralLeaderNote('')
+      return
+    }
+    if (!latestLeaderNoteRow) return
+    deleteLeaderNoteMutation.mutate(latestLeaderNoteRow.id)
   }
 
   function openAiForPerson() {
@@ -62,7 +167,7 @@ export default function LeaderPage() {
           selectedContact.location ? `Lokasyon: ${selectedContact.location}` : '',
           selectedContact.interests ? `İlgi alanları: ${selectedContact.interests}` : '',
           selectedContact.pain_points ? `Sıkıntılar: ${selectedContact.pain_points}` : '',
-          selectedSavedNote ? `Lider Notu: ${selectedSavedNote}` : '',
+          latestLeaderNote ? `Lider Notu: ${latestLeaderNote}` : '',
         ]
           .filter(Boolean)
           .join('\n')
@@ -114,19 +219,57 @@ export default function LeaderPage() {
       </motion.div>
 
       <motion.div variants={item} className="grid gap-4 md:grid-cols-3">
-        <Card>
+          <Card
+            hover
+            className={cn(activeList === 'contacts' && 'ring-1 ring-primary/35')}
+            onClick={() => setActiveList((current) => (current === 'contacts' ? null : 'contacts'))}
+          >
           <p className="text-xs text-text-tertiary">{currentLocale === 'tr' ? 'Toplam Kontak' : 'Total Contacts'}</p>
           <p className="mt-2 text-3xl font-bold text-text-primary">{contacts.length}</p>
         </Card>
-        <Card>
+        <Card
+          hover
+          className={cn(activeList === 'team' && 'ring-1 ring-primary/35')}
+          onClick={() => setActiveList((current) => (current === 'team' ? null : 'team'))}
+        >
           <p className="text-xs text-text-tertiary">{currentLocale === 'tr' ? 'Ekip Üyesi' : 'Team Members'}</p>
           <p className="mt-2 text-3xl font-bold text-text-primary">{totalTeam}</p>
         </Card>
-        <Card>
+        <Card
+          hover
+          className={cn(activeList === 'customers' && 'ring-1 ring-primary/35')}
+          onClick={() => setActiveList((current) => (current === 'customers' ? null : 'customers'))}
+        >
           <p className="text-xs text-text-tertiary">{currentLocale === 'tr' ? 'Müşteri' : 'Customers'}</p>
           <p className="mt-2 text-3xl font-bold text-text-primary">{totalCustomers}</p>
         </Card>
       </motion.div>
+
+      {activeList && (
+        <motion.div variants={item}>
+          <Card>
+            <p className="text-sm font-semibold text-text-primary">
+              {activeList === 'contacts'
+                ? (currentLocale === 'tr' ? 'Tüm Kişiler (A-Z)' : 'All People (A-Z)')
+                : activeList === 'team'
+                  ? (currentLocale === 'tr' ? 'Ekip Üyeleri (A-Z)' : 'Team Members (A-Z)')
+                  : (currentLocale === 'tr' ? 'Müşteriler (A-Z)' : 'Customers (A-Z)')}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(activeList === 'contacts'
+                ? sortedContacts
+                : activeList === 'team'
+                  ? sortedTeamMembers
+                  : sortedCustomers
+              ).map((person) => (
+                <span key={person.id} className="rounded-full border border-border px-3 py-1 text-xs text-text-secondary">
+                  {person.full_name}
+                </span>
+              ))}
+            </div>
+          </Card>
+        </motion.div>
+      )}
 
       <motion.div variants={item} className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <Card>
@@ -174,12 +317,60 @@ export default function LeaderPage() {
               </Button>
             </div>
 
-            {selectedSavedNote && (
-              <div className="rounded-xl border border-border-subtle bg-surface/50 p-3">
+            {latestLeaderNote && (
+              <div className="group rounded-xl border border-border-subtle bg-surface/50 p-3">
                 <p className="text-xs text-text-tertiary mb-1">
                   {currentLocale === 'tr' ? 'Kayıtlı Not' : 'Saved Note'}
                 </p>
-                <p className="text-sm text-text-secondary whitespace-pre-wrap">{selectedSavedNote}</p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    {isEditingSavedNote ? (
+                      <textarea
+                        value={savedNoteDraft}
+                        onChange={(event) => setSavedNoteDraft(event.target.value)}
+                        className="min-h-[84px] w-full rounded-xl border border-border bg-surface p-3 text-sm text-text-primary outline-none"
+                      />
+                    ) : (
+                      <p className="text-sm text-text-secondary whitespace-pre-wrap">{latestLeaderNote}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => void copySavedNote()}
+                      className="rounded-lg p-1.5 text-text-tertiary hover:bg-surface-hover hover:text-text-primary"
+                      title={currentLocale === 'tr' ? 'Kopyala' : 'Copy'}
+                    >
+                      {copiedSavedNote ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={beginEditSavedNote}
+                      className="rounded-lg p-1.5 text-text-tertiary hover:bg-surface-hover hover:text-text-primary"
+                      title={currentLocale === 'tr' ? 'Düzenle' : 'Edit'}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={deleteSavedNote}
+                      className="rounded-lg p-1.5 text-text-tertiary hover:bg-error/10 hover:text-error"
+                      title={currentLocale === 'tr' ? 'Sil' : 'Delete'}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+                {isEditingSavedNote && (
+                  <div className="mt-2 flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setIsEditingSavedNote(false)}>
+                      {currentLocale === 'tr' ? 'İptal' : 'Cancel'}
+                    </Button>
+                    <Button size="sm" onClick={saveEditedNote}>
+                      {currentLocale === 'tr' ? 'Kaydet' : 'Save'}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
