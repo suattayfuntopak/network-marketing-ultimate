@@ -1,25 +1,29 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 import { Textarea, Input } from '@/components/ui/Input'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { usePersistentState } from '@/hooks/usePersistentState'
-import { useAppStore } from '@/store/appStore'
 import { postAiChat } from '@/lib/aiClient'
-import { addInteraction, fetchContacts, type ContactRow } from '@/lib/queries'
+import { fetchContacts, type ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
-import { FEATURED_VIDEO, MOTIVATION_QUOTES, type MotivationQuote } from '@/app/motivation/motivationData'
+import {
+  CELEBRITY_QUOTES,
+  getDailyVideoForDate,
+  type MotivationQuote,
+} from '@/app/motivation/motivationData'
 import {
   Bookmark,
   ChevronDown,
   Copy,
   Edit3,
-  MessageCircle,
+  MessageSquare,
   Play,
+  SendHorizontal,
   Share2,
   Sparkles,
 } from 'lucide-react'
@@ -29,10 +33,8 @@ const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }
 
 const control =
   'h-10 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text-primary shadow-sm outline-none transition focus:border-primary/30 focus:ring-1 focus:ring-primary/15'
-/** Akademi / ana içerik ile uyumlu bölüm etiketi (tek tip punt o) */
-const sectionLabel = 'text-xs font-semibold uppercase tracking-wider text-text-tertiary'
-
-const CRM_PREFIX = '[MOTIVASYON_MERKEZİ]'
+/** Bölüm etiketleri: baş harf büyük (toHeadingCase ile) — tamamı büyük harf değil */
+const sectionLabelClass = 'text-xs font-semibold text-text-tertiary'
 
 type Segment = 'single' | 'new_starters' | 'rejection_block' | 'dormant' | 'near_goal' | 'leader_pool' | 'small_wins' | 'tagged'
 type Channel = 'whatsapp' | 'dm' | 'voice_script' | 'team_group' | 'one_on_one' | 'morning' | 'weekly_wrap'
@@ -41,10 +43,6 @@ type Purpose = 'morale' | 'action' | 'reopen' | 'micro_win' | 'rescue' | 'invite
 type LengthKey = 'micro' | 'short' | 'medium'
 type SafeVoice = 'grounded' | 'high_energy' | 'emotional' | 'corporate'
 type Personalize = 'same' | 'light'
-
-function firstName(full: string) {
-  return full.trim().split(/\s+/)[0] || full
-}
 
 function daysSinceLastTouch(iso: string | null | undefined) {
   if (!iso) return 999
@@ -84,8 +82,8 @@ function filterBySegment(contacts: ContactRow[], segment: Segment, tag: string) 
 }
 
 function pickQuote(index: number, saved: string[]) {
-  const bySaved = MOTIVATION_QUOTES.filter((q) => !saved.includes(quoteKey(q)))
-  const pool = bySaved.length ? bySaved : MOTIVATION_QUOTES
+  const bySaved = CELEBRITY_QUOTES.filter((q) => !saved.includes(quoteKey(q)))
+  const pool = bySaved.length ? bySaved : CELEBRITY_QUOTES
   return pool[index % pool.length]
 }
 
@@ -97,12 +95,9 @@ export default function MotivationPage() {
   const { locale } = useLanguage()
   const h = useHeadingCase()
   const tr = locale === 'tr'
-  const qc = useQueryClient()
-  const { currentUser } = useAppStore()
-
   const { data: contacts = [] } = useQuery<ContactRow[]>({ queryKey: ['contacts'], queryFn: fetchContacts })
 
-  const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * MOTIVATION_QUOTES.length))
+  const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * CELEBRITY_QUOTES.length))
   const [favIds] = usePersistentState<string[]>('nmu-motivation-fav-quotes', [], { version: 1 })
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [videoThumbError, setVideoThumbError] = useState(false)
@@ -124,12 +119,15 @@ export default function MotivationPage() {
   const [outHint, setOutHint] = useState('')
   const [variations, setVariations] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
-  const [, setFavMessages] = usePersistentState<string[]>('nmu-motivation-fav-messages', [], { version: 1 })
   const [copyFlash, setCopyFlash] = useState(false)
-  const [previewTab, setPreviewTab] = useState<'message' | 'variants' | 'bulk'>('message')
+  const [previewTab, setPreviewTab] = useState<'message' | 'variants'>('message')
   const [variantIndex, setVariantIndex] = useState(0)
   const [variantCount, setVariantCount] = useState<1 | 2 | 3>(1)
   const [dayVideoNote, setDayVideoNote] = useState('')
+  const [videoSummaryLoading, setVideoSummaryLoading] = useState(false)
+  const [dateKey, setDateKey] = useState(() => new Date().toDateString())
+  const [sendMenuOpen, setSendMenuOpen] = useState(false)
+  const sendMenuRef = useRef<HTMLDivElement>(null)
   const previewTextRef = useRef<HTMLTextAreaElement | null>(null)
   const contextNotesRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -175,26 +173,64 @@ export default function MotivationPage() {
       : 'Breathe, one clear line—today, truly listen to one person.'
   }, [tr, stagnant7, toRecognize])
 
-  const addCrm = useMutation({
-    mutationFn: () => {
-      if (!currentUser || !singleContact || !outBody.trim()) {
-        return Promise.reject(new Error('no-contact'))
+  const dailyVideo = useMemo(
+    () => getDailyVideoForDate(new Date(`${dateKey}T12:00:00`)),
+    [dateKey],
+  )
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const n = new Date().toDateString()
+      setDateKey((k) => (k === n ? k : n))
+    }, 45_000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    setDayVideoNote('')
+  }, [dailyVideo.id, dateKey])
+
+  useEffect(() => {
+    let cancelled = false
+    setVideoSummaryLoading(true)
+    const v = dailyVideo
+    const staticFallback = tr ? v.summaryTr : v.summaryEn
+    const prompt = tr
+      ? `Network marketing, doğrudan satış veya kişisel gelişim bağlamında, aşağıdaki günlük kısa video notu için 70–100 kelimelik TEK paragraf Türkçe özet yaz. Abartı yok, etik, motive edici. Garanti/şifa/kolay zenginlik dili yok. Başlık: ${v.titleLong}. Tema: ${v.contextHint}. Yedek metin: ${v.summaryTr}`
+      : `In one paragraph (80–100 words, English), summarize the following daily short-video theme for network marketing or personal development. Ethical, motivating, no hype. Title: ${v.titleLong}. Theme: ${v.contextHint}. Notes: ${v.summaryEn}`
+
+    void (async () => {
+      try {
+        const r = await postAiChat([{ role: 'user', content: prompt }])
+        if (cancelled) return
+        if (!r.ok) throw new Error('ai')
+        const t = (await r.text()).trim()
+        if (t) {
+          setDayVideoNote((prev) => (prev.trim() ? prev : t))
+        } else {
+          setDayVideoNote((prev) => (prev.trim() ? prev : staticFallback))
+        }
+      } catch {
+        if (cancelled) return
+        setDayVideoNote((prev) => (prev.trim() ? prev : staticFallback))
+      } finally {
+        if (!cancelled) setVideoSummaryLoading(false)
       }
-      return addInteraction(currentUser.id, {
-        contact_id: singleContact.id,
-        type: 'note',
-        channel: 'manual',
-        content: `${CRM_PREFIX} ${outBody.trim()}`,
-        date: new Date().toISOString(),
-      })
-    },
-    onSuccess: () => {
-      if (singleContact) {
-        void qc.invalidateQueries({ queryKey: ['contact-interactions', singleContact.id] })
-        void qc.invalidateQueries({ queryKey: ['leader-contact-notes', singleContact.id] })
-      }
-    },
-  })
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [dailyVideo, tr, dateKey])
+
+  useEffect(() => {
+    if (!sendMenuOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (sendMenuRef.current && !sendMenuRef.current.contains(e.target as Node)) setSendMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [sendMenuOpen])
 
   const buildContextBlock = useCallback(
     (target: 'generate' | 'refine', base?: string) => {
@@ -363,30 +399,6 @@ export default function MotivationPage() {
     window.setTimeout(() => setCopyFlash(false), 1200)
   }
 
-  const previewBulk = () => {
-    if (!outBody.trim()) return ''
-    const pool = segment === 'single' && singleContact
-      ? [singleContact]
-      : segmentPool.slice(0, 5)
-    if (pool.length === 0) {
-      return tr
-        ? 'Segment için yeterli kişi yok veya kişi seçilmedi. Önizleme için hedef veya listeyi kontrol et.'
-        : 'No people in this segment for preview.'
-    }
-    if (personalize === 'same') {
-      return pool
-        .map((_, i) => `${i + 1}) ${outBody.trim()}`)
-        .join('\n\n')
-    }
-    return pool
-      .map((c) => {
-        const greet = tr ? `Merhaba ${firstName(c.full_name)},` : `Hi ${firstName(c.full_name)},`
-        return `${greet}\n\n${outBody.trim()}`
-      })
-      .map((b, i) => `${i + 1}) ${b}`)
-      .join('\n\n—\n\n')
-  }
-
   const newQuote = () => {
     setQuoteIndex((i) => i + 1)
   }
@@ -396,9 +408,10 @@ export default function MotivationPage() {
     void navigator.clipboard.writeText(t)
   }
 
-  const videoSrc = `https://www.youtube.com/embed/${FEATURED_VIDEO.id}?rel=0&modestbranding=1&playsinline=1`
-  const videoThumb = `https://i.ytimg.com/vi/${FEATURED_VIDEO.id}/mqdefault.jpg`
-  const videoWatch = `https://www.youtube.com/watch?v=${FEATURED_VIDEO.id}`
+  const videoId = dailyVideo.id
+  const videoSrc = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1`
+  const videoThumb = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+  const videoWatch = `https://www.youtube.com/watch?v=${videoId}`
 
   const openYouTube = () => {
     window.open(videoWatch, '_blank', 'noopener,noreferrer')
@@ -406,8 +419,33 @@ export default function MotivationPage() {
 
   const toggleVideoSave = () => {
     setVideoSaved((prev) =>
-      prev.includes(FEATURED_VIDEO.id) ? prev.filter((x) => x !== FEATURED_VIDEO.id) : [...prev, FEATURED_VIDEO.id],
+      prev.includes(videoId) ? prev.filter((x) => x !== videoId) : [...prev, videoId],
     )
+  }
+
+  const openSendChannel = (ch: 'whatsapp' | 'telegram' | 'email' | 'sms' | 'instagram') => {
+    if (!outBody.trim()) return
+    const t = encodeURIComponent(outBody)
+    const phone = singleContact?.phone?.replace(/\D/g, '') ?? ''
+    const email = singleContact?.email?.trim() ?? ''
+    if (ch === 'whatsapp') {
+      if (!phone) return
+      window.open(`https://wa.me/${phone}?text=${t}`, '_blank', 'noopener,noreferrer')
+    } else if (ch === 'telegram') {
+      window.open(`https://t.me/share/url?url=${encodeURIComponent(' ')}&text=${t}`, '_blank', 'noopener,noreferrer')
+    } else if (ch === 'email') {
+      const href = email
+        ? `mailto:${email}?body=${t}`
+        : `mailto:?body=${t}`
+      window.open(href, '_blank', 'noopener,noreferrer')
+    } else if (ch === 'sms') {
+      if (!phone) return
+      window.open(`sms:${phone}?body=${t}`, '_blank', 'noopener,noreferrer')
+    } else if (ch === 'instagram') {
+      void navigator.clipboard.writeText(outBody)
+      window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer')
+    }
+    setSendMenuOpen(false)
   }
 
   const s = (trTR: string, en: string) => (tr ? trTR : en)
@@ -421,8 +459,8 @@ export default function MotivationPage() {
   )
 
   const hasDraft = outBody.trim().length > 0
-  const bulkText = hasDraft ? previewBulk() : ''
-  const canSend = hasDraft && (singleContact?.phone?.replace(/\D/g, '')?.length ?? 0) > 0
+  const hasPhone = (singleContact?.phone?.replace(/\D/g, '')?.length ?? 0) > 0
+  const hasEmail = Boolean(singleContact?.email?.trim())
 
   const focusPreviewEdit = () => {
     queueMicrotask(() => previewTextRef.current?.focus())
@@ -470,7 +508,7 @@ export default function MotivationPage() {
           <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/[0.06]" />
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
             <div className="min-w-0 flex-1">
-              <p className={sectionLabel}>{h(s("Günün sözü", "Today's line"))}</p>
+              <p className={sectionLabelClass}>{h(s("Günün sözü", "Today's line"))}</p>
               <blockquote className="mt-3 text-lg font-medium leading-relaxed text-text-primary sm:text-xl sm:leading-relaxed">
                 <span className="text-text-tertiary/80">“</span>
                 {currentQuote.text}
@@ -515,10 +553,10 @@ export default function MotivationPage() {
             {/* Sol: hedef & üretim */}
             <div className="flex flex-col gap-3 border-b border-border p-4 sm:p-5 lg:col-span-5 lg:border-b-0 lg:border-r">
               <h2 className="text-lg font-semibold tracking-tight text-text-primary sm:text-xl">
-                {s('Motivasyon Mesajı Üret', 'Create motivation message')}
+                {h(s('Motivasyon mesajı üret', 'Create motivation message'))}
               </h2>
 
-              <p className={sectionLabel}>{s('Hedef', 'Target')}</p>
+              <p className={sectionLabelClass}>{h(s('Hedef', 'Target'))}</p>
               <select
                 value={segment}
                 onChange={(e) => setSegment(e.target.value as Segment)}
@@ -558,7 +596,7 @@ export default function MotivationPage() {
                 </select>
               )}
 
-              <p className={sectionLabel}>{s('Amaç & ton', 'Intent & tone')}</p>
+              <p className={sectionLabelClass}>{h(s('Amaç & ton', 'Intent & tone'))}</p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <select
                   value={purpose}
@@ -588,7 +626,7 @@ export default function MotivationPage() {
               </div>
 
               <div>
-                <p className={sectionLabel}>{s('Bağlam (kısa)', 'Short context')}</p>
+                <p className={sectionLabelClass}>{h(s('Bağlam (kısa)', 'Short context'))}</p>
                 <Textarea
                   ref={contextNotesRef}
                   value={contextNotes}
@@ -604,7 +642,7 @@ export default function MotivationPage() {
                 onClick={() => setShowAdvanced((o) => !o)}
                 className="flex h-9 w-full items-center justify-between rounded-xl border border-dashed border-border bg-surface/50 px-3 text-left text-xs text-text-secondary transition hover:border-primary/25"
               >
-                <span>{s('Gelişmiş ayarlar', 'Advanced settings')}</span>
+                <span>{h(s('Gelişmiş ayarlar', 'Advanced settings'))}</span>
                 <ChevronDown className={cn('h-3.5 w-3.5 transition', showAdvanced && 'rotate-180')} />
               </button>
 
@@ -613,7 +651,7 @@ export default function MotivationPage() {
                   className="space-y-2.5 rounded-xl border border-border bg-surface-hover/40 p-3"
                 >
                   <div>
-                    <p className="text-xs font-medium text-text-tertiary">{s('Kanal', 'Channel')}</p>
+                    <p className="text-xs font-medium text-text-tertiary">{h(s('Kanal', 'Channel'))}</p>
                     <select
                       value={channel}
                       onChange={(e) => setChannel(e.target.value as Channel)}
@@ -629,7 +667,7 @@ export default function MotivationPage() {
                     </select>
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-text-tertiary">{s('Uzunluk', 'Length')}</p>
+                    <p className="text-xs font-medium text-text-tertiary">{h(s('Uzunluk', 'Length'))}</p>
                     <select
                       value={lengthKey}
                       onChange={(e) => setLengthKey(e.target.value as LengthKey)}
@@ -641,7 +679,7 @@ export default function MotivationPage() {
                     </select>
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-text-tertiary">{s('Dil / güvenli mod', 'Language / safe mode')}</p>
+                    <p className="text-xs font-medium text-text-tertiary">{h(s('Dil / güvenli mod', 'Language / safe mode'))}</p>
                     <select
                       value={safeVoice}
                       onChange={(e) => setSafeVoice(e.target.value as SafeVoice)}
@@ -654,7 +692,7 @@ export default function MotivationPage() {
                     </select>
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-text-tertiary">{s('Emoji', 'Emoji')}</p>
+                    <p className="text-xs font-medium text-text-tertiary">{h(s('Emoji', 'Emoji'))}</p>
                     <div className="mt-1 flex gap-1">
                       {([0, 1, 2] as const).map((n) => (
                         <button
@@ -676,7 +714,7 @@ export default function MotivationPage() {
                   {segment !== 'single' && (
                     <div>
                       <p className="text-xs font-medium text-text-tertiary">
-                        {s('Toplu kişiselleştirme', 'Bulk personalize')}
+                        {h(s('Toplu kişiselleştirme', 'Bulk personalize'))}
                       </p>
                       <div className="mt-1 flex gap-1">
                         <button
@@ -707,7 +745,7 @@ export default function MotivationPage() {
 
               <div className="mt-auto space-y-3 border-t border-border pt-3">
                 <div>
-                  <p className={sectionLabel}>{s('Varyasyon sayısı', 'Variation count')}</p>
+                  <p className={sectionLabelClass}>{h(s('Varyasyon sayısı', 'Variation count'))}</p>
                   <div className="mt-1.5 flex gap-1.5">
                     {([1, 2, 3] as const).map((n) => (
                       <button
@@ -753,22 +791,16 @@ export default function MotivationPage() {
               <div className="flex shrink-0 border-b border-border px-3 pt-2 sm:px-4">
                 {(
                   [
-                    { id: 'message' as const, label: s('Mesaj', 'Message') },
-                    { id: 'variants' as const, label: s('Varyasyonlar', 'Variants') },
-                    { id: 'bulk' as const, label: s('Toplu önizleme', 'Bulk preview') },
+                    { id: 'message' as const, label: h(s('Mesaj', 'Message')) },
+                    { id: 'variants' as const, label: h(s('Varyasyonlar', 'Variants')) },
                   ] as const
                 ).map((t) => (
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => {
-                      if (t.id === 'bulk' && !hasDraft) return
-                      setPreviewTab(t.id)
-                    }}
-                    disabled={t.id === 'bulk' && !hasDraft}
+                    onClick={() => setPreviewTab(t.id)}
                     className={cn(
                       '-mb-px border-b-2 px-2 py-2.5 text-sm font-medium transition',
-                      t.id === 'bulk' && !hasDraft && 'cursor-not-allowed opacity-30',
                       previewTab === t.id
                         ? 'border-primary text-text-primary'
                         : 'border-transparent text-text-tertiary hover:text-text-secondary',
@@ -783,17 +815,6 @@ export default function MotivationPage() {
                 {loading && (
                   <div className="absolute inset-0 z-20 flex items-center justify-center bg-surface/80 backdrop-blur-sm">
                     <p className="text-sm text-text-tertiary">{s('Üretiliyor…', 'Creating…')}</p>
-                  </div>
-                )}
-
-                {previewTab === 'bulk' && (
-                  <div className="flex h-full min-h-[14rem] flex-col">
-                    <p className="text-xs font-medium text-text-tertiary">
-                      {s('Segment (en fazla 5)', 'Up to 5 in segment')}
-                    </p>
-                    <pre className="mt-2 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-surface p-3 font-mono text-xs leading-relaxed text-text-secondary">
-                      {hasDraft ? bulkText : '—'}
-                    </pre>
                   </div>
                 )}
 
@@ -896,88 +917,107 @@ export default function MotivationPage() {
                 )}
               </div>
 
-              {previewTab !== 'bulk' && (previewTab === 'message' || (previewTab === 'variants' && hasVariations)) && (
-                <div className="shrink-0 space-y-1.5 border-t border-border p-3 sm:p-4">
-                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3 sm:gap-2">
+              {(previewTab === 'message' || (previewTab === 'variants' && hasVariations)) && (
+                <div className="shrink-0 space-y-2 border-t border-border p-3 sm:p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch">
                     <Button
                       type="button"
                       size="md"
                       variant="outline"
-                      className="h-9 w-full"
+                      className="h-9 min-w-0 sm:flex-1"
                       onClick={() => copyContent(hasDraft ? outBody : exampleMessage)}
                     >
                       <Copy className="mr-1.5 h-3.5 w-3.5" />
-                      {s('Kopyala', 'Copy')}
+                      {h(s('Kopyala', 'Copy'))}
                     </Button>
                     <Button
                       type="button"
                       size="md"
                       variant="outline"
-                      className="h-9 w-full"
+                      className="h-9 min-w-0 sm:flex-1"
                       onClick={focusContextOrPreview}
                       icon={<Edit3 className="h-3.5 w-3.5" />}
                     >
-                      {s('Düzenle', 'Edit')}
+                      {h(s('Düzenle', 'Edit'))}
                     </Button>
-                    <Button
-                      type="button"
-                      size="md"
-                      variant="primary"
-                      className="h-9 w-full"
-                      disabled={!canSend}
-                      title={!canSend && hasDraft ? s('Kişide telefon yok', 'No phone on contact') : !hasDraft ? s('Önce metin gerekir', 'Add text first') : undefined}
-                      onClick={() => {
-                        if (!singleContact?.phone || !outBody.trim()) return
-                        const d = singleContact.phone.replace(/\D/g, '')
-                        if (!d) return
-                        window.open(`https://wa.me/${d}?text=${encodeURIComponent(outBody)}`, '_blank', 'noopener,noreferrer')
-                      }}
-                      icon={<MessageCircle className="h-3.5 w-3.5" />}
-                    >
-                      {s('Gönder', 'Send')}
-                    </Button>
+                    <div className="relative min-w-0 sm:min-w-[10rem] sm:flex-1" ref={sendMenuRef}>
+                      <Button
+                        type="button"
+                        size="md"
+                        variant="primary"
+                        className="h-9 w-full gap-1"
+                        disabled={!hasDraft}
+                        onClick={() => setSendMenuOpen((o) => !o)}
+                        icon={<SendHorizontal className="h-3.5 w-3.5" />}
+                      >
+                        {h(s('Gönder', 'Send'))}
+                        <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+                      </Button>
+                      {sendMenuOpen && hasDraft && (
+                        <ul className="absolute top-full z-30 mt-1 w-full min-w-[12rem] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-xl sm:left-0 sm:right-auto">
+                          {(
+                            [
+                              {
+                                id: 'whatsapp' as const,
+                                label: 'WhatsApp',
+                                iconUrl: 'https://cdn.simpleicons.org/whatsapp/25D366',
+                                disabled: !hasPhone,
+                                title: s('Tek kişi ve telefon gerekir', 'Need one person with phone'),
+                              },
+                              {
+                                id: 'telegram' as const,
+                                label: 'Telegram',
+                                iconUrl: 'https://cdn.simpleicons.org/telegram/26A5E4',
+                                disabled: false,
+                                title: undefined,
+                              },
+                              {
+                                id: 'email' as const,
+                                label: s('E-posta', 'Email'),
+                                iconUrl: 'https://cdn.simpleicons.org/gmail/EA4335',
+                                disabled: false,
+                                title: hasEmail ? undefined : s('Genel e-posta istemcisi açılır', 'Opens default mail client'),
+                              },
+                              {
+                                id: 'sms' as const,
+                                label: 'SMS',
+                                disabled: !hasPhone,
+                                title: s('Tek kişi ve telefon gerekir', 'Need one person with phone'),
+                              },
+                              {
+                                id: 'instagram' as const,
+                                label: 'Instagram',
+                                iconUrl: 'https://cdn.simpleicons.org/instagram/E4405F',
+                                disabled: false,
+                                title: s('Metin panoya; Instagram açılır', 'Text copied; opens Instagram'),
+                              },
+                            ] as const
+                          ).map((c) => (
+                            <li key={c.id}>
+                              <button
+                                type="button"
+                                title={c.title}
+                                disabled={c.disabled}
+                                onClick={() => {
+                                  if (c.disabled) return
+                                  openSendChannel(c.id)
+                                }}
+                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-text-primary transition enabled:hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {'iconUrl' in c && c.iconUrl ? (
+                                  /* eslint-disable-next-line @next/next/no-img-element */
+                                  <img src={c.iconUrl} alt="" className="h-4 w-4 shrink-0" width={16} height={16} />
+                                ) : (
+                                  <MessageSquare className="h-4 w-4 shrink-0 text-cyan-300" />
+                                )}
+                                <span>{c.label}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-center text-xs text-text-tertiary/80">
-                    <button
-                      type="button"
-                      className="underline decoration-white/[0.1] underline-offset-2 transition hover:text-text-muted/55 disabled:opacity-30"
-                      disabled={!hasDraft || !singleContact || addCrm.isPending}
-                      onClick={() => {
-                        if (!outBody.trim() || !singleContact) return
-                        addCrm.mutate()
-                      }}
-                    >
-                      {s('CRM notu ekle', 'Add CRM note')}
-                    </button>
-                    <span className="mx-1.5">·</span>
-                    <button
-                      type="button"
-                      className="underline decoration-white/[0.1] underline-offset-2 transition hover:text-text-muted/55 disabled:opacity-30"
-                      disabled={!hasDraft}
-                      onClick={() => {
-                        if (!outBody.trim()) return
-                        setFavMessages((f) => [outBody.slice(0, 2000), ...f].slice(0, 20))
-                      }}
-                    >
-                      {s('Favori', 'Save favorite')}
-                    </button>
-                  </p>
-                </div>
-              )}
-
-              {previewTab === 'bulk' && (
-                <div className="shrink-0 border-t border-border p-3 sm:p-4">
-                  <Button
-                    type="button"
-                    size="md"
-                    variant="outline"
-                    className="h-9 w-full sm:max-w-[12rem]"
-                    disabled={!hasDraft}
-                    onClick={() => copyContent(bulkText)}
-                  >
-                    <Copy className="mr-1.5 h-3.5 w-3.5" />
-                    {s('Tümünü kopyala', 'Copy all')}
-                  </Button>
                 </div>
               )}
             </div>
@@ -985,74 +1025,79 @@ export default function MotivationPage() {
         </div>
       </motion.section>
 
-      {/* 4) Günün videosu — video ile özet aynı satır yüksekliğinde (masaüstü) */}
+      {/* 4) Günün videosu — sol: oynatıcı + alt bilgi, sağ: özet (aynı sütun yüksekliği) */}
       <motion.section variants={item} className="min-w-0">
-        <h2 className="mb-3 text-lg font-semibold text-text-primary">
+        <h2 className="mb-3 text-lg font-semibold text-text-primary sm:text-xl">
           {h(s('Günün videosu', "Today's video"))}
         </h2>
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
           <div className="grid min-h-0 grid-cols-1 items-stretch lg:grid-cols-12">
-            <div className="relative min-h-0 overflow-hidden bg-black/30 lg:col-span-7">
-              <div className="relative aspect-video w-full">
-                {/* Thumbnail probe: hata varsa embed göstermeyip link ver */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={videoThumb} alt="" className="absolute h-px w-px opacity-0" onError={() => setVideoThumbError(true)} />
-                {videoThumbError ? (
+            <div className="flex min-h-0 min-w-0 flex-col border-b border-border lg:col-span-7 lg:border-b-0">
+              <div className="relative w-full min-w-0 overflow-hidden bg-black/30">
+                <div className="relative aspect-video w-full">
+                  {/* Thumbnail probe: hata varsa embed göstermeyip link ver */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={videoThumb} alt="" className="absolute h-px w-px opacity-0" onError={() => setVideoThumbError(true)} />
+                  {videoThumbError ? (
+                    <button
+                      type="button"
+                      onClick={openYouTube}
+                      className="flex h-full w-full min-h-[12rem] flex-col items-center justify-center gap-2 text-text-tertiary transition hover:text-text-secondary"
+                    >
+                      <span className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-surface">
+                        <Play className="h-6 w-6" />
+                      </span>
+                      <span className="text-sm">{s("YouTube'ta aç", 'Open in YouTube')}</span>
+                    </button>
+                  ) : (
+                    <iframe
+                      title="YouTube"
+                      className="absolute inset-0 h-full w-full"
+                      src={videoSrc}
+                      allow="clipboard-write; encrypted-media; picture-in-picture; fullscreen"
+                      allowFullScreen
+                      loading="lazy"
+                    />
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-baseline gap-x-2 text-xs font-medium text-text-tertiary">
+                    <span>{h(dailyVideo.category)}</span>
+                    <span className="tabular-nums text-text-tertiary/80">{dailyVideo.durationShort}</span>
+                  </div>
+                  <p className="mt-0.5 text-sm font-semibold leading-snug text-text-primary">{dailyVideo.titleShort}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={openYouTube} className="h-9 rounded-xl border-border text-sm">
+                    {h(s('İzle', 'Watch'))}
+                  </Button>
                   <button
                     type="button"
-                    onClick={openYouTube}
-                    className="flex h-full w-full min-h-[12rem] flex-col items-center justify-center gap-2 text-text-tertiary transition hover:text-text-secondary"
+                    onClick={toggleVideoSave}
+                    className={cn(
+                      'flex h-9 w-9 items-center justify-center rounded-xl border border-border text-text-tertiary transition hover:text-text-secondary',
+                      videoSaved.includes(videoId) && 'text-amber-200/60',
+                    )}
+                    aria-label={h(s('Listeye ekle', 'Save'))}
                   >
-                    <span className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-surface">
-                      <Play className="h-6 w-6" />
-                    </span>
-                    <span className="text-sm">{s("YouTube'ta aç", 'Open in YouTube')}</span>
+                    <Bookmark className="h-3.5 w-3.5" />
                   </button>
-                ) : (
-                  <iframe
-                    title="YouTube"
-                    className="absolute inset-0 h-full w-full"
-                    src={videoSrc}
-                    allow="clipboard-write; encrypted-media; picture-in-picture; fullscreen"
-                    allowFullScreen
-                    loading="lazy"
-                  />
-                )}
+                </div>
               </div>
             </div>
-            <div className="flex h-full min-h-48 flex-col border-t border-border p-4 sm:p-5 lg:col-span-5 lg:min-h-0 lg:border-l lg:border-t-0">
-              <p className={sectionLabel}>{s('Video özeti', 'Video summary')}</p>
+            <div className="flex min-h-0 min-w-0 flex-col border-t border-border p-4 sm:p-5 lg:col-span-5 lg:min-h-0 lg:self-stretch lg:border-l lg:border-t-0">
+              <p className={sectionLabelClass}>{h(s('Video özeti', 'Video summary'))}</p>
+              {videoSummaryLoading && (
+                <p className="mt-1 text-xs text-text-tertiary/90">{s('Yapay zekâ özeti hazırlanıyor…', 'Preparing AI summary…')}</p>
+              )}
               <Textarea
                 value={dayVideoNote}
                 onChange={(e) => setDayVideoNote(e.target.value)}
                 placeholder={s('Video ile ilgili kısa not veya özet bu alana…', 'Short notes or summary for this video…')}
-                className="mt-3 min-h-0 w-full flex-1 resize-none rounded-xl border border-border bg-surface px-3 py-2.5 text-sm leading-relaxed text-text-primary"
+                className="mt-3 w-full min-h-[14rem] flex-1 resize-none rounded-xl border border-border bg-surface px-3 py-2.5 text-sm leading-relaxed text-text-primary lg:min-h-0"
               />
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-baseline gap-x-2 text-xs font-medium uppercase tracking-wider text-text-tertiary">
-                <span>{FEATURED_VIDEO.category}</span>
-                <span className="tabular-nums text-text-tertiary/80">{FEATURED_VIDEO.durationShort}</span>
-              </div>
-              <p className="mt-0.5 text-sm font-semibold leading-snug text-text-primary">{FEATURED_VIDEO.titleShort}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Button type="button" size="sm" variant="outline" onClick={openYouTube} className="h-9 rounded-xl border-border text-sm">
-                {s('İzle', 'Watch')}
-              </Button>
-              <button
-                type="button"
-                onClick={toggleVideoSave}
-                className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-xl border border-border text-text-tertiary transition hover:text-text-secondary',
-                  videoSaved.includes(FEATURED_VIDEO.id) && 'text-amber-200/60',
-                )}
-                aria-label={s('Listeye ekle', 'Save')}
-              >
-                <Bookmark className="h-3.5 w-3.5" />
-              </button>
             </div>
           </div>
         </div>
@@ -1063,7 +1108,7 @@ export default function MotivationPage() {
         variants={item}
         className="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5"
       >
-        <p className={sectionLabel}>{h(s("Bugünün önerisi", "Today's suggestion"))}</p>
+        <p className={sectionLabelClass}>{h(s("Bugünün önerisi", "Today's suggestion"))}</p>
         <p className="mt-2 text-sm leading-relaxed text-text-secondary">{insightLine}</p>
       </motion.div>
     </motion.div>
