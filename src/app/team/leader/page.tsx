@@ -40,8 +40,9 @@ export default function LeaderPage() {
     queryFn: fetchContacts,
   })
 
+  const isGeneralNoteSelected = selectedContactId === 'self'
   const selectedContact = contacts.find((contact) => contact.id === selectedContactId) ?? null
-  const selectedPersonName = selectedContact?.full_name ?? (currentUser?.name || 'Leader')
+  const selectedPersonName = isGeneralNoteSelected ? (currentUser?.name || 'Leader') : (selectedContact?.full_name ?? 'Leader')
   const sortedContacts = useMemo(
     () => [...contacts].sort((a, b) => a.full_name.localeCompare(b.full_name, currentLocale === 'tr' ? 'tr' : 'en')),
     [contacts, currentLocale],
@@ -62,13 +63,14 @@ export default function LeaderPage() {
   })
 
   const latestLeaderNote = useMemo(() => {
-    if (!selectedContact) return generalLeaderNote.trim()
+    if (isGeneralNoteSelected) return generalLeaderNote.trim()
+    if (!selectedContact) return ''
     const rows = selectedLeaderNotes
       .filter((entry) => entry.type === 'note' && entry.content.startsWith(LEADER_NOTE_PREFIX))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     if (!rows.length) return ''
     return rows[0].content.replace(LEADER_NOTE_PREFIX, '').trim()
-  }, [selectedContact, selectedLeaderNotes, generalLeaderNote])
+  }, [isGeneralNoteSelected, selectedContact, selectedLeaderNotes, generalLeaderNote])
 
   const latestLeaderNoteRow = useMemo(() => {
     const rows = selectedLeaderNotes
@@ -115,11 +117,12 @@ export default function LeaderPage() {
   function saveNote() {
     const note = draftNote.trim()
     if (!note) return
-    if (!selectedContact) {
+    if (isGeneralNoteSelected) {
       setGeneralLeaderNote(note)
       setDraftNote('')
       return
     }
+    if (!selectedContact) return
     addLeaderNoteMutation.mutate({ contactId: selectedContact.id, note })
     setDraftNote('')
   }
@@ -133,7 +136,7 @@ export default function LeaderPage() {
   function saveEditedNote() {
     const note = savedNoteDraft.trim()
     if (!note) return
-    if (!selectedContact) {
+    if (isGeneralNoteSelected) {
       setGeneralLeaderNote(note)
       setIsEditingSavedNote(false)
       return
@@ -151,7 +154,7 @@ export default function LeaderPage() {
   }
 
   function deleteSavedNote() {
-    if (!selectedContact) {
+    if (isGeneralNoteSelected) {
       setGeneralLeaderNote('')
       return
     }
@@ -288,7 +291,11 @@ export default function LeaderPage() {
           <div className="space-y-3">
             <select
               value={selectedContactId}
-              onChange={(event) => setSelectedContactId(event.target.value)}
+              onChange={(event) => {
+                const nextValue = event.target.value
+                setSelectedContactId(nextValue)
+                setDraftNote(nextValue === 'self' ? generalLeaderNote : '')
+              }}
               className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none"
             >
               <option value="self">{currentLocale === 'tr' ? 'Lider notu (genel)' : 'Leader note (general)'}</option>
