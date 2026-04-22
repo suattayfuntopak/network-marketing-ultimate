@@ -29,8 +29,9 @@ import {
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.03 } } }
 const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }
 
-const formLabel = 'text-[9px] font-medium uppercase tracking-[0.12em] text-text-muted/60'
-const sectionEyebrow = 'text-[9px] font-semibold uppercase tracking-[0.16em] text-text-muted/55'
+const control =
+  'h-9 w-full rounded-md border border-white/[0.08] bg-slate-900/50 px-2.5 text-[13px] text-text-primary shadow-sm outline-none transition focus:border-cyan-500/25 focus:ring-1 focus:ring-cyan-500/20'
+const lab = 'text-[8px] font-semibold uppercase tracking-[0.16em] text-text-muted/45'
 
 const CRM_PREFIX = '[MOTIVASYON_MERKEZİ]'
 
@@ -103,7 +104,7 @@ export default function MotivationPage() {
   const { data: contacts = [] } = useQuery<ContactRow[]>({ queryKey: ['contacts'], queryFn: fetchContacts })
 
   const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * MOTIVATION_QUOTES.length))
-  const [favIds, setFavIds] = usePersistentState<string[]>('nmu-motivation-fav-quotes', [], { version: 1 })
+  const [favIds] = usePersistentState<string[]>('nmu-motivation-fav-quotes', [], { version: 1 })
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [videoThumbError, setVideoThumbError] = useState(false)
   const [showMiniPlayer, setShowMiniPlayer] = useState(false)
@@ -127,7 +128,7 @@ export default function MotivationPage() {
   const [loading, setLoading] = useState(false)
   const [, setFavMessages] = usePersistentState<string[]>('nmu-motivation-fav-messages', [], { version: 1 })
   const [copyFlash, setCopyFlash] = useState(false)
-  const [previewTab, setPreviewTab] = useState<'message' | 'bulk'>('message')
+  const [previewTab, setPreviewTab] = useState<'message' | 'variants' | 'bulk'>('message')
   const [variantIndex, setVariantIndex] = useState(0)
   const previewTextRef = useRef<HTMLTextAreaElement | null>(null)
   const contextNotesRef = useRef<HTMLTextAreaElement | null>(null)
@@ -136,13 +137,43 @@ export default function MotivationPage() {
     () => pickQuote(quoteIndex, favIds),
     [quoteIndex, favIds],
   )
-  const isQuoteFav = favIds.includes(quoteKey(currentQuote))
 
   const singleContact = contacts.find((c) => c.id === singleId) ?? null
   const segmentPool = useMemo(
     () => filterBySegment(contacts, segment, tagFilter),
     [contacts, segment, tagFilter],
   )
+
+  const stagnant7 = useMemo(
+    () => contacts.filter((c) => daysSinceLastTouch(c.last_contact_date) >= 7).slice(0, 3),
+    [contacts],
+  )
+
+  const toRecognize = useMemo(
+    () =>
+      [...contacts]
+        .filter((c) => c.pipeline_stage === 'first_contact' || c.temperature === 'warm' || c.temperature === 'hot')
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 1)[0] ?? null,
+    [contacts],
+  )
+
+  const insightLine = useMemo(() => {
+    if (stagnant7.length) {
+      const n = stagnant7[0]!.full_name
+      return tr
+        ? `Bugünün net önerisi: son 7 gündür sessiz kalanlardan biriyle (${n}) kısa ve sıcak bir sohbet başlat.`
+        : `Start a short, warm chat with someone quiet for 7+ days (e.g. ${n.split(' ')[0]}).`
+    }
+    if (toRecognize) {
+      return tr
+        ? `Bugün kutlanacak küçük ilerleme: ${toRecognize.full_name} — samimi bir not yeter.`
+        : `A small win to celebrate: ${toRecognize.full_name} — one genuine note.`
+    }
+    return tr
+      ? 'Sakin bir nefes, net bir cümle; bugün yalnızca bir kişiye gerçekten kulak ver.'
+      : 'Breathe, one clear line—today, truly listen to one person.'
+  }, [tr, stagnant7, toRecognize])
 
   const addCrm = useMutation({
     mutationFn: () => {
@@ -281,6 +312,7 @@ export default function MotivationPage() {
             setVariations(parts.length ? parts : [text])
             setOutTitle(tr ? 'Varyasyonlar' : 'Variants')
             setOutBody(parts[0] ?? text)
+            setPreviewTab('variants')
             setOutHint(
               tr
                 ? 'Üç taslak: ihtiyacına göre birini seç veya birleştir. Çıktı, kişiye küçük ilerlemeyi görünür kılar ve baskı kurmadan davet eder.'
@@ -289,6 +321,7 @@ export default function MotivationPage() {
           } else {
             setOutBody(text)
             setOutTitle(tr ? 'Hazır mesaj' : 'Message')
+            setPreviewTab('message')
             setOutHint(
               tr
                 ? 'Bu taslak, ilişki kalitesi ve net sonraki adıma vurgu yapar; istersen kısalt veya yumuşat.'
@@ -313,11 +346,6 @@ export default function MotivationPage() {
     window.setTimeout(() => setCopyFlash(false), 1200)
   }
 
-  const shareUrl = (text: string) => {
-    const e = encodeURIComponent(text)
-    return `https://wa.me/?text=${e}`
-  }
-
   const previewBulk = () => {
     if (!outBody.trim()) return ''
     const pool = segment === 'single' && singleContact
@@ -340,11 +368,6 @@ export default function MotivationPage() {
       })
       .map((b, i) => `${i + 1}) ${b}`)
       .join('\n\n—\n\n')
-  }
-
-  const toggleFavQuote = () => {
-    const k = quoteKey(currentQuote)
-    setFavIds((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]))
   }
 
   const newQuote = () => {
@@ -389,83 +412,77 @@ export default function MotivationPage() {
   }
 
   const focusContextOrPreview = () => {
-    if (hasDraft) focusPreviewEdit()
-    else {
+    if (hasDraft) {
+      setPreviewTab('message')
+      focusPreviewEdit()
+    } else {
       contextNotesRef.current?.focus()
     }
   }
+
+  const hasVariations = variations.length > 1
 
   return (
     <motion.div
       variants={container}
       initial="hidden"
       animate="show"
-      className="w-full max-w-[1600px] mx-auto space-y-6 sm:space-y-7"
+      className="w-full max-w-[1024px] mx-auto space-y-4 sm:space-y-5"
     >
-      {/* 1) Üst şerit: başlık + söz (destekleyici) */}
-      <motion.section variants={item} className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
-        <div className="min-w-0 max-w-xl space-y-2">
-          <p className={sectionEyebrow}>{h(s('Motivasyon stüdyosu', 'Motivation studio'))}</p>
-          <h1 className="text-2xl font-semibold tracking-[-0.03em] text-text-primary sm:text-3xl">
+      {/* 1) Kompakt hero + günün sözü */}
+      <motion.section
+        variants={item}
+        className="flex flex-col gap-3.5 sm:flex-row sm:items-stretch sm:justify-between sm:gap-6"
+      >
+        <div className="min-w-0 max-w-md space-y-1.5">
+          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-text-primary sm:text-[1.65rem]">
             {h(s('Motivasyon Merkezi', 'Motivation hub'))}
           </h1>
-          <p className="text-sm text-text-secondary/80">
-            {s('Tek akış: seç → üret → gönder. Odak, netlik, sıcak ton.', 'One flow: choose → generate → send. Clarity, warmth.')}
+          <p className="text-[13px] leading-relaxed text-text-secondary/90">
+            {s(
+              'İlham al, hedefi netle, mesajı saniyeler içinde hazırla.',
+              'Get inspired, lock the target, prep your message in seconds.',
+            )}
+          </p>
+          <p className="text-xs leading-relaxed text-text-muted/75">
+            {s(
+              'Doğru kişiye, doğru anda, doğru tonda destek ver.',
+              'Support the right person, at the right moment, in the right tone.',
+            )}
           </p>
         </div>
 
-        <aside className="w-full shrink-0 opacity-[0.95] lg:max-w-md">
+        <aside className="w-full shrink-0 sm:max-w-[20rem] sm:self-start">
           <div
             className={cn(
-              'relative overflow-hidden rounded-2xl p-5 sm:p-6',
-              'border border-border-subtle/80',
-              'bg-slate-950/60',
+              'relative overflow-hidden rounded-xl p-4',
+              'border border-white/[0.07] bg-slate-950/70',
+              'shadow-[0_12px_40px_-24px_rgba(0,0,0,0.85)]',
             )}
           >
-            <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-cyan-500/[0.04] blur-2xl" />
-
-            <button
-              type="button"
-              onClick={toggleFavQuote}
-              className={cn(
-                'absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg',
-                'text-text-tertiary/60 transition hover:bg-white/[0.04] hover:text-text-secondary',
-                isQuoteFav && 'text-amber-200/50 hover:text-amber-200/70',
-              )}
-              aria-label={s('Listeye al', 'Save to list')}
-            >
-              <Bookmark className={cn('h-4 w-4', isQuoteFav && 'text-amber-200/80')} strokeWidth={1.5} />
-            </button>
-
-            <div className="pr-7">
-              <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-cyan-200/50">
-                {h(s('Günün sözü', 'Quote'))}
-              </p>
-              <div className="mt-2.5 inline-flex">
-                <span className="rounded-sm border border-white/[0.09] bg-white/[0.03] px-1.5 py-0.5 text-[9px] font-medium tracking-[0.12em] text-cyan-100/60">
-                  {currentQuote.category}
-                </span>
-              </div>
+            <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-cyan-500/[0.035]" />
+            <p className={cn(lab, 'text-cyan-200/40')}>{h(s("Günün sözü", "Today's line"))}</p>
+            <div className="mt-2.5">
+              <span className="inline-block border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[9px] font-medium tracking-[0.14em] text-cyan-100/50">
+                {currentQuote.category}
+              </span>
             </div>
-
-            <blockquote className="mt-4 text-base font-normal leading-[1.65] tracking-[-0.01em] text-text-primary/90 sm:text-[1.05rem]">
-              <span className="text-text-muted/30">“</span>
+            <blockquote className="mt-3 text-[0.9rem] font-light leading-[1.55] tracking-[-0.015em] text-text-primary/88">
+              <span className="text-cyan-200/25">“</span>
               {currentQuote.text}
-              <span className="text-text-muted/30">”</span>
+              <span className="text-cyan-200/25">”</span>
             </blockquote>
-
-            <footer className="mt-5 space-y-0.5 border-t border-border-subtle/50 pt-4">
-              <p className="text-[13px] font-medium text-text-primary">{currentQuote.author}</p>
-              <p className="text-[10px] leading-relaxed text-text-muted/80">{currentQuote.role}</p>
+            <footer className="mt-3 space-y-0.5 border-t border-white/[0.06] pt-3">
+              <p className="text-[12.5px] font-medium text-text-primary/95">{currentQuote.author}</p>
+              <p className="text-[9.5px] leading-snug text-text-muted/70">{currentQuote.role}</p>
             </footer>
-
-            <div className="mt-4 flex items-center gap-1">
+            <div className="mt-3 flex items-center gap-1.5">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
                 onClick={newQuote}
-                className="h-8 border-border-subtle/80 bg-transparent px-2.5 text-xs text-text-secondary hover:bg-white/[0.02]"
+                className="h-7 border-white/[0.1] bg-transparent px-2.5 text-[11px] text-text-secondary hover:bg-white/[0.04]"
               >
                 {s('Yeni söz', 'New quote')}
               </Button>
@@ -474,8 +491,8 @@ export default function MotivationPage() {
                 size="sm"
                 variant="ghost"
                 onClick={shareQuote}
-                className="h-8 gap-1 px-2.5 text-xs text-text-tertiary/90 hover:text-text-secondary"
-                icon={<Share2 className="h-3.5 w-3.5 opacity-50" />}
+                className="h-7 gap-1 px-2 text-[11px] text-text-muted/80 hover:text-text-secondary"
+                icon={<Share2 className="h-3 w-3 opacity-60" />}
               >
                 {s('Paylaş', 'Share')}
               </Button>
@@ -484,542 +501,600 @@ export default function MotivationPage() {
         </aside>
       </motion.section>
 
-      {/* 2) AI stüdyo — ana odak */}
-      <motion.section variants={item} className="space-y-2.5">
-        <div>
-          <h2 className="text-xl font-semibold tracking-[-0.02em] text-text-primary sm:text-2xl">
-            {s('AI motivasyon stüdyosu', 'AI motivation studio')}
-          </h2>
-          <p className="text-xs text-text-muted/75">{s('Seç, üret, gönder.', 'Choose, generate, send.')}</p>
-        </div>
+      {/* 2) Ana kahraman: motivasyon akış stüdyosu */}
+      <motion.section variants={item} className="min-w-0">
+        <div
+          className={cn(
+            'overflow-hidden rounded-2xl',
+            'border border-white/[0.07] bg-gradient-to-b from-slate-900/45 via-slate-950/55 to-slate-950/95',
+            'shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_24px_60px_-32px_rgba(0,0,0,0.75)]',
+          )}
+        >
+          <div className="grid min-h-0 grid-cols-1 lg:grid-cols-12">
+            {/* Sol: hızlı seçim */}
+            <div className="flex flex-col gap-3 border-b border-white/[0.05] p-4 sm:p-5 lg:col-span-5 lg:border-b-0 lg:border-r">
+              <div>
+                <p className={lab}>{s('Seç', 'Select')}</p>
+                <h2 className="mt-1 text-sm font-medium tracking-[-0.02em] text-text-primary/95 sm:text-base">
+                  {s('Motivasyon akış stüdyosu', 'Motivation flow studio')}
+                </h2>
+                <p className="mt-0.5 text-[11px] text-text-muted/70">
+                  {s('Seç → üret → gönder. Gelişmiş ayarlar aşağıda.', 'Choose → generate → send. Advanced below.')}
+                </p>
+              </div>
 
-        <div className="grid grid-cols-1 gap-4 rounded-2xl border border-border-subtle/70 bg-slate-950/35 p-3 sm:gap-5 sm:p-4 lg:grid-cols-12 lg:p-5">
-          <div className="flex flex-col gap-2.5 lg:col-span-4">
-            <p className={formLabel}>{s('Kişi veya segment', 'Person or segment')}</p>
-            <select
-              value={segment}
-              onChange={(e) => setSegment(e.target.value as Segment)}
-              className="h-9 w-full rounded-lg border border-border/90 bg-surface/80 px-2.5 text-sm"
-            >
-              <option value="single">{s('Tek kişi', 'One person')}</option>
-              <option value="new_starters">{s('Yeni başlayanlar', 'New starters')}</option>
-              <option value="rejection_block">{s('Takılda kalan / itiraz', 'Stuck or objections')}</option>
-              <option value="dormant">{s('Uzun süredir pasif', 'Long-dormant')}</option>
-              <option value="near_goal">{s('Hedefe yakın', 'Close to a milestone')}</option>
-              <option value="leader_pool">{s('Lider adayları / ekip', 'Leaders & team')}</option>
-              <option value="small_wins">{s('Küçük başarı sinyali', 'Small-win signals')}</option>
-              <option value="tagged">{s('Etiketli grup', 'Tagged group')}</option>
-            </select>
-            {segment === 'tagged' && (
-              <Input
-                className="h-9"
-                value={tagFilter}
-                onChange={(e) => setTagFilter(e.target.value)}
-                placeholder={s('Etiket', 'Tag')}
-              />
-            )}
-            {segment === 'single' && (
+              <p className={lab}>{s('Hedef', 'Target')}</p>
               <select
-                value={singleId}
-                onChange={(e) => setSingleId(e.target.value)}
-                className="h-9 w-full rounded-lg border border-border/90 bg-surface/80 px-2.5 text-sm"
+                value={segment}
+                onChange={(e) => setSegment(e.target.value as Segment)}
+                className={control}
               >
-                <option value="">{s('Kişi seçin', 'Select a person')}</option>
-                {[...contacts]
-                  .sort((a, b) => a.full_name.localeCompare(b.full_name, tr ? 'tr' : 'en'))
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.full_name}
-                    </option>
-                  ))}
+                <option value="single">{s('Tek kişi', 'One person')}</option>
+                <option value="new_starters">{s('Yeni başlayanlar', 'New starters')}</option>
+                <option value="rejection_block">{s('Takılda kalan / itiraz', 'Stuck or objections')}</option>
+                <option value="dormant">{s('Uzun süredir pasif', 'Long-dormant')}</option>
+                <option value="near_goal">{s('Hedefe yakın', 'Close to a milestone')}</option>
+                <option value="leader_pool">{s('Lider adayları / ekip', 'Leaders & team')}</option>
+                <option value="small_wins">{s('Küçük başarı sinyali', 'Small-win signals')}</option>
+                <option value="tagged">{s('Etiketli grup', 'Tagged group')}</option>
               </select>
-            )}
-
-            <p className={cn('pt-0.5', formLabel)}>{s('Amaç', 'Intent')}</p>
-            <select
-              value={purpose}
-              onChange={(e) => setPurpose(e.target.value as Purpose)}
-              className="h-9 w-full rounded-lg border border-border/90 bg-surface/80 px-2.5 text-sm"
-            >
-              <option value="morale">{s('Moral / destek', 'Support')}</option>
-              <option value="action">{s('Aksiyon', 'Action')}</option>
-              <option value="reopen">{s('Yeniden iletişim', 'Re-open')}</option>
-              <option value="micro_win">{s('Küçük kazanım', 'Small win')}</option>
-              <option value="rescue">{s('Etik toparlama', 'Gentle rescue')}</option>
-              <option value="invite">{s('Davet / toplantı', 'Invite')}</option>
-              <option value="focus">{s('Hedefe odak', 'Focus')}</option>
-            </select>
-
-            <p className={cn('pt-0.5', formLabel)}>{s('Ton', 'Tone')}</p>
-            <select
-              value={tone}
-              onChange={(e) => setTone(e.target.value as Tone)}
-              className="h-9 w-full rounded-lg border border-border/90 bg-surface/80 px-2.5 text-sm"
-            >
-              <option value="warm">{s('Sıcak & destekleyici', 'Warm & supportive')}</option>
-              <option value="leader">{s('Liderce', 'Leader')}</option>
-              <option value="crisp">{s('Kısa & net', 'Crisp')}</option>
-              <option value="friendly">{s('Samimi', 'Friendly')}</option>
-              <option value="vision">{s('Vizyon', 'Vision')}</option>
-              <option value="recovery">{s('Toparlayıcı', 'Recovery')}</option>
-            </select>
-
-            <p className={cn('pt-0.5', formLabel)}>{s('Kısa bağlam', 'Short context')}</p>
-            <Textarea
-              ref={contextNotesRef}
-              value={contextNotes}
-              onChange={(e) => setContextNotes(e.target.value)}
-              rows={2}
-              placeholder={s('Opsiyonel: son temas, duygu, hedef…', 'Optional: last touch, mood, goal…')}
-              className="min-h-[3.5rem] resize-y text-sm"
-            />
-
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((o) => !o)}
-              className="flex h-8 w-full items-center justify-between rounded-lg border border-dashed border-border-subtle/90 px-2.5 text-left text-xs text-text-tertiary transition hover:text-text-secondary"
-            >
-              <span>{s('Gelişmiş: kanal, uzunluk, emoji, toplu…', 'Advanced: channel, length, bulk…')}</span>
-              <ChevronDown className={cn('h-3.5 w-3.5 transition', showAdvanced && 'rotate-180')} />
-            </button>
-
-            {showAdvanced && (
-              <div className="space-y-2.5 rounded-lg border border-border-subtle/50 bg-obsidian/20 p-2.5">
-                <div>
-                  <p className="text-[10px] text-text-muted">{s('Kanal', 'Channel')}</p>
-                  <select
-                    value={channel}
-                    onChange={(e) => setChannel(e.target.value as Channel)}
-                    className="mt-0.5 h-8 w-full rounded-md border border-border bg-surface px-2 text-sm"
-                  >
-                    <option value="whatsapp">WhatsApp</option>
-                    <option value="dm">{s('Kısa DM', 'Short DM')}</option>
-                    <option value="voice_script">{s('Ses notu', 'Voice script')}</option>
-                    <option value="team_group">{s('Takım', 'Team group')}</option>
-                    <option value="one_on_one">1:1</option>
-                    <option value="morning">{s('Sabah', 'Morning')}</option>
-                    <option value="weekly_wrap">{s('Haftalık', 'Weekly')}</option>
-                  </select>
-                </div>
-                <div>
-                  <p className="text-[10px] text-text-muted">{s('Uzunluk', 'Length')}</p>
-                  <select
-                    value={lengthKey}
-                    onChange={(e) => setLengthKey(e.target.value as LengthKey)}
-                    className="mt-0.5 h-8 w-full rounded-md border border-border bg-surface px-2 text-sm"
-                  >
-                    <option value="micro">{s('Çok kısa', 'Micro')}</option>
-                    <option value="short">{s('Kısa', 'Short')}</option>
-                    <option value="medium">{s('Orta', 'Medium')}</option>
-                  </select>
-                </div>
-                <div>
-                  <p className="text-[10px] text-text-muted">{s('Dil hissi', 'Language feel')}</p>
-                  <select
-                    value={safeVoice}
-                    onChange={(e) => setSafeVoice(e.target.value as SafeVoice)}
-                    className="mt-0.5 h-8 w-full rounded-md border border-border bg-surface px-2 text-sm"
-                  >
-                    <option value="grounded">{s('Abartısız', 'Grounded')}</option>
-                    <option value="high_energy">{s('Enerjik', 'Energetic')}</option>
-                    <option value="emotional">{s('Duygusal', 'Emotional')}</option>
-                    <option value="corporate">{s('Profesyonel', 'Pro')}</option>
-                  </select>
-                </div>
-                <div>
-                  <p className="text-[10px] text-text-muted">{s('Emoji', 'Emoji')}</p>
-                  <div className="mt-0.5 flex gap-1">
-                    {([0, 1, 2] as const).map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setEmojiLevel(n)}
-                        className={cn(
-                          'h-7 flex-1 rounded-md border text-xs',
-                          emojiLevel === n ? 'border-cyan-500/30 bg-cyan-500/10' : 'border-border',
-                        )}
-                      >
-                        {n}
-                      </button>
+              {segment === 'tagged' && (
+                <Input
+                  className="h-9"
+                  value={tagFilter}
+                  onChange={(e) => setTagFilter(e.target.value)}
+                  placeholder={s('Etiket', 'Tag')}
+                />
+              )}
+              {segment === 'single' && (
+                <select
+                  value={singleId}
+                  onChange={(e) => setSingleId(e.target.value)}
+                  className={control}
+                >
+                  <option value="">{s('Kişi seçin', 'Select a person')}</option>
+                  {[...contacts]
+                    .sort((a, b) => a.full_name.localeCompare(b.full_name, tr ? 'tr' : 'en'))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.full_name}
+                      </option>
                     ))}
-                  </div>
-                </div>
-                {segment !== 'single' && (
+                </select>
+              )}
+
+              <p className={lab}>{s('Amaç & ton', 'Intent & tone')}</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <select
+                  value={purpose}
+                  onChange={(e) => setPurpose(e.target.value as Purpose)}
+                  className={control}
+                >
+                  <option value="morale">{s('Moral / destek', 'Support')}</option>
+                  <option value="action">{s('Aksiyon', 'Action')}</option>
+                  <option value="reopen">{s('Yeniden iletişim', 'Re-open')}</option>
+                  <option value="micro_win">{s('Küçük kazanım', 'Small win')}</option>
+                  <option value="rescue">{s('Etik toparlama', 'Gentle rescue')}</option>
+                  <option value="invite">{s('Davet / toplantı', 'Invite')}</option>
+                  <option value="focus">{s('Hedefe odak', 'Focus')}</option>
+                </select>
+                <select
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value as Tone)}
+                  className={control}
+                >
+                  <option value="warm">{s('Sıcak', 'Warm')}</option>
+                  <option value="leader">{s('Liderce', 'Leader')}</option>
+                  <option value="crisp">{s('Kısa & net', 'Crisp')}</option>
+                  <option value="friendly">{s('Samimi', 'Friendly')}</option>
+                  <option value="vision">{s('Vizyon', 'Vision')}</option>
+                  <option value="recovery">{s('Toparlayıcı', 'Recovery')}</option>
+                </select>
+              </div>
+
+              <div>
+                <p className={lab}>{s('Bağlam (kısa)', 'Short context')}</p>
+                <Textarea
+                  ref={contextNotesRef}
+                  value={contextNotes}
+                  onChange={(e) => setContextNotes(e.target.value)}
+                  rows={2}
+                  placeholder={s('Opsiyonel: son temas, duygu…', 'Optional: last touch, mood…')}
+                  className="min-h-[3.2rem] resize-none rounded-md border border-white/[0.08] bg-slate-950/40 py-2 text-[13px] leading-relaxed text-text-primary/90"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((o) => !o)}
+                className="flex h-8 w-full items-center justify-between rounded-md border border-dashed border-white/[0.1] bg-transparent px-2.5 text-left text-[11px] text-text-muted/80 transition hover:border-white/[0.16] hover:text-text-secondary/90"
+              >
+                <span>{s('Gelişmiş ayarlar', 'Advanced settings')}</span>
+                <ChevronDown className={cn('h-3.5 w-3.5 transition', showAdvanced && 'rotate-180')} />
+              </button>
+
+              {showAdvanced && (
+                <div
+                  className="space-y-2.5 rounded-lg border border-white/[0.06] p-2.5"
+                  style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.5) 0%, rgba(2,6,23,0.4) 100%)' }}
+                >
                   <div>
-                    <p className="text-[10px] text-text-muted">{s('Toplu metin', 'Bulk copy')}</p>
-                    <div className="mt-0.5 flex gap-1">
+                    <p className="text-[9px] font-medium text-text-muted/70">{s('Kanal', 'Channel')}</p>
+                    <select
+                      value={channel}
+                      onChange={(e) => setChannel(e.target.value as Channel)}
+                      className={cn(control, 'mt-1 h-8')}
+                    >
+                      <option value="whatsapp">WhatsApp</option>
+                      <option value="dm">{s('Kısa DM', 'Short DM')}</option>
+                      <option value="voice_script">{s('Ses notu', 'Voice script')}</option>
+                      <option value="team_group">{s('Takım', 'Team group')}</option>
+                      <option value="one_on_one">1:1</option>
+                      <option value="morning">{s('Sabah', 'Morning')}</option>
+                      <option value="weekly_wrap">{s('Haftalık', 'Weekly')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-medium text-text-muted/70">{s('Uzunluk', 'Length')}</p>
+                    <select
+                      value={lengthKey}
+                      onChange={(e) => setLengthKey(e.target.value as LengthKey)}
+                      className={cn(control, 'mt-1 h-8')}
+                    >
+                      <option value="micro">{s('Çok kısa', 'Micro')}</option>
+                      <option value="short">{s('Kısa', 'Short')}</option>
+                      <option value="medium">{s('Orta', 'Medium')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-medium text-text-muted/70">{s('Dil / güvenli mod', 'Language / safe mode')}</p>
+                    <select
+                      value={safeVoice}
+                      onChange={(e) => setSafeVoice(e.target.value as SafeVoice)}
+                      className={cn(control, 'mt-1 h-8')}
+                    >
+                      <option value="grounded">{s('Abartısız', 'Grounded')}</option>
+                      <option value="high_energy">{s('Enerjik', 'Energetic')}</option>
+                      <option value="emotional">{s('Duygusal', 'Emotional')}</option>
+                      <option value="corporate">{s('Profesyonel', 'Pro')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-medium text-text-muted/70">{s('Emoji', 'Emoji')}</p>
+                    <div className="mt-1 flex gap-1">
+                      {([0, 1, 2] as const).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setEmojiLevel(n)}
+                          className={cn(
+                            'h-7 flex-1 rounded-md border text-[10px] transition',
+                            emojiLevel === n
+                              ? 'border-cyan-500/30 bg-cyan-500/10 text-text-primary'
+                              : 'border-white/[0.08] text-text-muted/80 hover:bg-white/[0.04]',
+                          )}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {segment !== 'single' && (
+                    <div>
+                      <p className="text-[9px] font-medium text-text-muted/70">
+                        {s('Toplu kişiselleştirme', 'Bulk personalize')}
+                      </p>
+                      <div className="mt-1 flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setPersonalize('same')}
+                          className={cn(
+                            'h-7 flex-1 rounded-md border text-[10px] transition',
+                            personalize === 'same' ? 'border-cyan-500/25 bg-white/[0.04]' : 'border-white/[0.08] text-text-muted/70',
+                          )}
+                        >
+                          {s('Aynı metin', 'Same')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPersonalize('light')}
+                          className={cn(
+                            'h-7 flex-1 rounded-md border text-[10px] transition',
+                            personalize === 'light' ? 'border-cyan-500/25 bg-white/[0.04]' : 'border-white/[0.08] text-text-muted/70',
+                          )}
+                        >
+                          {s('+ İsim', '+ Name')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-auto space-y-2 border-t border-white/[0.06] pt-3">
+                <Button
+                  type="button"
+                  size="lg"
+                  className="h-11 w-full text-[15px] font-medium shadow-[0_0_0_1px_rgba(34,211,238,0.12)]"
+                  onClick={() => void runGenerate('one')}
+                  loading={loading}
+                  icon={<Wand2 className="h-4 w-4" />}
+                >
+                  {s('Mesaj üret', 'Generate message')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  className="h-9 w-full"
+                  onClick={() => void runGenerate('three')}
+                  loading={loading}
+                  icon={<Sparkles className="h-3.5 w-3.5" />}
+                >
+                  {s('3 varyasyon üret', 'Generate 3 variants')}
+                </Button>
+              </div>
+
+              {/* Destek: mini medya (asıl odak değil) */}
+              <div
+                className={cn(
+                  'mt-1 rounded-lg border border-white/[0.06] p-2.5',
+                  'bg-slate-950/40',
+                )}
+              >
+                <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-text-muted/50">
+                  {s('Sessiz eşlik', 'Quiet support')}
+                </p>
+                <div className="mt-2 flex gap-2.5">
+                  <button
+                    type="button"
+                    onClick={openYouTube}
+                    className="group relative h-11 w-16 shrink-0 overflow-hidden rounded-md border border-white/[0.08] text-left"
+                  >
+                    {videoThumbError ? (
+                      <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90">
+                        <Play className="h-3.5 w-3.5 text-text-muted/50" />
+                      </div>
+                    ) : (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={videoThumb}
+                        alt=""
+                        onError={() => setVideoThumbError(true)}
+                        className="h-full w-full object-cover opacity-90"
+                      />
+                    )}
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/50 to-transparent">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/30 text-white/95">
+                        <Play className="h-2.5 w-2.5 fill-current pl-px" />
+                      </span>
+                    </div>
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-1.5">
+                      <span className="text-[7px] font-medium uppercase tracking-wider text-text-muted/60">
+                        {FEATURED_VIDEO.category}
+                      </span>
+                      <span className="text-[8px] tabular-nums text-text-muted/45">{FEATURED_VIDEO.durationShort}</span>
+                    </div>
+                    <p className="mt-0.5 line-clamp-2 text-[11px] font-medium leading-snug text-text-primary/80">
+                      {FEATURED_VIDEO.titleShort}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={openYouTube}
+                        className="h-6 border-white/[0.1] px-2 text-[10px]"
+                      >
+                        {s('İzle', 'Watch')}
+                      </Button>
                       <button
                         type="button"
-                        onClick={() => setPersonalize('same')}
-                        className={cn('h-7 flex-1 rounded-md border text-[10px]', personalize === 'same' ? 'bg-surface' : 'text-text-tertiary')}
+                        onClick={() => setShowMiniPlayer((v) => !v)}
+                        className="text-[9px] text-text-muted/50 hover:text-text-tertiary/90"
                       >
-                        {s('Aynı', 'Same')}
+                        {showMiniPlayer ? s('Mini gizle', 'Hide player') : s('Mini oynat', 'Mini play')}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPersonalize('light')}
-                        className={cn('h-7 flex-1 rounded-md border text-[10px]', personalize === 'light' ? 'bg-surface' : 'text-text-tertiary')}
+                        onClick={toggleVideoSave}
+                        className={cn(
+                          'text-text-muted/40 hover:text-text-tertiary/80',
+                          videoSaved.includes(FEATURED_VIDEO.id) && 'text-amber-200/40',
+                        )}
+                        aria-label={s('Kaydet', 'Save')}
                       >
-                        {s('+İsim', '+Name')}
+                        <Bookmark className="h-2.5 w-2.5" />
                       </button>
                     </div>
                   </div>
+                </div>
+                {showMiniPlayer && !videoThumbError && (
+                  <div className="relative mt-2 overflow-hidden rounded-md border border-white/[0.06] bg-black/50">
+                    <button
+                      type="button"
+                      onClick={() => setShowMiniPlayer(false)}
+                      className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded bg-black/50 text-text-muted hover:text-text-secondary"
+                      aria-label={s('Kapat', 'Close')}
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                    <div className="h-[3.5rem] w-full">
+                      <iframe
+                        title="YouTube"
+                        className="h-full w-full"
+                        src={videoSrc}
+                        allow="clipboard-write; encrypted-media; picture-in-picture; fullscreen"
+                        allowFullScreen
+                        loading="lazy"
+                      />
+                    </div>
+                    <p className="border-t border-white/[0.06] px-2 py-0.5 text-center text-[8px] text-text-muted/60">
+                      <button
+                        type="button"
+                        className="hover:text-text-tertiary/90"
+                        onClick={() => {
+                          setShowMiniPlayer(false)
+                          openYouTube()
+                        }}
+                      >
+                        {s("YouTube'ta aç", 'Open in YouTube')}
+                      </button>
+                    </p>
+                  </div>
                 )}
               </div>
-            )}
-
-            <div className="mt-auto space-y-2 border-t border-border-subtle/40 pt-3">
-              <Button
-                type="button"
-                size="lg"
-                className="h-12 w-full text-[15px]"
-                onClick={() => {
-                  setPreviewTab('message')
-                  void runGenerate('one')
-                }}
-                loading={loading}
-                icon={<Wand2 className="h-4 w-4" />}
-              >
-                {s('Mesaj üret', 'Generate message')}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="md"
-                className="h-10 w-full opacity-95"
-                onClick={() => {
-                  setPreviewTab('message')
-                  void runGenerate('three')
-                }}
-                loading={loading}
-                icon={<Sparkles className="h-3.5 w-3.5" />}
-              >
-                {s('3 varyasyon üret', 'Generate 3 variants')}
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex min-h-0 flex-col gap-0 lg:col-span-8">
-            <div className="mb-1.5 flex gap-3 border-b border-border-subtle/40">
-              <button
-                type="button"
-                onClick={() => setPreviewTab('message')}
-                className={cn(
-                  '-mb-px border-b border-transparent px-0.5 pb-2 text-[11px] font-medium transition',
-                  previewTab === 'message' ? 'border-text-primary/80 text-text-primary' : 'text-text-muted/80 hover:text-text-secondary',
-                )}
-              >
-                {s('Mesaj', 'Message')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (hasDraft) setPreviewTab('bulk')
-                }}
-                disabled={!hasDraft}
-                title={!hasDraft ? s('Önce mesaj üretin', 'Generate a message first') : undefined}
-                className={cn(
-                  '-mb-px border-b border-transparent px-0.5 pb-2 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-35',
-                  previewTab === 'bulk' ? 'border-text-primary/80 text-text-primary' : 'text-text-muted/80 hover:text-text-secondary',
-                )}
-              >
-                {s('Toplu (5)', 'Bulk (5)')}
-              </button>
             </div>
 
-            {previewTab === 'bulk' ? (
-              <div className="flex min-h-[14rem] flex-col rounded-xl border border-border-subtle/50 bg-slate-950/20 p-3">
-                <p className="text-[10px] text-text-muted/65">{s('Segment (en fazla 5)', 'Up to 5 in segment')}</p>
-                <pre className="mt-2 max-h-64 flex-1 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-text-secondary/90">
-                  {hasDraft ? bulkText : s('—', '—')}
-                </pre>
-                <div className="mt-2 flex justify-end">
+            {/* Sağ: canlı mesaj stüdyosu */}
+            <div className="flex min-h-0 flex-col bg-slate-950/15 lg:col-span-7">
+              <div className="flex shrink-0 border-b border-white/[0.05] px-3 pt-2 sm:px-4">
+                {(
+                  [
+                    { id: 'message' as const, label: s('Mesaj', 'Message') },
+                    { id: 'variants' as const, label: s('Varyasyonlar', 'Variants') },
+                    { id: 'bulk' as const, label: s('Toplu önizleme', 'Bulk preview') },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      if (t.id === 'bulk' && !hasDraft) return
+                      setPreviewTab(t.id)
+                    }}
+                    disabled={t.id === 'bulk' && !hasDraft}
+                    className={cn(
+                      '-mb-px border-b-2 px-1.5 py-2.5 text-[11px] font-medium transition',
+                      t.id === 'bulk' && !hasDraft && 'cursor-not-allowed opacity-30',
+                      previewTab === t.id
+                        ? 'border-cyan-400/50 text-text-primary'
+                        : 'border-transparent text-text-muted/65 hover:text-text-secondary/90',
+                    )}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative min-h-0 flex-1 overflow-hidden p-3 sm:p-4">
+                {loading && (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/50 backdrop-blur-[2px]">
+                    <p className="text-xs text-text-tertiary/90">{s('Üretiliyor…', 'Creating…')}</p>
+                  </div>
+                )}
+
+                {previewTab === 'bulk' && (
+                  <div className="flex h-full min-h-[14rem] flex-col">
+                    <p className="text-[9px] font-medium text-text-muted/55">
+                      {s('Segment (en fazla 5)', 'Up to 5 in segment')}
+                    </p>
+                    <pre className="mt-2 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words rounded-md border border-white/[0.06] bg-slate-950/30 p-2.5 font-mono text-[10.5px] leading-relaxed text-text-secondary/90">
+                      {hasDraft ? bulkText : '—'}
+                    </pre>
+                  </div>
+                )}
+
+                {previewTab === 'variants' && (
+                  <div className="space-y-2">
+                    {!hasVariations ? (
+                      <p className="text-sm text-text-muted/70">
+                        {s('Önce "3 varyasyon üret" ile taslakları al.', 'Use “Generate 3 variants” to get drafts.')}
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {variations.map((v, i) => (
+                          <button
+                            key={`${i}-${v.slice(0, 10)}`}
+                            type="button"
+                            onClick={() => {
+                              setVariantIndex(i)
+                              setOutBody(v)
+                            }}
+                            className={cn(
+                              'w-full rounded-lg border p-2.5 text-left transition',
+                              variantIndex === i
+                                ? 'border-cyan-500/30 bg-cyan-500/5'
+                                : 'border-white/[0.07] bg-slate-950/25 hover:border-white/[0.1]',
+                            )}
+                          >
+                            <p className="text-[9px] font-medium text-text-muted/55">#{i + 1}</p>
+                            <p className="mt-0.5 max-h-24 overflow-y-auto text-[12.5px] leading-relaxed text-text-primary/88">
+                              {v}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {outHint && hasVariations && (
+                      <p className="text-[9px] leading-relaxed text-text-muted/55">{outHint}</p>
+                    )}
+                  </div>
+                )}
+
+                {previewTab === 'message' && (
+                  <div className="flex h-full min-h-[15rem] flex-col">
+                    <div className="flex items-start justify-between gap-2 border-b border-white/[0.04] pb-2">
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-cyan-200/30">
+                          {hasDraft ? (outTitle || s('Taslak', 'Draft')) : s('Önizleme', 'Preview')}
+                        </p>
+                        {outHint && hasDraft && (
+                          <p className="mt-0.5 line-clamp-2 text-[9px] text-text-muted/55">{outHint}</p>
+                        )}
+                        {!hasDraft && (
+                          <p className="mt-0.5 text-[10px] text-text-muted/45">
+                            {s('Taslak, üretimle burada belirecek.', 'Your draft will appear when you generate.')}
+                          </p>
+                        )}
+                      </div>
+                      {copyFlash && (
+                        <span className="shrink-0 text-[8px] text-cyan-300/70">
+                          {s('Kopyalandı', 'Copied')}
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      className={cn(
+                        'mt-2 flex-1 overflow-hidden rounded-lg border',
+                        'border-white/[0.08] bg-gradient-to-b from-slate-900/20 to-slate-950/40',
+                        'p-3',
+                      )}
+                    >
+                      {hasDraft ? (
+                        <Textarea
+                          ref={previewTextRef}
+                          value={outBody}
+                          onChange={(e) => setOutBody(e.target.value)}
+                          className="min-h-[8rem] w-full max-h-[min(38vh,19rem)] resize-none border-0 bg-transparent p-0 text-[13px] leading-[1.58] text-text-primary/92 placeholder:text-text-muted/35 focus:ring-0"
+                        />
+                      ) : (
+                        <p className="pointer-events-none min-h-[8rem] max-h-[min(38vh,19rem)] overflow-y-auto text-[12.5px] leading-[1.58] text-text-muted/45">
+                          {exampleMessage}
+                        </p>
+                      )}
+                    </div>
+                    {hasDraft && (
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 border-t border-white/[0.04] pt-2">
+                        {[
+                          { l: s('Kısalt', 'Tighter'), h: s('Daha kısa yap', 'Shorter') as string },
+                          { l: s('Sıcak', 'Warmer'), h: s('Daha samimi yap', 'More human') as string },
+                          { l: s('Sakin', 'Calmer'), h: s('Daha sakin, liderce', 'Calmer, leaderly') as string },
+                        ].map((x) => (
+                          <button
+                            key={x.h}
+                            type="button"
+                            onClick={() => void runGenerate('refine', x.h)}
+                            className="text-[9px] text-text-muted/50 hover:text-cyan-200/50"
+                          >
+                            {x.l}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {previewTab !== 'bulk' && (previewTab === 'message' || (previewTab === 'variants' && hasVariations)) && (
+                <div className="shrink-0 space-y-1.5 border-t border-white/[0.05] p-3 sm:p-4">
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3 sm:gap-2">
+                    <Button
+                      type="button"
+                      size="md"
+                      variant="outline"
+                      className="h-9 w-full"
+                      onClick={() => copyContent(hasDraft ? outBody : exampleMessage)}
+                    >
+                      <Copy className="mr-1.5 h-3.5 w-3.5" />
+                      {s('Kopyala', 'Copy')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="md"
+                      variant="outline"
+                      className="h-9 w-full"
+                      onClick={focusContextOrPreview}
+                      icon={<Edit3 className="h-3.5 w-3.5" />}
+                    >
+                      {s('Düzenle', 'Edit')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="md"
+                      variant="primary"
+                      className="h-9 w-full"
+                      disabled={!canSend}
+                      title={!canSend && hasDraft ? s('Kişide telefon yok', 'No phone on contact') : !hasDraft ? s('Önce metin gerekir', 'Add text first') : undefined}
+                      onClick={() => {
+                        if (!singleContact?.phone || !outBody.trim()) return
+                        const d = singleContact.phone.replace(/\D/g, '')
+                        if (!d) return
+                        window.open(`https://wa.me/${d}?text=${encodeURIComponent(outBody)}`, '_blank', 'noopener,noreferrer')
+                      }}
+                      icon={<MessageCircle className="h-3.5 w-3.5" />}
+                    >
+                      {s('Gönder', 'Send')}
+                    </Button>
+                  </div>
+                  <p className="text-center text-[8px] text-text-muted/35">
+                    <button
+                      type="button"
+                      className="underline decoration-white/[0.1] underline-offset-2 transition hover:text-text-muted/55 disabled:opacity-30"
+                      disabled={!hasDraft || !singleContact || addCrm.isPending}
+                      onClick={() => {
+                        if (!outBody.trim() || !singleContact) return
+                        addCrm.mutate()
+                      }}
+                    >
+                      {s('CRM notu ekle', 'Add CRM note')}
+                    </button>
+                    <span className="mx-1.5">·</span>
+                    <button
+                      type="button"
+                      className="underline decoration-white/[0.1] underline-offset-2 transition hover:text-text-muted/55 disabled:opacity-30"
+                      disabled={!hasDraft}
+                      onClick={() => {
+                        if (!outBody.trim()) return
+                        setFavMessages((f) => [outBody.slice(0, 2000), ...f].slice(0, 20))
+                      }}
+                    >
+                      {s('Favori', 'Save favorite')}
+                    </button>
+                  </p>
+                </div>
+              )}
+
+              {previewTab === 'bulk' && (
+                <div className="shrink-0 border-t border-white/[0.05] p-3 sm:p-4">
                   <Button
                     type="button"
-                    size="sm"
+                    size="md"
                     variant="outline"
-                    className="h-8 text-xs"
+                    className="h-9 w-full sm:max-w-[12rem]"
                     disabled={!hasDraft}
                     onClick={() => copyContent(bulkText)}
                   >
-                    {s('Kopyala', 'Copy all')}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div
-                className={cn(
-                  'flex min-h-[min(20rem,52vh)] flex-col rounded-xl border border-border-subtle/55 bg-slate-950/25 p-0',
-                )}
-              >
-                <div className="flex items-center justify-between gap-2 border-b border-border-subtle/40 px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-text-tertiary">
-                      {hasDraft
-                        ? (outTitle || s('Taslak', 'Draft'))
-                        : s('Örnek çıktı', 'Sample output')}
-                    </p>
-                    {outHint && hasDraft && <p className="mt-0.5 line-clamp-2 text-[10px] text-text-muted/60">{outHint}</p>}
-                    {!hasDraft && (
-                      <p className="mt-0.5 text-[11px] text-text-muted">
-                        {s('Metin, üretimden sonra bu kartta belirir.', 'Your generated text will appear in this card.')}
-                      </p>
-                    )}
-                  </div>
-                  {copyFlash && <span className="shrink-0 text-[10px] text-cyan-300/90">{s('Kopyalandı', 'Copied')}</span>}
-                </div>
-
-                {variations.length > 1 && hasDraft && (
-                  <div className="flex flex-wrap gap-1 border-b border-border-subtle/30 px-2 py-1.5">
-                    {variations.map((v, i) => (
-                      <button
-                        key={`${i}-${v.slice(0, 8)}`}
-                        type="button"
-                        onClick={() => {
-                          setVariantIndex(i)
-                          setOutBody(v)
-                        }}
-                        className={cn(
-                          'rounded-md px-2 py-0.5 text-[11px]',
-                          variantIndex === i && outBody === v ? 'bg-white/[0.06] text-text-primary' : 'text-text-muted/70 hover:bg-white/[0.03]',
-                        )}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="relative min-h-0 flex-1 p-3 sm:p-4">
-                  {loading && (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-b-xl bg-slate-950/60">
-                      <span className="text-sm text-text-tertiary">{s('Üretiliyor…', 'Creating…')}</span>
-                    </div>
-                  )}
-                  {hasDraft ? (
-                    <Textarea
-                      ref={previewTextRef}
-                      value={outBody}
-                      onChange={(e) => setOutBody(e.target.value)}
-                      className="min-h-[10rem] w-full resize-y border-0 bg-transparent p-0 font-[system-ui] text-[14px] leading-[1.62] text-text-primary/95 placeholder:text-text-tertiary/50 focus-visible:ring-0"
-                    />
-                  ) : (
-                    <div
-                      className="pointer-events-none min-h-[10rem] select-none font-[system-ui] text-[14px] leading-[1.62] text-text-tertiary/55"
-                      aria-hidden
-                    >
-                      {exampleMessage}
-                    </div>
-                  )}
-
-                  {hasDraft && (
-                    <div className="mt-2 flex flex-wrap gap-2 border-t border-border-subtle/30 pt-2">
-                      <button
-                        type="button"
-                        className="text-[10px] text-text-muted/55 hover:text-text-tertiary/90"
-                        onClick={() => void runGenerate('refine', s('Daha kısa yap', 'Shorter'))}
-                      >
-                        {s('Kısalt', 'Tighter')}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-[10px] text-text-muted/55 hover:text-text-tertiary/90"
-                        onClick={() => void runGenerate('refine', s('Daha samimi yap', 'More human'))}
-                      >
-                        {s('Sıcak', 'Warmer')}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-[10px] text-text-muted/55 hover:text-text-tertiary/90"
-                        onClick={() => void runGenerate('refine', s('Daha sakin, liderce', 'Calmer, leaderly'))}
-                      >
-                        {s('Sakin', 'Calmer')}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {previewTab === 'message' && (
-              <div className="mt-3 space-y-2">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <Button
-                    type="button"
-                    size="md"
-                    variant="outline"
-                    className="h-10 w-full"
-                    onClick={() => copyContent(hasDraft ? outBody : exampleMessage)}
-                  >
                     <Copy className="mr-1.5 h-3.5 w-3.5" />
-                    {s('Kopyala', 'Copy')}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="md"
-                    variant="outline"
-                    className="h-10 w-full"
-                    onClick={focusContextOrPreview}
-                    icon={<Edit3 className="h-3.5 w-3.5" />}
-                  >
-                    {s('Düzenle', 'Edit')}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="md"
-                    variant="primary"
-                    className="h-10 w-full"
-                    disabled={!canSend}
-                    title={!canSend && hasDraft ? s('Kişide telefon yok', 'No phone on contact') : !hasDraft ? s('Önce metin gerekir', 'Add text first') : undefined}
-                    onClick={() => {
-                      if (!singleContact?.phone || !outBody.trim()) return
-                      const d = singleContact.phone.replace(/\D/g, '')
-                      if (!d) return
-                      window.open(`https://wa.me/${d}?text=${encodeURIComponent(outBody)}`, '_blank', 'noopener,noreferrer')
-                    }}
-                    icon={<MessageCircle className="h-3.5 w-3.5" />}
-                  >
-                    {s('Gönder', 'Send')}
+                    {s('Tümünü kopyala', 'Copy all')}
                   </Button>
                 </div>
-                <p className="text-center text-[10px] text-text-muted/45">
-                  <button
-                    type="button"
-                    className="underline decoration-border-subtle underline-offset-2 hover:text-text-tertiary/80 disabled:opacity-30"
-                    disabled={!hasDraft || !singleContact || addCrm.isPending}
-                    onClick={() => {
-                      if (!outBody.trim() || !singleContact) return
-                      addCrm.mutate()
-                    }}
-                  >
-                    {s('CRM notu', 'CRM note')}
-                  </button>
-                  <span className="mx-1.5 text-text-muted/30">·</span>
-                  <button
-                    type="button"
-                    className="underline decoration-border-subtle underline-offset-2 hover:text-text-tertiary/80 disabled:opacity-30"
-                    disabled={!hasDraft}
-                    onClick={() => {
-                      if (!outBody.trim()) return
-                      setFavMessages((f) => [outBody.slice(0, 2000), ...f].slice(0, 20))
-                    }}
-                  >
-                    {s('Favori', 'Favorite')}
-                  </button>
-                </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </motion.section>
 
-      {/* 3) Kısa medya — destek */}
-      <motion.section variants={item} className="max-w-md">
-        <p className={sectionEyebrow}>{s('Kısa medya', 'Short media')}</p>
-        <div className="mt-2 rounded-2xl border border-border-subtle/70 bg-slate-950/30 p-3 sm:p-3.5">
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={openYouTube}
-              className="group relative h-[3.75rem] w-24 shrink-0 overflow-hidden rounded-md border border-border-subtle/60 bg-slate-900/40 text-left transition hover:border-border-subtle"
-            >
-              {videoThumbError ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
-                  <Play className="h-4 w-4 text-text-muted/40" />
-                </div>
-              ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={videoThumb}
-                  alt=""
-                  onError={() => setVideoThumbError(true)}
-                  className="h-full w-full object-cover opacity-90"
-                />
-              )}
-              {!videoThumbError && <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />}
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/35 text-white">
-                  <Play className="h-2.5 w-2.5 fill-current pl-px" />
-                </span>
-              </div>
-            </button>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-baseline gap-x-2">
-                <span className="rounded border border-border-subtle/80 px-1 py-0.5 text-[8px] font-medium uppercase tracking-wider text-text-muted/70">
-                  {FEATURED_VIDEO.category}
-                </span>
-                <span className="text-[9px] tabular-nums text-text-muted/60">{FEATURED_VIDEO.durationShort}</span>
-              </div>
-              <p className="mt-1 line-clamp-2 text-[13px] font-medium leading-snug text-text-primary/90">{FEATURED_VIDEO.titleShort}</p>
-              <div className="mt-2 flex items-center gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={openYouTube} className="h-7 border-border-subtle/80 px-2.5 text-[11px]">
-                  {s('İzle', 'Watch')}
-                </Button>
-                <button
-                  type="button"
-                  onClick={() => setShowMiniPlayer((v) => !v)}
-                  className="text-[10px] text-text-muted/60 hover:text-text-tertiary"
-                >
-                  {showMiniPlayer ? s('Gizle', 'Hide') : s('Mini', 'Mini')}
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleVideoSave}
-                  className={cn(
-                    'text-text-muted/50 hover:text-text-tertiary',
-                    videoSaved.includes(FEATURED_VIDEO.id) && 'text-amber-200/45',
-                  )}
-                  aria-label={s('Kaydet', 'Save')}
-                >
-                  <Bookmark className="h-3 w-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => window.open(shareUrl(`${FEATURED_VIDEO.titleShort} — ${videoWatch}`), '_blank', 'noopener,noreferrer')}
-                  className="text-text-muted/50 hover:text-text-tertiary"
-                  aria-label={s('Paylaş', 'Share')}
-                >
-                  <Share2 className="h-3 w-3" />
-                </button>
-              </div>
-            </div>
-          </div>
-          {showMiniPlayer && (
-            <div className="relative mt-2 overflow-hidden rounded-md border border-border-subtle/50 bg-black/30">
-              <button
-                type="button"
-                onClick={() => setShowMiniPlayer(false)}
-                className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded bg-black/40 text-text-muted hover:text-text-secondary"
-                aria-label={s('Kapat', 'Close')}
-              >
-                <X className="h-3 w-3" />
-              </button>
-              <div className="h-[4rem] w-full">
-                <iframe
-                  title="YouTube"
-                  className="h-full w-full"
-                  src={videoSrc}
-                  allow="clipboard-write; encrypted-media; picture-in-picture; fullscreen"
-                  allowFullScreen
-                  loading="lazy"
-                />
-              </div>
-              <p className="border-t border-border-subtle/40 px-2 py-1 text-center text-[9px] text-text-muted/70">
-                <button
-                  type="button"
-                  className="hover:text-text-secondary"
-                  onClick={() => {
-                    setShowMiniPlayer(false)
-                    openYouTube()
-                  }}
-                >
-                  {s("YouTube'ta aç", 'Open in YouTube')}
-                </button>
-              </p>
-            </div>
-          )}
-        </div>
-      </motion.section>
+      {/* 3) Sessiz öneri şeridi */}
+      <motion.div
+        variants={item}
+        className="flex items-center gap-3 rounded-lg border border-white/[0.05] bg-slate-950/30 px-3 py-2.5 sm:px-4"
+      >
+        <div className="h-1 w-1 shrink-0 rounded-full bg-cyan-400/30" />
+        <p className="text-[12px] leading-relaxed text-text-secondary/80">{insightLine}</p>
+      </motion.div>
     </motion.div>
   )
 }
