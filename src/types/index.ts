@@ -107,7 +107,7 @@ export interface Task {
   contactId?: string
   title: string
   description?: string
-  type: 'follow_up' | 'call' | 'meeting' | 'presentation' | 'onboarding' | 'training' | 'custom'
+  type: 'follow_up' | 'call' | 'message' | 'meeting' | 'presentation' | 'onboarding' | 'training' | 'motivation' | 'custom'
   status: 'pending' | 'in_progress' | 'completed' | 'skipped' | 'overdue'
   priority: 'low' | 'medium' | 'high' | 'urgent'
   dueDate: string

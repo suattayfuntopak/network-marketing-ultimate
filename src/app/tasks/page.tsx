@@ -18,7 +18,7 @@ import { addTask, deleteTask, fetchContacts, fetchTasks, setTaskStatus } from '@
 import type { ContactRow, TaskRow } from '@/lib/queries'
 import {
   Plus, CheckCircle2, Circle, Clock, Phone, Users as UsersIcon,
-  MessageCircle, GraduationCap, ListTodo, Pencil, Trash2,
+  MessageCircle, GraduationCap, ListTodo, Pencil, Trash2, Flame,
 } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }
@@ -27,10 +27,12 @@ const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 const TYPE_ICONS: Record<string, React.ElementType> = {
   follow_up: Clock,
   call: Phone,
+  message: MessageCircle,
   meeting: UsersIcon,
   presentation: MessageCircle,
   onboarding: UsersIcon,
   training: GraduationCap,
+  motivation: Flame,
   custom: Circle,
 }
 
@@ -44,10 +46,12 @@ const PRIORITY_VARIANT: Record<string, string> = {
 const TYPE_KEY_MAP: Record<string, keyof typeof import('@/lib/i18n').translations.en.tasks.types> = {
   follow_up: 'followUp',
   call: 'call',
+  message: 'message',
   meeting: 'meeting',
   presentation: 'presentation',
   onboarding: 'onboarding',
   training: 'training',
+  motivation: 'motivation',
   custom: 'custom',
 }
 

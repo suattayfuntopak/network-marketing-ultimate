@@ -15,8 +15,35 @@ type AddForm = {
   type: TaskRow['type']
   priority: TaskRow['priority']
   due_date: string
+  due_time: string
   description: string
   contact_id: string
+}
+
+const TASK_TIME_PREFIXES = ['Saat:', 'Time:']
+
+function parseTaskDescription(description: string | null | undefined) {
+  const lines = (description ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+
+  const timeLine = lines.find((line) => TASK_TIME_PREFIXES.some((prefix) => line.startsWith(prefix)))
+  const dueTime = timeLine
+    ? timeLine.replace(/^Saat:\s*|^Time:\s*/i, '').trim() || '09:00'
+    : '09:00'
+
+  const cleanDescription = lines
+    .filter((line) => line.length > 0 && !TASK_TIME_PREFIXES.some((prefix) => line.startsWith(prefix)))
+    .join('\n')
+
+  return {
+    due_time: dueTime,
+    description: cleanDescription,
+  }
+}
+
+function buildTaskDescription(dueTime: string, description: string) {
+  return [`Saat: ${dueTime}`, description.trim()].filter(Boolean).join('\n')
 }
 
 const buildEmptyForm = (initialDueDate?: string, contactId = ''): AddForm => ({
@@ -24,18 +51,24 @@ const buildEmptyForm = (initialDueDate?: string, contactId = ''): AddForm => ({
   type: 'follow_up',
   priority: 'medium',
   due_date: initialDueDate ?? new Date().toISOString().split('T')[0],
+  due_time: '09:00',
   description: '',
   contact_id: contactId,
 })
 
-const buildFormFromTask = (task: TaskRow): AddForm => ({
-  title: task.title,
-  type: task.type,
-  priority: task.priority,
-  due_date: task.due_date,
-  description: task.description ?? '',
-  contact_id: task.contact_id ?? '',
-})
+const buildFormFromTask = (task: TaskRow): AddForm => {
+  const parsedDescription = parseTaskDescription(task.description)
+
+  return {
+    title: task.title,
+    type: task.type,
+    priority: task.priority,
+    due_date: task.due_date,
+    due_time: parsedDescription.due_time,
+    description: parsedDescription.description,
+    contact_id: task.contact_id ?? '',
+  }
+}
 
 export function TaskComposerModal({
   open,
@@ -100,7 +133,7 @@ export function TaskComposerModal({
       type: values.type,
       priority: values.priority,
       due_date: values.due_date,
-      description: values.description || undefined,
+      description: buildTaskDescription(values.due_time, values.description) || undefined,
       contact_id: values.contact_id || undefined,
     }),
     onSuccess: () => {
@@ -117,7 +150,7 @@ export function TaskComposerModal({
         type: values.type,
         priority: values.priority,
         due_date: values.due_date,
-        description: values.description || null,
+        description: buildTaskDescription(values.due_time, values.description) || null,
         contact_id: values.contact_id || null,
       }),
     onSuccess: () => {
@@ -192,10 +225,12 @@ export function TaskComposerModal({
                   >
                     <option value="follow_up">Takip</option>
                     <option value="call">Arama</option>
+                    <option value="message">Mesaj</option>
                     <option value="meeting">Toplantı</option>
                     <option value="presentation">Sunum</option>
                     <option value="onboarding">Oryantasyon</option>
                     <option value="training">Eğitim</option>
+                    <option value="motivation">Motivasyon</option>
                     <option value="custom">Özel</option>
                   </select>
                 </div>
@@ -214,14 +249,25 @@ export function TaskComposerModal({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1.5">Son Tarih *</label>
-                <input
-                  type="date"
-                  value={form.due_date}
-                  onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))}
-                  className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1.5">Son Tarih *</label>
+                  <input
+                    type="date"
+                    value={form.due_date}
+                    onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))}
+                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1.5">Saat</label>
+                  <input
+                    type="time"
+                    value={form.due_time}
+                    onChange={(event) => setForm((current) => ({ ...current, due_time: event.target.value }))}
+                    className="w-full px-3 py-2.5 bg-surface border border-border rounded-xl text-text-primary text-sm outline-none focus:border-primary/50 transition-all"
+                  />
+                </div>
               </div>
 
               {contacts.length > 0 && (

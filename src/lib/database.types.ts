@@ -184,7 +184,7 @@ export interface Database {
           contact_id: string | null
           title: string
           description: string | null
-          type: 'follow_up' | 'call' | 'meeting' | 'presentation' | 'onboarding' | 'training' | 'custom'
+          type: 'follow_up' | 'call' | 'message' | 'meeting' | 'presentation' | 'onboarding' | 'training' | 'motivation' | 'custom'
           status: 'pending' | 'in_progress' | 'completed' | 'skipped' | 'overdue'
           priority: 'low' | 'medium' | 'high' | 'urgent'
           due_date: string
@@ -197,7 +197,7 @@ export interface Database {
           contact_id?: string | null
           title: string
           description?: string | null
-          type?: 'follow_up' | 'call' | 'meeting' | 'presentation' | 'onboarding' | 'training' | 'custom'
+          type?: 'follow_up' | 'call' | 'message' | 'meeting' | 'presentation' | 'onboarding' | 'training' | 'motivation' | 'custom'
           status?: 'pending' | 'in_progress' | 'completed' | 'skipped' | 'overdue'
           priority?: 'low' | 'medium' | 'high' | 'urgent'
           due_date: string

@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS nmu_tasks (
   title        TEXT NOT NULL,
   description  TEXT,
   type         TEXT NOT NULL DEFAULT 'custom'
-                 CHECK (type IN ('follow_up','call','meeting','presentation','onboarding','training','custom')),
+                 CHECK (type IN ('follow_up','call','message','meeting','presentation','onboarding','training','motivation','custom')),
   status       TEXT NOT NULL DEFAULT 'pending'
                  CHECK (status IN ('pending','in_progress','completed','skipped','overdue')),
   priority     TEXT NOT NULL DEFAULT 'medium'
