@@ -774,12 +774,12 @@ export function ContactDetailPersonView({
             >
               {tr ? 'Mesajı Hazırla' : 'Prepare Message'}
             </Button>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid w-full grid-cols-3 gap-2">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="w-full"
+                className="w-full min-w-0 justify-center px-2"
                 onClick={() => void copyCoachingMessage()}
                 icon={copiedCoaching ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               >
@@ -788,7 +788,7 @@ export function ContactDetailPersonView({
               <Button
                 type="button"
                 size="sm"
-                className="w-full bg-amber-300 text-amber-950 hover:bg-amber-200 shadow-none"
+                className="w-full min-w-0 justify-center px-2 bg-amber-300 text-amber-950 hover:bg-amber-200 shadow-none"
                 onClick={() => void handleGenerateCoachingMessage()}
                 loading={coachingLoading}
                 icon={<RefreshCcw className="h-3.5 w-3.5" />}
@@ -804,7 +804,8 @@ export function ContactDetailPersonView({
                 email={contact.email}
                 size="sm"
                 variant="secondary"
-                className="min-w-0 w-full"
+                className="min-w-0 w-full sm:min-w-0 sm:flex-none"
+                buttonClassName="justify-center px-2"
               />
             </div>
           </Card>
