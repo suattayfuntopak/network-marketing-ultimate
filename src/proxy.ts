@@ -3,20 +3,11 @@ import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME, getSafeRedirectTarget } from "@/lib/auth";
 
 const AUTH_ROUTES = new Set(["/auth/login", "/auth/signup"]);
+const PUBLIC_ROUTES = new Set(["/", "/auth/login", "/auth/signup"]);
 
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  const hasSessionMarker = request.cookies.get(AUTH_COOKIE_NAME)?.value === "1";
-  const hasSupabaseAuthCookie = request.cookies
-    .getAll()
-    .some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token"));
-  const hasSession = hasSessionMarker && hasSupabaseAuthCookie;
-
-  if (pathname === "/") {
-    return NextResponse.redirect(
-      new URL(hasSession ? "/dashboard" : "/auth/login", request.url)
-    );
-  }
+  const hasSession = request.cookies.get(AUTH_COOKIE_NAME)?.value === "1";
 
   if (AUTH_ROUTES.has(pathname)) {
     if (hasSession) {
@@ -26,6 +17,10 @@ export function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(nextTarget, request.url));
     }
 
+    return NextResponse.next();
+  }
+
+  if (PUBLIC_ROUTES.has(pathname)) {
     return NextResponse.next();
   }
 
