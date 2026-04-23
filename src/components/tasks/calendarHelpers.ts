@@ -190,6 +190,16 @@ export function entryToneClasses(entry: CalendarEntry) {
   )
 }
 
+export function entryTextToneClasses(entry: CalendarEntry) {
+  return cn(
+    entry.tone === 'success' && 'text-success',
+    entry.tone === 'secondary' && 'text-secondary',
+    entry.tone === 'warning' && 'text-warning',
+    entry.tone === 'primary' && 'text-primary',
+    entry.tone === 'default' && 'text-text-secondary',
+  )
+}
+
 export function isTimedCalendarEntry(entry: CalendarEntry) {
   return Boolean(entry.startsAt && entry.endsAt)
 }

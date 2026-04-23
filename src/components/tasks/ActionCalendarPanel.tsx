@@ -26,8 +26,8 @@ import {
   dayKey,
   endOfWeek,
   entryEnd,
+  entryTextToneClasses,
   entryStart,
-  entryToneClasses,
   formatHourLabel,
   formatPeriodTitle,
   fromInputDate,
@@ -214,6 +214,77 @@ export function ActionCalendarPanel({
     }, {})
   }, [entries])
 
+  const timedLayoutsByDay = useMemo(() => {
+    const layoutMap: Record<string, Array<{ entry: CalendarEntry; column: number; columns: number }>> = {}
+
+    for (const [key, dayEntries] of Object.entries(entriesByDay)) {
+      const timedEntries = dayEntries.filter(isTimedCalendarEntry)
+      if (timedEntries.length === 0) continue
+
+      const sortedEntries = [...timedEntries].sort((left, right) => {
+        const leftStart = entryStart(left)?.getTime() ?? 0
+        const rightStart = entryStart(right)?.getTime() ?? 0
+
+        if (leftStart !== rightStart) return leftStart - rightStart
+
+        const leftEnd = entryEnd(left)?.getTime() ?? leftStart
+        const rightEnd = entryEnd(right)?.getTime() ?? rightStart
+        return leftEnd - rightEnd
+      })
+
+      const clusters: CalendarEntry[][] = []
+      let currentCluster: CalendarEntry[] = []
+      let clusterEnd = -1
+
+      sortedEntries.forEach((entry) => {
+        const start = entryStart(entry)?.getTime() ?? 0
+        const end = entryEnd(entry)?.getTime() ?? start
+
+        if (currentCluster.length === 0 || start < clusterEnd) {
+          currentCluster.push(entry)
+          clusterEnd = Math.max(clusterEnd, end)
+          return
+        }
+
+        clusters.push(currentCluster)
+        currentCluster = [entry]
+        clusterEnd = end
+      })
+
+      if (currentCluster.length > 0) {
+        clusters.push(currentCluster)
+      }
+
+      layoutMap[key] = clusters.flatMap((cluster) => {
+        const columnEndTimes: number[] = []
+        const positionedEntries: Array<{ entry: CalendarEntry; column: number }> = []
+
+        cluster.forEach((entry) => {
+          const start = entryStart(entry)?.getTime() ?? 0
+          const end = entryEnd(entry)?.getTime() ?? start
+          let column = columnEndTimes.findIndex((columnEnd) => columnEnd <= start)
+
+          if (column === -1) {
+            column = columnEndTimes.length
+            columnEndTimes.push(end)
+          } else {
+            columnEndTimes[column] = end
+          }
+
+          positionedEntries.push({ entry, column })
+        })
+
+        const columns = Math.max(1, columnEndTimes.length)
+        return positionedEntries.map((positionedEntry) => ({
+          ...positionedEntry,
+          columns,
+        }))
+      })
+    }
+
+    return layoutMap
+  }, [entriesByDay])
+
   function buildContext(nextViewMode = viewMode, nextFocusDate = focusDate): CalendarContext {
     return {
       viewMode: nextViewMode,
@@ -257,12 +328,12 @@ export function ActionCalendarPanel({
     }
   }
 
-  function timedEntriesForDay(day: Date) {
-    return (entriesByDay[dayKey(day)] ?? []).filter(isTimedCalendarEntry)
-  }
-
   function allDayEntriesForDay(day: Date) {
     return (entriesByDay[dayKey(day)] ?? []).filter((entry) => !isTimedCalendarEntry(entry))
+  }
+
+  function timedLayoutsForDay(day: Date) {
+    return timedLayoutsByDay[dayKey(day)] ?? []
   }
 
   function timedEntryTop(entry: CalendarEntry) {
@@ -431,7 +502,7 @@ export function ActionCalendarPanel({
                       )}
                     </div>
 
-                    <div className="mt-1.5 sm:mt-3 space-y-1 sm:space-y-1.5 overflow-hidden">
+                <div className="mt-1.5 sm:mt-3 space-y-1 sm:space-y-1.5 overflow-hidden">
                       <div className="sm:hidden flex flex-wrap gap-1">
                         {dayEntries.slice(0, 3).map((entry) => (
                           <span
@@ -454,11 +525,10 @@ export function ActionCalendarPanel({
                             }}
                             onDoubleClick={(event) => event.stopPropagation()}
                             className={cn(
-                              'flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 text-[10px] font-medium text-left transition-colors hover:border-border',
-                              entryToneClasses(entry),
+                              'block w-full cursor-pointer text-left text-[10px] font-medium transition-opacity hover:opacity-80',
+                              entryTextToneClasses(entry),
                             )}
                           >
-                            <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-80" />
                             <span className="truncate">{entry.title}</span>
                           </button>
                         ))}
@@ -545,8 +615,8 @@ export function ActionCalendarPanel({
                               }}
                               onDoubleClick={(event) => event.stopPropagation()}
                               className={cn(
-                                'w-full cursor-pointer rounded-lg sm:rounded-xl px-1.5 sm:px-2.5 py-1.5 sm:py-2 text-left text-[10px] sm:text-[11px] font-medium transition-colors hover:border-border',
-                                entryToneClasses(entry),
+                                'block w-full cursor-pointer text-left text-[10px] sm:text-[11px] font-medium transition-opacity hover:opacity-80',
+                                entryTextToneClasses(entry),
                               )}
                             >
                               <p className="truncate">{entry.title}</p>
@@ -578,7 +648,7 @@ export function ActionCalendarPanel({
                     </div>
 
                     {weekDays.map((day) => {
-                      const timedEntries = timedEntriesForDay(day)
+                      const timedLayouts = timedLayoutsForDay(day)
                       const isToday = sameDay(day, today)
                       const nowTop = currentTimeIndicatorTop()
 
@@ -607,26 +677,27 @@ export function ActionCalendarPanel({
                             </div>
                           )}
 
-                          {timedEntries.map((entry) => (
+                          {timedLayouts.map((layout) => (
                             <button
-                              key={entry.id}
+                              key={layout.entry.id}
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation()
-                                handleEntryOpen(entry)
+                                handleEntryOpen(layout.entry)
                               }}
                               onDoubleClick={(event) => event.stopPropagation()}
                               className={cn(
-                                'absolute left-1 right-1 sm:left-2 sm:right-2 z-20 overflow-hidden rounded-xl sm:rounded-2xl border px-2 sm:px-3 py-1.5 sm:py-2 text-left shadow-[0_18px_32px_-24px_rgba(0,0,0,0.75)] cursor-pointer',
-                                entryToneClasses(entry),
+                                'absolute z-20 overflow-hidden px-1 sm:px-1.5 text-left cursor-pointer transition-opacity hover:opacity-80',
+                                entryTextToneClasses(layout.entry),
                               )}
                               style={{
-                                top: timedEntryTop(entry),
-                                height: timedEntryHeight(entry),
+                                top: timedEntryTop(layout.entry),
+                                height: timedEntryHeight(layout.entry),
+                                left: `calc(${(layout.column * 100) / layout.columns}% + 6px)`,
+                                width: `calc(${100 / layout.columns}% - 12px)`,
                               }}
                             >
-                              <p className="truncate text-[11px] sm:text-xs font-semibold">{entry.title}</p>
-                              <p className="mt-0.5 sm:mt-1 truncate text-[10px] sm:text-[11px] opacity-80">{entry.meta}</p>
+                              <p className="truncate text-[11px] sm:text-xs font-semibold leading-4">{layout.entry.title}</p>
                             </button>
                           ))}
                         </div>
@@ -680,22 +751,11 @@ export function ActionCalendarPanel({
                       }}
                       onDoubleClick={(event) => event.stopPropagation()}
                       className={cn(
-                        'w-full cursor-pointer rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 text-left transition-colors hover:border-border',
-                        entryToneClasses(entry),
+                        'block w-full cursor-pointer text-left transition-opacity hover:opacity-80',
+                        entryTextToneClasses(entry),
                       )}
                     >
-                      <div className="flex items-center justify-between gap-2 sm:gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-[13px] sm:text-sm font-semibold">{entry.title}</p>
-                          <p className="mt-0.5 sm:mt-1 truncate text-[11px] sm:text-xs opacity-75">{entry.meta}</p>
-                        </div>
-                        <Badge
-                          variant={entry.kind === 'event' ? 'primary' : entry.tone === 'warning' ? 'warning' : 'default'}
-                          size="sm"
-                        >
-                          {entry.kind === 'event' ? labels.event : labels.task}
-                        </Badge>
-                      </div>
+                      <p className="truncate text-[13px] sm:text-sm font-semibold">{entry.title}</p>
                     </button>
                   ))
                 ) : (
@@ -744,26 +804,27 @@ export function ActionCalendarPanel({
                   </div>
                 )}
 
-                {timedEntriesForDay(focusDate).map((entry) => (
+                {timedLayoutsForDay(focusDate).map((layout) => (
                   <button
-                    key={entry.id}
+                    key={layout.entry.id}
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation()
-                      handleEntryOpen(entry)
+                      handleEntryOpen(layout.entry)
                     }}
                     onDoubleClick={(event) => event.stopPropagation()}
                     className={cn(
-                      'absolute left-2 right-2 sm:left-3 sm:right-3 z-20 overflow-hidden rounded-xl sm:rounded-2xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-left shadow-[0_18px_32px_-24px_rgba(0,0,0,0.75)] cursor-pointer',
-                      entryToneClasses(entry),
+                      'absolute z-20 overflow-hidden px-1.5 sm:px-2 text-left cursor-pointer transition-opacity hover:opacity-80',
+                      entryTextToneClasses(layout.entry),
                     )}
                     style={{
-                      top: timedEntryTop(entry),
-                      height: timedEntryHeight(entry),
+                      top: timedEntryTop(layout.entry),
+                      height: timedEntryHeight(layout.entry),
+                      left: `calc(${(layout.column * 100) / layout.columns}% + 10px)`,
+                      width: `calc(${100 / layout.columns}% - 20px)`,
                     }}
                   >
-                    <p className="truncate text-[13px] sm:text-sm font-semibold">{entry.title}</p>
-                    <p className="mt-0.5 sm:mt-1 truncate text-[11px] sm:text-xs opacity-80">{entry.meta}</p>
+                    <p className="truncate text-[13px] sm:text-sm font-semibold leading-5">{layout.entry.title}</p>
                   </button>
                 ))}
               </div>
