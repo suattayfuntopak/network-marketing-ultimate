@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Flame,
   Package,
-  Presentation,
   TrendingUp,
   Users,
   UserRoundCheck,
@@ -196,10 +195,7 @@ export default function DashboardPage() {
   const now = new Date()
   const todayStart = startOfDay(now)
   const todayEnd = endOfDay(now)
-  const weekStart = addDays(todayStart, -6)
   const weekEnd = endOfDay(addDays(todayStart, 6))
-  const previousWeekStart = addDays(weekStart, -7)
-  const previousWeekEnd = endOfDay(addDays(weekStart, -1))
   const heroDateLabel = formatHeroDate(todayStart, locale)
   const fullName = currentUser?.name ?? ''
 
@@ -242,6 +238,12 @@ export default function DashboardPage() {
     })
     .sort((left, right) => new Date(left.due_date).getTime() - new Date(right.due_date).getTime())
 
+  const activeEvents = events.filter((event) => event.status !== 'cancelled')
+  const overdueEvents = activeEvents.filter((event) => {
+    if (event.status === 'completed') return false
+    return new Date(event.endDate).getTime() < now.getTime()
+  })
+
   const riskItems: RiskItem[] = [
     ...overdueTasks.slice(0, 3).map((task) => ({
       id: `task-${task.id}`,
@@ -268,39 +270,6 @@ export default function DashboardPage() {
       variant: 'default' as const,
     })),
   ].slice(0, 6)
-
-  const currentWeekTouches = contacts.filter((contact) => {
-    if (!contact.last_contact_date) return false
-    const date = new Date(contact.last_contact_date)
-    return date >= weekStart && date <= weekEnd
-  }).length
-  const previousWeekTouches = contacts.filter((contact) => {
-    if (!contact.last_contact_date) return false
-    const date = new Date(contact.last_contact_date)
-    return date >= previousWeekStart && date <= previousWeekEnd
-  }).length
-
-  const previousWeekFocus = tasks.filter((task) => {
-    const due = new Date(task.due_date)
-    return due >= previousWeekStart && due <= previousWeekEnd
-  }).length
-  const currentWeekFocus = tasks.filter((task) => {
-    const due = new Date(task.due_date)
-    return due >= weekStart && due <= weekEnd
-  }).length
-
-  const currentWeekOverdue = overdueTasks.length
-  const previousWeekOverdue = tasks.filter((task) => {
-    if (task.status === 'completed' || task.status === 'skipped') return false
-    const due = new Date(task.due_date)
-    return due >= previousWeekStart && due <= previousWeekEnd
-  }).length
-
-  const previousWeekSessions = tasks.filter((task) => {
-    if (!['meeting', 'presentation', 'training'].includes(task.type)) return false
-    const due = new Date(task.due_date)
-    return due >= previousWeekStart && due <= previousWeekEnd
-  }).length
 
   const totalCustomers = customerContactIds
     ? new Set(customerContactIds).size
@@ -347,47 +316,51 @@ export default function DashboardPage() {
 
   const kpis = [
     {
-      label: locale === 'tr' ? 'Bugünkü Aksiyonlar' : "Today's Actions",
-      value: focusTasks.length,
+      label: locale === 'tr' ? 'Tüm Aksiyonlar' : 'All Actions',
+      value: openTasks.length + activeEvents.length,
       hint: locale === 'tr'
-        ? `${overdueTasks.length} gecikmiş, ${Math.max(focusTasks.length - overdueTasks.length, 0)} bugün`
-        : `${overdueTasks.length} overdue, ${Math.max(focusTasks.length - overdueTasks.length, 0)} due today`,
+        ? `${openTasks.length} görev & takip, ${activeEvents.length} etkinlik`
+        : `${openTasks.length} tasks & follow-ups, ${activeEvents.length} events`,
       icon: Zap,
-      route: '/tasks',
+      route: '/calendar',
       accent: 'primary',
-      delta: calcDelta(currentWeekFocus, previousWeekFocus),
+      delta: calcDelta(openTasks.length + activeEvents.length, openTasks.length + activeEvents.length),
       deltaTone: 'auto' as const,
     },
     {
-      label: locale === 'tr' ? 'Geciken Takipler' : 'Overdue Follow-ups',
-      value: overdueTasks.length,
-      hint: locale === 'tr' ? `${riskItems.length} kayıt hemen aksiyon istiyor` : `${riskItems.length} records need action now`,
-      icon: AlertTriangle,
+      label: locale === 'tr' ? 'Tüm Görev & Takipler' : 'All Tasks & Follow-ups',
+      value: openTasks.length,
+      hint: locale === 'tr'
+        ? `${focusTasks.length} tanesi bugün odakta`
+        : `${focusTasks.length} are in today's focus`,
+      icon: CheckCircle2,
       route: '/tasks',
       accent: 'error',
-      delta: calcDelta(currentWeekOverdue, previousWeekOverdue),
-      deltaTone: 'inverse' as const,
-    },
-    {
-      label: locale === 'tr' ? 'Sıcak Adaylar' : 'Hot Prospects',
-      value: hotLeads.length,
-      hint: locale === 'tr' ? `${staleHotLeads.length} tanesinde temas zayıf` : `${staleHotLeads.length} need a fresh touch`,
-      icon: Flame,
-      route: '/contacts?temperature=hot',
-      accent: 'warning',
-      delta: calcDelta(currentWeekTouches, previousWeekTouches),
+      delta: calcDelta(openTasks.length, openTasks.length),
       deltaTone: 'auto' as const,
     },
     {
-      label: locale === 'tr' ? 'Bu Hafta Toplantı / Sunum' : 'This Week Sessions',
-      value: upcomingSessions.length,
+      label: locale === 'tr' ? 'Geciken Etkinlikler' : 'Overdue Events',
+      value: overdueEvents.length,
       hint: locale === 'tr'
-        ? `${upcomingSessions.filter((item) => item.type === 'presentation').length} sunum, ${upcomingSessions.filter((item) => item.type === 'meeting').length} toplantı`
-        : `${upcomingSessions.filter((item) => item.type === 'presentation').length} presentations, ${upcomingSessions.filter((item) => item.type === 'meeting').length} meetings`,
-      icon: Presentation,
-      route: '/calendar',
+        ? `${activeEvents.length} etkinliğin ${overdueEvents.length} tanesi geride kaldı`
+        : `${overdueEvents.length} of ${activeEvents.length} events are in the past`,
+      icon: Calendar,
+      route: '/events',
+      accent: 'warning',
+      delta: calcDelta(overdueEvents.length, overdueEvents.length),
+      deltaTone: 'auto' as const,
+    },
+    {
+      label: locale === 'tr' ? 'Geciken Görev & Takipler' : 'Overdue Tasks & Follow-ups',
+      value: overdueTasks.length,
+      hint: locale === 'tr'
+        ? `${riskItems.length} kritik kayıt listede öne çıkıyor`
+        : `${riskItems.length} critical records rise to the top`,
+      icon: AlertTriangle,
+      route: '/tasks',
       accent: 'secondary',
-      delta: calcDelta(upcomingSessions.length, previousWeekSessions),
+      delta: calcDelta(overdueTasks.length, overdueTasks.length),
       deltaTone: 'auto' as const,
     },
   ] as const

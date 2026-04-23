@@ -344,6 +344,25 @@ export default function ContactsPage() {
 
   const contactKpiRows = useMemo(() => {
     const tr = currentLocale === 'tr'
+    const accentClasses = [
+      {
+        card: 'border-primary/20 bg-gradient-to-br from-primary/18 to-primary/5',
+        icon: 'border-primary/18 bg-primary/10 text-primary',
+      },
+      {
+        card: 'border-error/20 bg-gradient-to-br from-error/18 to-error/5',
+        icon: 'border-error/18 bg-error/10 text-error',
+      },
+      {
+        card: 'border-warning/20 bg-gradient-to-br from-warning/18 to-warning/5',
+        icon: 'border-warning/18 bg-warning/10 text-warning',
+      },
+      {
+        card: 'border-secondary/20 bg-gradient-to-br from-secondary/18 to-secondary/5',
+        icon: 'border-secondary/18 bg-secondary/10 text-secondary',
+      },
+    ] as const
+
     return {
       top: [
         {
@@ -351,32 +370,32 @@ export default function ContactsPage() {
           label: tr ? 'Toplam Kontak Sayısı' : 'Total contacts',
           value: contactStats.total,
           icon: Users,
-          glow: 'primary' as const,
           segment: 'all' as SegmentKey | null,
+          accent: accentClasses[0],
         },
         {
           key: 'month',
           label: tr ? 'Bu Ay Eklenenler' : 'Added this month',
           value: contactStats.monthAdded,
           icon: CalendarClock,
-          glow: 'primary' as const,
           segment: 'month_added' as SegmentKey | null,
+          accent: accentClasses[1],
         },
         {
           key: 'week',
           label: tr ? 'Bu Hafta Eklenenler' : 'Added this week',
           value: contactStats.weekAdded,
           icon: CalendarRange,
-          glow: 'warning' as const,
           segment: 'week_added' as SegmentKey | null,
+          accent: accentClasses[2],
         },
         {
           key: 'today',
           label: tr ? 'Bugün Eklenenler' : 'Added today',
           value: contactStats.todayAdded,
           icon: CalendarDays,
-          glow: 'success' as const,
           segment: 'today_added' as SegmentKey | null,
+          accent: accentClasses[3],
         },
       ],
       bottom: [
@@ -385,32 +404,32 @@ export default function ContactsPage() {
           label: tr ? 'Potansiyeller' : 'Prospects',
           value: contactStats.prospects,
           icon: UserPlus,
-          glow: 'warning' as const,
           segment: 'prospects' as SegmentKey | null,
+          accent: accentClasses[0],
         },
         {
           key: 'customers',
           label: tr ? 'Müşteriler' : 'Customers',
           value: contactStats.customers,
           icon: ShoppingBag,
-          glow: 'success' as const,
           segment: 'customers' as SegmentKey | null,
+          accent: accentClasses[1],
         },
         {
           key: 'team',
           label: tr ? 'Ekip' : 'Team',
           value: contactStats.team,
           icon: Contact,
-          glow: 'primary' as const,
           segment: 'team' as SegmentKey | null,
+          accent: accentClasses[2],
         },
         {
           key: 'follow',
           label: tr ? 'Takip Gereken' : 'Follow-up due',
           value: contactStats.followUpDue,
           icon: ListChecks,
-          glow: 'error' as const,
           segment: 'follow_up' as SegmentKey | null,
+          accent: accentClasses[3],
         },
       ],
     }
@@ -944,13 +963,12 @@ export default function ContactsPage() {
                 <Card
                   key={stat.key}
                   hover={clickable}
-                  glow={stat.glow}
-                  className={cn('min-h-[108px]', isActive && 'ring-1 ring-primary/25')}
+                  className={cn('min-h-[108px] border', stat.accent.card, isActive && 'ring-1 ring-primary/25')}
                   onClick={clickable ? () => updateSegment(stat.segment!) : undefined}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-hover">
-                      <Icon className="h-4 w-4 text-primary" />
+                    <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border', stat.accent.icon)}>
+                      <Icon className="h-4 w-4" />
                     </div>
                     <p className="text-3xl font-bold text-text-primary kpi-number">{stat.value}</p>
                   </div>
@@ -968,13 +986,12 @@ export default function ContactsPage() {
                 <Card
                   key={stat.key}
                   hover={clickable}
-                  glow={stat.glow}
-                  className={cn('min-h-[108px]', isActive && 'ring-1 ring-primary/25')}
+                  className={cn('min-h-[108px] border', stat.accent.card, isActive && 'ring-1 ring-primary/25')}
                   onClick={clickable ? () => updateSegment(stat.segment!) : undefined}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-hover">
-                      <Icon className="h-4 w-4 text-primary" />
+                    <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border', stat.accent.icon)}>
+                      <Icon className="h-4 w-4" />
                     </div>
                     <p className="text-3xl font-bold text-text-primary kpi-number">{stat.value}</p>
                   </div>

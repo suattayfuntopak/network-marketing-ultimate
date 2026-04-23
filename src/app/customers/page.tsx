@@ -306,6 +306,25 @@ export default function CustomersPage() {
     return { total, month, week, today }
   }, [startOfMonth, startOfWeek, startOfToday, validOrders])
 
+  const dashboardAccentClasses = [
+    {
+      card: 'border-primary/20 bg-gradient-to-br from-primary/18 to-primary/5',
+      icon: 'text-primary',
+    },
+    {
+      card: 'border-error/20 bg-gradient-to-br from-error/18 to-error/5',
+      icon: 'text-error',
+    },
+    {
+      card: 'border-warning/20 bg-gradient-to-br from-warning/18 to-warning/5',
+      icon: 'text-warning',
+    },
+    {
+      card: 'border-secondary/20 bg-gradient-to-br from-secondary/18 to-secondary/5',
+      icon: 'text-secondary',
+    },
+  ] as const
+
   const customerRows = useMemo(() => {
     return customers.map((customer) => {
       const orders = validOrders.filter((order) => order.contact_id === customer.id)
@@ -354,12 +373,13 @@ export default function CustomersPage() {
             { label: locale === 'tr' ? 'BU AYKİ MÜŞTERİLER' : 'CUSTOMERS THIS MONTH', value: customerKpis.month, icon: CalendarRange },
             { label: locale === 'tr' ? 'BU HAFTAKİ MÜŞTERİLER' : 'CUSTOMERS THIS WEEK', value: customerKpis.week, icon: CalendarDays },
             { label: locale === 'tr' ? 'BUGÜNKÜ MÜŞTERİLER' : 'CUSTOMERS TODAY', value: customerKpis.today, icon: Sun },
-          ].map((s) => {
+          ].map((s, index) => {
             const Icon = s.icon
+            const accent = dashboardAccentClasses[index % dashboardAccentClasses.length]
             return (
-              <Card key={s.label} className="p-4">
+              <Card key={s.label} className={`p-4 border ${accent.card}`}>
                 <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-tertiary">
-                  <Icon className="h-3.5 w-3.5 text-primary" />
+                  <Icon className={`h-3.5 w-3.5 ${accent.icon}`} />
                   <span>{s.label}</span>
                 </div>
                 <p className="text-3xl font-semibold text-text-primary kpi-number">{s.value}</p>
@@ -374,15 +394,17 @@ export default function CustomersPage() {
             { label: locale === 'tr' ? 'BU AYKİ GELİR' : 'REVENUE THIS MONTH', value: formatTRY(revenueKpis.month) },
             { label: locale === 'tr' ? 'BU HAFTAKİ GELİR' : 'REVENUE THIS WEEK', value: formatTRY(revenueKpis.week) },
             { label: locale === 'tr' ? 'BUGÜNKÜ GELİR' : 'REVENUE TODAY', value: formatTRY(revenueKpis.today) },
-          ].map((s) => (
-            <Card key={s.label} className="p-4">
+          ].map((s, index) => {
+            const accent = dashboardAccentClasses[index % dashboardAccentClasses.length]
+            return (
+            <Card key={s.label} className={`p-4 border ${accent.card}`}>
               <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-tertiary">
-                <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                <TrendingUp className={`h-3.5 w-3.5 ${accent.icon}`} />
                 <span>{s.label}</span>
               </div>
               <p className="text-3xl font-semibold text-text-primary kpi-number">{s.value}</p>
             </Card>
-          ))}
+          )})}
         </motion.div>
 
         <motion.div variants={itemAnim} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -391,15 +413,17 @@ export default function CustomersPage() {
             { label: locale === 'tr' ? 'BU AYKİ SİPARİŞ' : 'ORDERS THIS MONTH', value: orderKpis.month },
             { label: locale === 'tr' ? 'BU HAFTAKİ SİPARİŞ' : 'ORDERS THIS WEEK', value: orderKpis.week },
             { label: locale === 'tr' ? 'BUGÜNKÜ SİPARİŞ' : 'ORDERS TODAY', value: orderKpis.today },
-          ].map((s) => (
-            <Card key={s.label} className="p-4">
+          ].map((s, index) => {
+            const accent = dashboardAccentClasses[index % dashboardAccentClasses.length]
+            return (
+            <Card key={s.label} className={`p-4 border ${accent.card}`}>
               <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-tertiary">
-                <Receipt className="h-3.5 w-3.5 text-primary" />
+                <Receipt className={`h-3.5 w-3.5 ${accent.icon}`} />
                 <span>{s.label}</span>
               </div>
               <p className="text-3xl font-semibold text-text-primary kpi-number">{s.value}</p>
             </Card>
-          ))}
+          )})}
         </motion.div>
 
         <motion.div variants={itemAnim}>
