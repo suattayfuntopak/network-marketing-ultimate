@@ -11,8 +11,11 @@ import {
   CheckCircle2,
   ChevronRight,
   Flame,
+  Package,
   Presentation,
   TrendingUp,
+  Users,
+  UserRoundCheck,
   Zap,
 } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -22,8 +25,16 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { useAppStore } from '@/store/appStore'
-import { completeTask, fetchAllOrders, fetchContacts, fetchEvents, fetchTasks } from '@/lib/queries'
-import type { ContactRow, OrderRow, TaskRow } from '@/lib/queries'
+import {
+  completeTask,
+  fetchAllOrders,
+  fetchContacts,
+  fetchCustomerContactIds,
+  fetchEvents,
+  fetchProducts,
+  fetchTasks,
+} from '@/lib/queries'
+import type { ContactRow, OrderRow, ProductRow, TaskRow } from '@/lib/queries'
 import type { Event } from '@/types'
 import {
   addDays,
@@ -152,11 +163,30 @@ export default function DashboardPage() {
   })
   const events = eventsQuery.data ?? []
 
+  const productsQuery = useQuery<ProductRow[]>({
+    queryKey: ['products'],
+    queryFn: fetchProducts,
+    staleTime: 30_000,
+  })
+  const products = productsQuery.data ?? []
+
+  const customerContactIdsQuery = useQuery<string[] | null>({
+    queryKey: ['customer-contact-ids'],
+    queryFn: fetchCustomerContactIds,
+    staleTime: 30_000,
+  })
+  const customerContactIds = customerContactIdsQuery.data ?? null
+
   const isInitialLoading =
     (contactsQuery.isPending && !contactsQuery.data) ||
     (tasksQuery.isPending && !tasksQuery.data) ||
     (ordersQuery.isPending && !ordersQuery.data) ||
     (eventsQuery.isPending && !eventsQuery.data)
+
+  const isSummaryLoading =
+    (contactsQuery.isPending && !contactsQuery.data) ||
+    (productsQuery.isPending && !productsQuery.data) ||
+    (customerContactIdsQuery.isPending && customerContactIdsQuery.data === undefined)
 
   const completeTaskMutation = useMutation({
     mutationFn: completeTask,
@@ -272,6 +302,45 @@ export default function DashboardPage() {
     return due >= previousWeekStart && due <= previousWeekEnd
   }).length
 
+  const totalCustomers = customerContactIds
+    ? new Set(customerContactIds).size
+    : contacts.filter((contact) => contact.pipeline_stage === 'became_customer').length
+
+  const heroSummaryCards = [
+    {
+      label: locale === 'tr' ? 'Toplam Kontak Sayısı' : 'Total Contacts',
+      value: contacts.length,
+      icon: Users,
+      route: '/contacts',
+      accentClass: 'border-primary/18 bg-primary/10 text-primary',
+      hint: locale === 'tr' ? 'aktif ilişki havuzu' : 'active relationship pool',
+    },
+    {
+      label: locale === 'tr' ? 'Toplam Ekip Sayısı' : 'Total Team Members',
+      value: contacts.filter((contact) => contact.pipeline_stage === 'became_member').length,
+      icon: UserRoundCheck,
+      route: '/team',
+      accentClass: 'border-secondary/18 bg-secondary/10 text-secondary',
+      hint: locale === 'tr' ? 'ekipte kayıtlı kişi' : 'people currently in team',
+    },
+    {
+      label: locale === 'tr' ? 'Toplam Müşteri Sayısı' : 'Total Customers',
+      value: totalCustomers,
+      icon: TrendingUp,
+      route: '/customers',
+      accentClass: 'border-success/18 bg-success/10 text-success',
+      hint: locale === 'tr' ? 'aktif müşteri kaydı' : 'active customer records',
+    },
+    {
+      label: locale === 'tr' ? 'Toplam Ürün Sayısı' : 'Total Products',
+      value: products.length,
+      icon: Package,
+      route: '/products',
+      accentClass: 'border-warning/18 bg-warning/10 text-warning',
+      hint: locale === 'tr' ? 'ürün kataloğunda aktif' : 'active in product catalog',
+    },
+  ] as const
+
   const kpis = [
     {
       label: locale === 'tr' ? 'Bugünkü Aksiyonlar' : "Today's Actions",
@@ -356,6 +425,34 @@ export default function DashboardPage() {
             </div>
           </div>
         </Card>
+      </motion.div>
+
+      <motion.div variants={item} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {isSummaryLoading && Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={`summary-skeleton-${index}`} className="h-[116px]" />
+        ))}
+        {!isSummaryLoading && heroSummaryCards.map((card) => {
+          const Icon = card.icon
+
+          return (
+            <button
+              key={card.label}
+              onClick={() => router.push(card.route)}
+              className="group rounded-xl border border-border bg-card/95 p-4 text-left transition-all hover:border-border-strong hover:bg-card-hover"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-text-tertiary">{card.label}</p>
+                  <p className="mt-3 text-3xl font-bold text-text-primary">{card.value}</p>
+                  <p className="mt-2 text-xs text-text-secondary">{card.hint}</p>
+                </div>
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${card.accentClass}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+              </div>
+            </button>
+          )
+        })}
       </motion.div>
 
       <motion.div variants={item}>
