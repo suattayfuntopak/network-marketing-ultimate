@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import type { EventParticipantPickerLabels } from '@/components/events/EventParticipantPicker'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
@@ -10,7 +11,7 @@ import { AvatarGroup } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
-import { EventInviteModal } from '@/components/events/EventInviteModal'
+import { EventInviteSendModal } from '@/components/events/EventInviteSendModal'
 import { EventCreateModal } from '@/components/events/EventCreateModal'
 import { EventDetailsModal } from '@/components/events/EventDetailsModal'
 import {
@@ -18,15 +19,16 @@ import {
   blankEvent,
   eventPrefillFromDate,
   eventToForm,
+  type EventFormShape,
   eventTypeColors,
   formToInput,
   type EventFieldLabels,
-  type EventFormShape,
 } from '@/components/events/eventForm'
 import { useAppStore } from '@/store/appStore'
 import {
   createEvent as apiCreateEvent,
   deleteEvent as apiDeleteEvent,
+  deleteEventAttendees,
   fetchContacts,
   fetchEvents,
   updateEvent as apiUpdateEvent,
@@ -53,6 +55,8 @@ export default function EventsPage() {
   const [editForm, setEditForm] = useState(blankEvent)
   const [returnPath, setReturnPath] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [pendingAttendeeIds, setPendingAttendeeIds] = useState<string[]>([])
+  const [savingEvent, setSavingEvent] = useState(false)
   const [processedParamsToken, setProcessedParamsToken] = useState<string | null>(null)
 
   const { data: eventItems = [] } = useQuery<Event[]>({
@@ -128,67 +132,133 @@ export default function EventsPage() {
         description: 'Description',
       }
 
+  const trPicker: EventParticipantPickerLabels = {
+    searchLabel: 'Kontak ara',
+    searchPlaceholder: 'İsim, rol veya konum...',
+    selectAll: 'Tümünü Seç',
+    clear: 'Temizle',
+    empty: 'Eşleşen kontak yok.',
+    done: 'Tamam',
+    send: 'Gönder',
+    peopleCount: (n: number) => (n === 0 ? 'Henüz kimse seçilmedi.' : `${n} kişi seçili.`),
+  }
+
+  const enPicker: EventParticipantPickerLabels = {
+    searchLabel: 'Search',
+    searchPlaceholder: 'Name, role, or location...',
+    selectAll: 'Select all',
+    clear: 'Clear',
+    empty: 'No matching contacts.',
+    done: 'Done',
+    send: 'Send',
+    peopleCount: (n: number) => (n === 0 ? 'No one selected yet.' : `${n} selected.`),
+  }
+
   const labels = locale === 'tr'
     ? {
         details: 'Detaylar',
         invite: 'Kişilere Gönder',
-        inviteTitle: 'Etkinliği Kişilere Gönder',
-        inviteDesc: 'Seçtiğin kontaklar davetli olarak etkinliğe eklenecek.',
-        inviteSearchLabel: 'Kontak Ara',
-        inviteSearch: 'Kontak ara...',
-        inviteEmpty: 'Bu etkinlik için yeni davetli bulunamadı.',
-        inviteSubmit: 'Gönder',
-        inviteNow: 'Tekli Gönder',
-        selectAll: 'Tümünü Seç',
-        selectEligible: 'Uygunları Seç',
-        clearSelection: 'Temizle',
-        sendChannel: 'Gönderim Kanalı',
-        channelHint: 'WhatsApp ve SMS telefon, e-posta ise mail adresi ister. Telegram paylaşım ekranı açar.',
+        sendBlockedHint: 'Davet göndermek veya toplu mesaj açmadan önce tüm değişiklikleri (etkinlik alanları + katılımcı listesi) “Değişiklikleri Kaydet” ile kaydedin.',
+        sendModal: {
+          title: 'Etkinliği Kişilere Gönder',
+          description: 'Kayıtlı katılımcılara aynı etkinlik mesajını ilet. İstersen aşağıdaki isimlerin yanındaki “Aç” ile tek tek de gönderebilirsin.',
+          sendChannel: 'Gönderim kanalı',
+          channelHint: 'WhatsApp ve SMS telefon, e-posta e-posta adresi, Telegram paylaşım penceresi ister.',
+          messageLabel: 'Mesaj (yer tutucular: {name}, {eventTitle}, {date}, {time}, {location}, {meetingUrl}, {groupLink})',
+          bulkSend: 'Toplu gönder',
+          sequentialSend: 'Sırayla aç',
+          oneByOne: 'Tek tek aç (liste)',
+          openLink: 'Aç',
+          advanced: 'Grup linkleri ve şablon',
+          groupLinksHint: 'Grup sohbetine yönlendirmek istersen bağlantıları doldur; mesajda {groupLink} kullan.',
+          whatsappGroup: 'WhatsApp grup davet linki',
+          telegramGroup: 'Telegram grup linki',
+          templateLabel: 'Mesaj şablonu',
+          saveAsTemplate: 'Metni şablon kaydet',
+          historyTitle: 'Son gönderimler',
+          noHistory: 'Bu etkinlik için geçmiş yok.',
+          selectedCount: 'kişi',
+          recipientCount: (n: number) => `Alıcı: ${n} kişi (kaydedilen katılımcı listesi).`,
+          cancel: 'Kapat',
+          addedToEvent: 'kayıt güncellendi.',
+          sentTo: 'gönderim penceresi hazır',
+          noCompatibleContacts: 'Bu kanal için uygun telefon, e-posta veya paylaşım yolu yok.',
+        },
         delete: 'Etkinliği Sil',
         attendees: 'Katılımcılar',
         attendeesEmpty: 'Henüz katılımcı eklenmedi.',
         manageHint: 'Etkinliği düzenle, davet gönder veya gerekirse akıştan kaldır.',
-        selected: 'Seçili',
         openMeeting: 'Toplantıyı Aç',
         openMap: 'Haritada Aç',
-        viewContacts: 'Kontakları Gör',
-        selectedCount: 'seçili',
-        sentTo: 'gönderim hazırlandı',
-        addedToEvent: 'kişi etkinliğe eklendi',
-        noCompatibleContacts: 'Seçilen kanala uygun iletişim bilgisi bulunamadı.',
-        telegramNotice: 'Telegram bağlantısı paylaşım ekranında açıldı.',
+        viewContacts: 'Katılımcı Ekle',
         createDescription: 'Yeni bir sunum, egitim veya ekip bulusmasi planla.',
       }
     : {
         details: 'Details',
-        invite: 'Send to Contacts',
-        inviteTitle: 'Send Event to Contacts',
-        inviteDesc: 'Selected contacts will be added as invited attendees.',
-        inviteSearchLabel: 'Search Contacts',
-        inviteSearch: 'Search contacts...',
-        inviteEmpty: 'No additional contacts are available for this event.',
-        inviteSubmit: 'Send',
-        inviteNow: 'Send Now',
-        selectAll: 'Select All',
-        selectEligible: 'Select Eligible',
-        clearSelection: 'Clear',
-        sendChannel: 'Delivery Channel',
-        channelHint: 'WhatsApp and SMS need phone numbers, email needs an address, Telegram opens the share flow.',
+        invite: 'Notify participants',
+        sendBlockedHint: 'Save your changes to the event fields and attendee list with “Save changes” before opening invitations.',
+        sendModal: {
+          title: 'Send to participants',
+          description: 'Send the same invitation message to saved attendees, or use Open next to a name to send one at a time.',
+          sendChannel: 'Channel',
+          channelHint: 'WhatsApp and SMS need a phone number, email needs an address, Telegram opens a share flow.',
+          messageLabel: 'Message (placeholders: {name}, {eventTitle}, {date}, {time}, {location}, {meetingUrl}, {groupLink})',
+          bulkSend: 'Bulk send',
+          sequentialSend: 'Open in sequence',
+          oneByOne: 'Open one by one',
+          openLink: 'Open',
+          advanced: 'Group links and templates',
+          groupLinksHint: 'Optional group invite links; use {groupLink} in the message.',
+          whatsappGroup: 'WhatsApp group invite link',
+          telegramGroup: 'Telegram group link',
+          templateLabel: 'Message template',
+          saveAsTemplate: 'Save text as template',
+          historyTitle: 'Recent sends',
+          noHistory: 'No send history for this event.',
+          selectedCount: 'recipients',
+          recipientCount: (n: number) => `Recipients: ${n} (saved list).`,
+          cancel: 'Close',
+          addedToEvent: 'records updated.',
+          sentTo: 'delivery window ready',
+          noCompatibleContacts: 'No phone, email, or share path for this channel.',
+        },
         delete: 'Delete Event',
         attendees: 'Attendees',
         attendeesEmpty: 'No attendees added yet.',
         manageHint: 'Update the event, send invitations, or remove it from the flow.',
-        selected: 'Selected',
         openMeeting: 'Open Meeting',
         openMap: 'Open Map',
-        viewContacts: 'View Contacts',
-        selectedCount: 'selected',
-        sentTo: 'delivery prepared',
-        addedToEvent: 'contacts added to the event',
-        noCompatibleContacts: 'No compatible contact info is available for the selected channel.',
-        telegramNotice: 'Telegram share flow has been opened.',
+        viewContacts: 'Add participants',
         createDescription: 'Plan a new presentation, training, or team session.',
       }
+
+  const attendeesDirty = useMemo(() => {
+    if (!activeEvent) return false
+    const a = activeEvent.attendees
+      .map((x) => x.contactId)
+      .sort()
+      .join(',')
+    const b = [...pendingAttendeeIds].sort().join(',')
+    return a !== b
+  }, [activeEvent, pendingAttendeeIds])
+
+  const formDirty = useMemo(() => {
+    if (!activeEvent) return false
+    const e = eventToForm(activeEvent)
+    return (
+      editForm.title !== e.title
+      || editForm.description !== e.description
+      || editForm.type !== e.type
+      || editForm.startDate !== e.startDate
+      || editForm.endDate !== e.endDate
+      || editForm.location !== e.location
+      || editForm.meetingUrl !== e.meetingUrl
+      || editForm.maxAttendees !== e.maxAttendees
+      || editForm.status !== e.status
+    )
+  }, [activeEvent, editForm])
+
+  const sendBlocked = formDirty || attendeesDirty
 
   const eventTypeLabel = (type: string) => {
     const key = EVENT_TYPE_KEY[type]
@@ -244,11 +314,13 @@ export default function EventsPage() {
     setActiveEventId(event.id)
     setInviteOpen(false)
     setEditForm(eventToForm(event))
+    setPendingAttendeeIds(event.attendees.map((a) => a.contactId))
   }
 
   function closeDetailsModal() {
     setInviteOpen(false)
     setActiveEventId(null)
+    setPendingAttendeeIds([])
     navigateBackIfNeeded()
   }
 
@@ -282,18 +354,44 @@ export default function EventsPage() {
     if (created) {
       setActiveEventId(created.id)
       setEditForm(eventToForm(created))
+      setPendingAttendeeIds(created.attendees.map((a) => a.contactId))
     }
   }
 
   async function saveEvent() {
     if (!activeEvent) return
+    setSavingEvent(true)
     const fallback = locale === 'tr' ? 'Yeni Etkinlik' : 'New Event'
-    await updateMutation.mutateAsync({
-      id: activeEvent.id,
-      input: formToInput(editForm, fallback),
-    })
-    closeDetailsModal()
-    navigateBackIfNeeded()
+    try {
+      await updateMutation.mutateAsync({
+        id: activeEvent.id,
+        input: formToInput(editForm, fallback),
+      })
+
+      const existingById = new Map(activeEvent.attendees.map((a) => [a.contactId, a]))
+      const toRemove = activeEvent.attendees
+        .filter((a) => !pendingAttendeeIds.includes(a.contactId))
+        .map((a) => a.contactId)
+      if (toRemove.length > 0) {
+        await deleteEventAttendees(activeEvent.id, toRemove)
+      }
+      if (pendingAttendeeIds.length > 0) {
+        const entries = pendingAttendeeIds.map((contactId) => {
+          const contact = contacts.find((c) => c.id === contactId)
+          const old = existingById.get(contactId)
+          return {
+            contact_id: contactId,
+            contact_name: contact?.full_name ?? old?.name ?? (locale === 'tr' ? 'Bilinmiyor' : 'Unknown'),
+            rsvp_status: old?.rsvpStatus ?? ('invited' as const),
+            follow_up_status: old?.followUpStatus ?? ('pending' as const),
+          }
+        })
+        await attendeesMutation.mutateAsync({ eventId: activeEvent.id, entries })
+      }
+      navigateBackIfNeeded()
+    } finally {
+      setSavingEvent(false)
+    }
   }
 
   async function deleteEvent(eventId: string) {
@@ -303,8 +401,9 @@ export default function EventsPage() {
     navigateBackIfNeeded()
   }
 
-  function openInviteModal() {
+  function openSendModal() {
     if (!activeEvent) return
+    if (sendBlocked) return
     setInviteOpen(true)
   }
 
@@ -327,18 +426,6 @@ export default function EventsPage() {
     })
 
     await attendeesMutation.mutateAsync({ eventId: activeEvent.id, entries })
-  }
-
-  function stageLabel(contact: ContactRow) {
-    if (locale === 'tr') {
-      if (contact.pipeline_stage === 'became_customer') return 'Müşteri'
-      if (contact.pipeline_stage === 'became_member') return 'Ekip'
-      return 'Potansiyel'
-    }
-
-    if (contact.pipeline_stage === 'became_customer') return 'Customer'
-    if (contact.pipeline_stage === 'became_member') return 'Team'
-    return 'Prospect'
   }
 
   return (
@@ -446,42 +533,73 @@ export default function EventsPage() {
       <EventDetailsModal
         open={Boolean(activeEvent)}
         onClose={closeDetailsModal}
+        locale={locale}
         event={activeEvent}
         contacts={contacts}
         form={editForm}
         onFormChange={setEditForm}
+        selectedAttendeeIds={pendingAttendeeIds}
+        onSelectedAttendeeIdsChange={setPendingAttendeeIds}
+        onRequestSend={openSendModal}
+        sendBlocked={sendBlocked}
+        sendBlockedMessage={labels.sendBlockedHint}
         labels={{
           ...fieldLabels,
           manageHint: labels.manageHint,
           attendees: labels.attendees,
           attendeesEmpty: labels.attendeesEmpty,
-          invite: locale === 'tr' ? 'Kişilere Gönder' : 'Notify Participants',
+          invite: labels.invite,
           openMeeting: labels.openMeeting,
           openMap: labels.openMap,
-          viewContacts: locale === 'tr' ? 'Katılımcı Ekle' : 'Add Participants',
+          viewContacts: labels.viewContacts,
+          sendBlockedHint: labels.sendBlockedHint,
           delete: labels.delete,
           cancel: t.common.cancel,
           saveChanges: t.common.saveChanges,
+          pickerLabels: locale === 'tr' ? trPicker : enPicker,
         }}
         eventTypeLabel={eventTypeLabel}
         eventStatusLabel={eventStatusLabel}
         onSave={saveEvent}
         onDelete={deleteEvent}
-        onOpenInvite={openInviteModal}
-        onOpenContacts={openInviteModal}
-        isSaving={updateMutation.isPending}
+        isSaving={savingEvent || updateMutation.isPending || attendeesMutation.isPending}
         isDeleting={deleteMutation.isPending}
       />
 
-      <EventInviteModal
+      <EventInviteSendModal
+        key={`${activeEvent?.id ?? 'e'}-${String(inviteOpen)}`}
         open={inviteOpen && Boolean(activeEvent)}
         onClose={() => setInviteOpen(false)}
         event={activeEvent}
         contacts={contacts}
+        recipientIds={pendingAttendeeIds}
         locale={locale}
-        labels={{ ...labels, cancel: t.common.cancel }}
+        labels={{
+          title: labels.sendModal.title,
+          description: labels.sendModal.description,
+          sendChannel: labels.sendModal.sendChannel,
+          channelHint: labels.sendModal.channelHint,
+          messageLabel: labels.sendModal.messageLabel,
+          bulkSend: labels.sendModal.bulkSend,
+          sequentialSend: labels.sendModal.sequentialSend,
+          oneByOne: labels.sendModal.oneByOne,
+          openLink: labels.sendModal.openLink,
+          advanced: labels.sendModal.advanced,
+          groupLinksHint: labels.sendModal.groupLinksHint,
+          whatsappGroup: labels.sendModal.whatsappGroup,
+          telegramGroup: labels.sendModal.telegramGroup,
+          templateLabel: labels.sendModal.templateLabel,
+          saveAsTemplate: labels.sendModal.saveAsTemplate,
+          historyTitle: labels.sendModal.historyTitle,
+          noHistory: labels.sendModal.noHistory,
+          selectedCount: labels.sendModal.selectedCount,
+          recipientCount: labels.sendModal.recipientCount,
+          cancel: labels.sendModal.cancel,
+          addedToEvent: labels.sendModal.addedToEvent,
+          sentTo: labels.sendModal.sentTo,
+          noCompatibleContacts: labels.sendModal.noCompatibleContacts,
+        }}
         isSyncing={attendeesMutation.isPending}
-        stageLabel={stageLabel}
         onSyncAttendees={syncInvitedContacts}
       />
     </motion.div>

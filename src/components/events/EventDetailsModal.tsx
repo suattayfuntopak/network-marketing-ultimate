@@ -1,12 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { EventParticipantPicker, type EventParticipantPickerLabels } from '@/components/events/EventParticipantPicker'
 import { EVENT_TYPE_KEY, type EventFieldLabels, type EventFormShape } from '@/components/events/eventForm'
 import type { Event } from '@/types'
 import type { ContactRow } from '@/lib/queries'
-import { MapPin, Send, Trash2, Users, Video } from 'lucide-react'
+import { MapPin, Send, Trash2, UserPlus, Users, Video } from 'lucide-react'
 
 export interface EventDetailsLabels extends EventFieldLabels {
   manageHint: string
@@ -16,14 +18,17 @@ export interface EventDetailsLabels extends EventFieldLabels {
   openMeeting: string
   openMap: string
   viewContacts: string
+  sendBlockedHint: string
   delete: string
   cancel: string
   saveChanges: string
+  pickerLabels: EventParticipantPickerLabels
 }
 
 interface Props {
   open: boolean
   onClose: () => void
+  locale: 'tr' | 'en'
   event: Event | null
   contacts: ContactRow[]
   form: EventFormShape
@@ -33,8 +38,11 @@ interface Props {
   eventStatusLabel: (status: Event['status']) => string
   onSave: () => void
   onDelete: (eventId: string) => void
-  onOpenInvite: () => void
-  onOpenContacts: () => void
+  onRequestSend: () => void
+  sendBlocked: boolean
+  sendBlockedMessage?: string
+  selectedAttendeeIds: string[]
+  onSelectedAttendeeIdsChange: (ids: string[]) => void
   isSaving: boolean
   isDeleting: boolean
 }
@@ -42,6 +50,7 @@ interface Props {
 export function EventDetailsModal({
   open,
   onClose,
+  locale,
   event,
   contacts,
   form,
@@ -51,11 +60,16 @@ export function EventDetailsModal({
   eventStatusLabel,
   onSave,
   onDelete,
-  onOpenInvite,
-  onOpenContacts,
+  onRequestSend,
+  sendBlocked,
+  sendBlockedMessage,
+  selectedAttendeeIds,
+  onSelectedAttendeeIdsChange,
   isSaving,
   isDeleting,
 }: Props) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+
   function attendeesSummary(names: string[]) {
     if (names.length <= 4) return names.join(', ')
     const visible = names.slice(0, 4).join(', ')
@@ -65,6 +79,8 @@ export function EventDetailsModal({
   function resolveAttendeeName(contactId: string, fallback: string) {
     return contacts.find((contact) => contact.id === contactId)?.full_name ?? fallback
   }
+
+  const attendeeNames = selectedAttendeeIds.map((id) => resolveAttendeeName(id, id))
 
   return (
     <Modal
@@ -159,17 +175,26 @@ export function EventDetailsModal({
               <div className="flex items-center gap-2 text-sm text-text-primary">
                 <Users className="w-4 h-4 text-primary" />
                 {labels.attendees}
-                <Badge size="sm" variant="default">{event.attendees.length}</Badge>
+                <Badge size="sm" variant="default">{selectedAttendeeIds.length}</Badge>
               </div>
-              <Button type="button" size="sm" variant="outline" icon={<Send className="w-3.5 h-3.5" />} onClick={onOpenInvite}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                icon={<Send className="w-3.5 h-3.5" />}
+                onClick={onRequestSend}
+                disabled={sendBlocked}
+                title={sendBlocked ? sendBlockedMessage : undefined}
+              >
                 {labels.invite}
               </Button>
             </div>
+            {sendBlocked && (
+              <p className="text-[11px] text-warning mb-2">{labels.sendBlockedHint}</p>
+            )}
             <div className="flex flex-wrap gap-2">
-              {event.attendees.length > 0 ? (
-                <p className="text-sm text-text-secondary">
-                  {attendeesSummary(event.attendees.map((attendee) => resolveAttendeeName(attendee.contactId, attendee.name)))}
-                </p>
+              {attendeeNames.length > 0 ? (
+                <p className="text-sm text-text-secondary">{attendeesSummary(attendeeNames)}</p>
               ) : (
                 <p className="text-sm text-text-tertiary">{labels.attendeesEmpty}</p>
               )}
@@ -197,9 +222,24 @@ export function EventDetailsModal({
                 <MapPin className="w-3.5 h-3.5" /> {labels.openMap}
               </Button>
             )}
-            <Button type="button" variant="ghost" size="sm" onClick={onOpenContacts}>
-              <Users className="w-3.5 h-3.5" /> {labels.viewContacts}
-            </Button>
+            <EventParticipantPicker
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              contacts={contacts}
+              selectedIds={selectedAttendeeIds}
+              onSelectedIdsChange={onSelectedAttendeeIdsChange}
+              locale={locale}
+              disabled={false}
+              onRequestSend={() => {
+                onRequestSend()
+              }}
+              renderTrigger={(toggle) => (
+                <Button type="button" variant="ghost" size="sm" onClick={toggle} icon={<UserPlus className="w-3.5 h-3.5" />}>
+                  {labels.viewContacts}
+                </Button>
+              )}
+              labels={labels.pickerLabels}
+            />
           </div>
 
           <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">

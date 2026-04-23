@@ -859,4 +859,23 @@ export async function upsertEventAttendees(
   if (error) throw error
 }
 
+export async function deleteEventAttendees(eventId: string, contactIds: string[]): Promise<void> {
+  if (contactIds.length === 0) return
+  const userId = await requireSessionUserId()
+  const { error: eventError } = await supabase
+    .from('nmu_events')
+    .select('id')
+    .eq('id', eventId)
+    .eq('user_id', userId)
+    .single()
+  if (eventError) throw eventError
+
+  const { error } = await supabase
+    .from('nmu_event_attendees')
+    .delete()
+    .eq('event_id', eventId)
+    .in('contact_id', contactIds)
+  if (error) throw error
+}
+
 export type { ContactActivityPayload } from './contactActivityLog'
