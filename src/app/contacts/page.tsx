@@ -190,6 +190,31 @@ export default function ContactsPage() {
         await addContactActivityLog(currentUser.id, selectedId!, { kind: 'warmth_changed', previous: prev, score })
       }
     },
+    onMutate: async ({ score }) => {
+      await qc.cancelQueries({ queryKey: ['contacts'] })
+      const previousContacts = qc.getQueryData<ContactRow[]>(['contacts'])
+
+      qc.setQueryData<ContactRow[]>(['contacts'], (old) =>
+        old
+          ? old.map((contact) =>
+              contact.id === selectedId
+                ? {
+                    ...contact,
+                    temperature_score: score,
+                    temperature: temperatureFromScore(score),
+                  }
+                : contact,
+            )
+          : [],
+      )
+
+      return { previousContacts }
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousContacts) {
+        qc.setQueryData(['contacts'], context.previousContacts)
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contacts'] })
       qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
