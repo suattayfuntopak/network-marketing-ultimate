@@ -15,19 +15,27 @@ export type CalendarEntry = {
   title: string
   day: Date
   sortDate: Date
+  startsAt?: Date | null
+  endsAt?: Date | null
   tone: 'primary' | 'success' | 'warning' | 'secondary' | 'default'
   meta: string
   task?: TaskRow
   event?: Event
 }
 
-export const CALENDAR_HOUR_START = 7
-export const CALENDAR_HOUR_END = 21
+export const CALENDAR_HOUR_START = 0
+export const CALENDAR_HOUR_END = 24
 export const CALENDAR_HOUR_HEIGHT = 56
 export const CALENDAR_HOURS = Array.from(
+  { length: CALENDAR_HOUR_END - CALENDAR_HOUR_START },
+  (_, index) => CALENDAR_HOUR_START + index,
+)
+export const CALENDAR_HOUR_BOUNDARIES = Array.from(
   { length: CALENDAR_HOUR_END - CALENDAR_HOUR_START + 1 },
   (_, index) => CALENDAR_HOUR_START + index,
 )
+
+const TASK_TIME_PATTERN = /^(?:Saat|Time):\s*([01]\d|2[0-3]):([0-5]\d)$/i
 
 export function startOfDay(value: Date) {
   const date = new Date(value)
@@ -96,11 +104,34 @@ export function toInputDate(value: Date) {
   return `${year}-${month}-${day}`
 }
 
+export function fromInputDate(value: string) {
+  const [year, month, day] = value.split('-').map((part) => Number(part))
+  return new Date(year, month - 1, day)
+}
+
 export function itemTone(task: TaskRow): CalendarEntry['tone'] {
   if (task.status === 'overdue') return 'warning'
   if (task.priority === 'urgent' || task.priority === 'high') return 'secondary'
   if (task.priority === 'medium') return 'primary'
   return 'default'
+}
+
+export function parseTaskTime(description: string | null | undefined) {
+  const lines = (description ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const timeLine = lines.find((line) => TASK_TIME_PATTERN.test(line))
+  if (!timeLine) return null
+
+  const match = timeLine.match(TASK_TIME_PATTERN)
+  if (!match) return null
+
+  return {
+    hour: Number(match[1]),
+    minute: Number(match[2]),
+  }
 }
 
 export function shiftDate(value: Date, viewMode: CalendarViewMode, direction: 'prev' | 'next') {
@@ -160,19 +191,19 @@ export function entryToneClasses(entry: CalendarEntry) {
 }
 
 export function isTimedCalendarEntry(entry: CalendarEntry) {
-  return entry.kind === 'event' && Boolean(entry.event)
+  return Boolean(entry.startsAt && entry.endsAt)
 }
 
 export function entryStart(entry: CalendarEntry) {
-  if (!entry.event) return null
-  return new Date(entry.event.startDate)
+  if (!entry.startsAt) return null
+  return new Date(entry.startsAt)
 }
 
 export function entryEnd(entry: CalendarEntry) {
-  if (!entry.event) return null
-  return new Date(entry.event.endDate)
+  if (!entry.endsAt) return null
+  return new Date(entry.endsAt)
 }
 
 export function formatHourLabel(hour: number) {
-  return `${`${hour}`.padStart(2, '0')}:00`
+  return `${`${hour % 24}`.padStart(2, '0')}:00`
 }

@@ -18,7 +18,7 @@ import {
   Layers3,
 } from 'lucide-react'
 import {
-  CALENDAR_HOURS,
+  CALENDAR_HOUR_BOUNDARIES,
   CALENDAR_HOUR_HEIGHT,
   CALENDAR_HOUR_START,
   buildMonthGrid,
@@ -30,10 +30,12 @@ import {
   entryToneClasses,
   formatHourLabel,
   formatPeriodTitle,
+  fromInputDate,
   isSameMonth,
   isTimedCalendarEntry,
   isWithinRange,
   itemTone,
+  parseTaskTime,
   sameDay,
   shiftDate,
   startOfDay,
@@ -53,6 +55,7 @@ export function ActionCalendarPanel({
   contactMap,
   initialViewMode = 'month',
   initialFocusDate,
+  onOpenAllActions,
   onOpenEvents,
   onOpenTasks,
   onCreateEvent,
@@ -66,6 +69,7 @@ export function ActionCalendarPanel({
   contactMap: Record<string, string>
   initialViewMode?: CalendarViewMode
   initialFocusDate?: Date
+  onOpenAllActions?: () => void
   onOpenEvents: () => void
   onOpenTasks: () => void
   onCreateEvent: (date?: string, context?: CalendarContext) => void
@@ -81,10 +85,9 @@ export function ActionCalendarPanel({
     ? {
         title: 'Takvim Akışı',
         subtitle: 'Görevleri ve etkinlikleri aynı takvimde izle.',
-        today: 'Bugün',
         allActions: 'Tüm Aksiyonlar',
         todayEvents: "Bugünün Etkinlikleri",
-        dueFollowUps: 'Bugünkü Takipler',
+        dueFollowUps: 'Bugünkü Görev & Takipler',
         noAgenda: 'Bu alan için planlanmış aksiyon görünmüyor. Herhangi bir güne çift tıklayarak görev ekleyebilirsin.',
         openEvents: 'Etkinlikleri Aç',
         openTasks: 'Görevleri Aç',
@@ -102,10 +105,9 @@ export function ActionCalendarPanel({
     : {
         title: 'Action Calendar',
         subtitle: 'Track tasks and events on one planning surface.',
-        today: 'Today',
         allActions: 'All Actions',
         todayEvents: "Today's Events",
-        dueFollowUps: "Today's Tasks",
+        dueFollowUps: "Today's Tasks & Follow-ups",
         noAgenda: 'No actions are visible here yet. Double-click any day to add a task.',
         openEvents: 'Open Events',
         openTasks: 'Open Tasks',
@@ -129,13 +131,29 @@ export function ActionCalendarPanel({
     const taskEntries = tasks
       .filter((task) => task.status !== 'completed' && task.status !== 'skipped')
       .map((task) => {
-        const dueDate = new Date(task.due_date)
+        const dueDate = fromInputDate(task.due_date)
+        const taskTime = parseTaskTime(task.description)
+        const startsAt = taskTime
+          ? new Date(
+              dueDate.getFullYear(),
+              dueDate.getMonth(),
+              dueDate.getDate(),
+              taskTime.hour,
+              taskTime.minute,
+            )
+          : null
+        const endsAt = startsAt
+          ? new Date(startsAt.getTime() + 30 * 60 * 1000)
+          : null
+
         return {
           id: `task-${task.id}`,
           kind: 'task' as const,
           title: task.title,
           day: startOfDay(dueDate),
-          sortDate: startOfDay(dueDate),
+          sortDate: startsAt ?? startOfDay(dueDate),
+          startsAt,
+          endsAt,
           tone: itemTone(task),
           meta: task.contact_id
             ? contactMap[task.contact_id] ?? (locale === 'tr' ? 'Kontak görevi' : 'Contact task')
@@ -154,6 +172,8 @@ export function ActionCalendarPanel({
           title: event.title,
           day: startOfDay(startDate),
           sortDate: startDate,
+          startsAt: startDate,
+          endsAt: new Date(event.endDate),
           tone: (event.status === 'live' ? 'success' : 'primary') as CalendarEntry['tone'],
           meta: event.location || (event.meetingUrl ? (locale === 'tr' ? 'Sanal toplantı' : 'Virtual meeting') : (locale === 'tr' ? 'Etkinlik' : 'Event')),
           event,
@@ -183,7 +203,7 @@ export function ActionCalendarPanel({
   const todayEntries = entries.filter((entry) => sameDay(entry.day, today))
   const todayEvents = todayEntries.filter((entry) => entry.kind === 'event').length
   const todayTasks = todayEntries.filter((entry) => entry.kind === 'task').length
-  const timeGridHeight = CALENDAR_HOURS.length * CALENDAR_HOUR_HEIGHT
+  const timeGridHeight = (CALENDAR_HOUR_BOUNDARIES.length - 1) * CALENDAR_HOUR_HEIGHT
 
   const entriesByDay = useMemo(() => {
     return entries.reduce<Record<string, CalendarEntry[]>>((accumulator, entry) => {
@@ -303,14 +323,6 @@ export function ActionCalendarPanel({
               </button>
             </div>
 
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setFocusDate(today)}
-            >
-              {labels.today}
-            </Button>
-
             <div className="inline-flex items-center rounded-2xl border border-border bg-surface/35 p-1">
               {viewButtons.map(({ key, label, icon: Icon }) => (
                 <button
@@ -347,11 +359,16 @@ export function ActionCalendarPanel({
 
         <div className="mt-4 sm:mt-5 grid grid-cols-3 gap-2 sm:gap-3">
           {[
-            { label: labels.allActions, value: visibleEntries.length, Icon: Layers3 },
-            { label: labels.todayEvents, value: todayEvents, Icon: CalendarClock },
-            { label: labels.dueFollowUps, value: todayTasks, Icon: Bell },
-          ].map(({ label, value, Icon }) => (
-            <div key={label} className="rounded-2xl border border-border bg-surface/35 px-2.5 sm:px-4 py-2.5 sm:py-3">
+            { label: labels.allActions, value: visibleEntries.length, Icon: Layers3, onClick: onOpenAllActions ?? onOpenTasks },
+            { label: labels.todayEvents, value: todayEvents, Icon: CalendarClock, onClick: onOpenEvents },
+            { label: labels.dueFollowUps, value: todayTasks, Icon: Bell, onClick: onOpenTasks },
+          ].map(({ label, value, Icon, onClick }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={onClick}
+              className="rounded-2xl border border-border bg-surface/35 px-2.5 sm:px-4 py-2.5 sm:py-3 text-left transition-colors hover:bg-surface/55 hover:border-primary/30"
+            >
               <div className="flex items-center justify-between gap-2 sm:gap-3">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/12 flex items-center justify-center text-primary shrink-0">
                   <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -359,7 +376,7 @@ export function ActionCalendarPanel({
                 <p className="text-lg sm:text-2xl font-bold text-text-primary kpi-number">{value}</p>
               </div>
               <p className="mt-2 sm:mt-3 text-[11px] sm:text-sm text-text-secondary font-medium line-clamp-2 leading-tight">{label}</p>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -549,7 +566,7 @@ export function ActionCalendarPanel({
                 <div className="relative max-h-[560px] sm:max-h-[780px] overflow-y-auto">
                   <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] sm:grid-cols-[72px_repeat(7,minmax(0,1fr))]" style={{ height: timeGridHeight }}>
                     <div className="border-r border-border bg-surface/20 relative">
-                      {CALENDAR_HOURS.map((hour) => (
+                      {CALENDAR_HOUR_BOUNDARIES.map((hour) => (
                         <div
                           key={hour}
                           className="absolute left-0 right-0 flex justify-end pr-2 sm:pr-3"
@@ -575,7 +592,7 @@ export function ActionCalendarPanel({
                           onKeyDown={(event) => handleCellKeyDown(event, day)}
                           className="relative border-r border-border last:border-r-0"
                         >
-                          {CALENDAR_HOURS.map((hour) => (
+                          {CALENDAR_HOUR_BOUNDARIES.map((hour) => (
                             <div
                               key={hour}
                               className="absolute left-0 right-0 border-t border-border/50"
@@ -692,7 +709,7 @@ export function ActionCalendarPanel({
             <div className="flex max-h-[560px] sm:max-h-[780px] overflow-auto">
               <div className="w-[56px] sm:w-[72px] shrink-0 border-r border-border bg-surface/20">
                 <div style={{ height: timeGridHeight }} className="relative">
-                  {CALENDAR_HOURS.map((hour) => (
+                  {CALENDAR_HOUR_BOUNDARIES.map((hour) => (
                     <div
                       key={hour}
                       className="absolute left-0 right-0 flex justify-end pr-2 sm:pr-3"
@@ -712,7 +729,7 @@ export function ActionCalendarPanel({
                 className="relative flex-1"
                 style={{ height: timeGridHeight }}
               >
-                {CALENDAR_HOURS.map((hour) => (
+                {CALENDAR_HOUR_BOUNDARIES.map((hour) => (
                   <div
                     key={hour}
                     className="absolute left-0 right-0 border-t border-border/50"
