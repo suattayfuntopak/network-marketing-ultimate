@@ -13,6 +13,7 @@ import {
   Edit3,
   Pencil,
   Plus,
+  RefreshCcw,
   SendHorizontal,
   Sparkles,
   Trash2,
@@ -773,9 +774,26 @@ export function ContactDetailPersonView({
             >
               {tr ? 'Mesajı Hazırla' : 'Prepare Message'}
             </Button>
-            <div className="flex items-center gap-2">
-              <Button type="button" size="sm" variant="outline" onClick={() => void copyCoachingMessage()} icon={copiedCoaching ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}>
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={() => void copyCoachingMessage()}
+                icon={copiedCoaching ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              >
                 {tr ? 'Kopyala' : 'Copy'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="w-full bg-amber-300 text-amber-950 hover:bg-amber-200 shadow-none"
+                onClick={() => void handleGenerateCoachingMessage()}
+                loading={coachingLoading}
+                icon={<RefreshCcw className="h-3.5 w-3.5" />}
+              >
+                {tr ? 'Yeniden Üret' : 'Regenerate'}
               </Button>
               <ChannelSendButton
                 body={coachingMessage}
@@ -786,7 +804,7 @@ export function ContactDetailPersonView({
                 email={contact.email}
                 size="sm"
                 variant="secondary"
-                className="min-w-0 flex-1"
+                className="min-w-0 w-full"
               />
             </div>
           </Card>
