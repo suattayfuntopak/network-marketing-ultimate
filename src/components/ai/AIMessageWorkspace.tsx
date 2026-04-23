@@ -127,6 +127,24 @@ function daysSince(dateValue: string | null | undefined) {
   return Math.round((today.getTime() - value.getTime()) / 86_400_000)
 }
 
+const aiCardAccentClasses = [
+  {
+    card: 'border-primary/20 bg-gradient-to-br from-primary/18 to-primary/5',
+    activeCard: 'border-primary/35 bg-gradient-to-br from-primary/24 to-primary/8 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.16)]',
+    icon: 'border-primary/18 bg-primary/10 text-primary',
+  },
+  {
+    card: 'border-error/20 bg-gradient-to-br from-error/18 to-error/5',
+    activeCard: 'border-error/35 bg-gradient-to-br from-error/24 to-error/8 shadow-[inset_0_0_0_1px_rgba(244,63,94,0.16)]',
+    icon: 'border-error/18 bg-error/10 text-error',
+  },
+  {
+    card: 'border-warning/20 bg-gradient-to-br from-warning/18 to-warning/5',
+    activeCard: 'border-warning/35 bg-gradient-to-br from-warning/24 to-warning/8 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.16)]',
+    icon: 'border-warning/18 bg-warning/10 text-warning',
+  },
+] as const
+
 export function AIMessageWorkspace() {
   const searchParams = useSearchParams()
   const { locale } = useLanguage()
@@ -308,16 +326,19 @@ export function AIMessageWorkspace() {
               key: 'all' as const,
               icon: Users,
               value: stats.total,
+              accent: aiCardAccentClasses[0],
             },
             {
               key: 'team' as const,
               icon: UserCheck,
               value: stats.team,
+              accent: aiCardAccentClasses[1],
             },
             {
               key: 'customers' as const,
               icon: HandCoins,
               value: stats.customers,
+              accent: aiCardAccentClasses[2],
             },
           ].map((card) => {
             const Icon = card.icon
@@ -328,14 +349,14 @@ export function AIMessageWorkspace() {
                 type="button"
                 onClick={() => setSegment(card.key)}
                 className={cn(
-                  'rounded-3xl border bg-surface/30 p-5 text-left transition-all',
+                  'rounded-3xl border p-5 text-left transition-all',
                   active
-                    ? 'border-primary/35 bg-primary/10 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.15)]'
-                    : 'border-border-subtle hover:border-primary/20 hover:bg-surface/40',
+                    ? card.accent.activeCard
+                    : cn(card.accent.card, 'hover:-translate-y-0.5 hover:brightness-110'),
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
+                  <div className={cn('flex h-12 w-12 items-center justify-center rounded-2xl border', card.accent.icon)}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <span className="text-2xl font-semibold text-text-primary">{card.value}</span>
@@ -353,16 +374,19 @@ export function AIMessageWorkspace() {
               key: 'follow_due' as const,
               icon: AlarmClockCheck,
               value: stats.followDue,
+              accent: aiCardAccentClasses[0],
             },
             {
               key: 'hot' as const,
               icon: Flame,
               value: stats.hot,
+              accent: aiCardAccentClasses[1],
             },
             {
               key: 'dormant' as const,
               icon: TimerOff,
               value: stats.dormant,
+              accent: aiCardAccentClasses[2],
             },
           ].map((card) => {
             const Icon = card.icon
@@ -373,14 +397,14 @@ export function AIMessageWorkspace() {
                 type="button"
                 onClick={() => setSegment(card.key)}
                 className={cn(
-                  'rounded-3xl border bg-surface/30 p-5 text-left transition-all',
+                  'rounded-3xl border p-5 text-left transition-all',
                   active
-                    ? 'border-primary/35 bg-primary/10 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.15)]'
-                    : 'border-border-subtle hover:border-primary/20 hover:bg-surface/40',
+                    ? card.accent.activeCard
+                    : cn(card.accent.card, 'hover:-translate-y-0.5 hover:brightness-110'),
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
+                  <div className={cn('flex h-12 w-12 items-center justify-center rounded-2xl border', card.accent.icon)}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <span className="text-2xl font-semibold text-text-primary">{card.value}</span>
