@@ -8,14 +8,13 @@ import { cn } from '@/lib/utils'
 import type { TaskRow } from '@/lib/queries'
 import type { Event } from '@/types'
 import {
-  Bell,
   Calendar,
-  CalendarClock,
   CalendarDays,
   CalendarRange,
   ChevronLeft,
   ChevronRight,
-  Layers3,
+  CalendarClock,
+  ListTodo,
 } from 'lucide-react'
 import {
   CALENDAR_HOUR_BOUNDARIES,
@@ -55,7 +54,6 @@ export function ActionCalendarPanel({
   contactMap,
   initialViewMode = 'month',
   initialFocusDate,
-  onOpenAllActions,
   onOpenEvents,
   onOpenTasks,
   onCreateEvent,
@@ -69,7 +67,6 @@ export function ActionCalendarPanel({
   contactMap: Record<string, string>
   initialViewMode?: CalendarViewMode
   initialFocusDate?: Date
-  onOpenAllActions?: () => void
   onOpenEvents: () => void
   onOpenTasks: () => void
   onCreateEvent: (date?: string, context?: CalendarContext) => void
@@ -85,9 +82,8 @@ export function ActionCalendarPanel({
     ? {
         title: 'Takvim Akışı',
         subtitle: 'Görevleri ve etkinlikleri aynı takvimde izle.',
-        allActions: 'Tüm Aksiyonlar',
-        todayEvents: "Bugünün Etkinlikleri",
-        dueFollowUps: 'Bugünkü Görev & Takipler',
+        allEvents: 'Tüm Etkinlikler',
+        allTasks: 'Tüm Görev & Takipler',
         noAgenda: 'Bu alan için planlanmış aksiyon görünmüyor. Herhangi bir güne çift tıklayarak görev ekleyebilirsin.',
         openEvents: 'Etkinlikleri Aç',
         openTasks: 'Görevleri Aç',
@@ -105,9 +101,8 @@ export function ActionCalendarPanel({
     : {
         title: 'Action Calendar',
         subtitle: 'Track tasks and events on one planning surface.',
-        allActions: 'All Actions',
-        todayEvents: "Today's Events",
-        dueFollowUps: "Today's Tasks & Follow-ups",
+        allEvents: 'All Events',
+        allTasks: 'All Tasks & Follow-ups',
         noAgenda: 'No actions are visible here yet. Double-click any day to add a task.',
         openEvents: 'Open Events',
         openTasks: 'Open Tasks',
@@ -200,9 +195,8 @@ export function ActionCalendarPanel({
   const monthDays = useMemo(() => buildMonthGrid(focusDate), [focusDate])
   const weekDays = useMemo(() => buildWeekDays(focusDate), [focusDate])
   const periodTitle = formatPeriodTitle(locale, viewMode, focusDate)
-  const todayEntries = entries.filter((entry) => sameDay(entry.day, today))
-  const todayEvents = todayEntries.filter((entry) => entry.kind === 'event').length
-  const todayTasks = todayEntries.filter((entry) => entry.kind === 'task').length
+  const activeEventCount = entries.filter((entry) => entry.kind === 'event').length
+  const activeTaskCount = entries.filter((entry) => entry.kind === 'task').length
   const timeGridHeight = (CALENDAR_HOUR_BOUNDARIES.length - 1) * CALENDAR_HOUR_HEIGHT
 
   const entriesByDay = useMemo(() => {
@@ -428,11 +422,10 @@ export function ActionCalendarPanel({
           </div>
         </div>
 
-        <div className="mt-4 sm:mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="mt-4 sm:mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
           {[
-            { label: labels.allActions, value: visibleEntries.length, Icon: Layers3, onClick: onOpenAllActions ?? onOpenTasks },
-            { label: labels.todayEvents, value: todayEvents, Icon: CalendarClock, onClick: onOpenEvents },
-            { label: labels.dueFollowUps, value: todayTasks, Icon: Bell, onClick: onOpenTasks },
+            { label: labels.allEvents, value: activeEventCount, Icon: CalendarClock, onClick: onOpenEvents },
+            { label: labels.allTasks, value: activeTaskCount, Icon: ListTodo, onClick: onOpenTasks },
           ].map(({ label, value, Icon, onClick }) => (
             <button
               key={label}

@@ -115,7 +115,6 @@ export default function CalendarPage() {
           contactMap={contactMap}
           initialViewMode={initialViewMode}
           initialFocusDate={initialFocusDate}
-          onOpenAllActions={() => router.push('/tasks')}
           onOpenEvents={() => router.push('/events')}
           onOpenTasks={() => router.push('/tasks')}
           onCreateEvent={(date, context) => {
