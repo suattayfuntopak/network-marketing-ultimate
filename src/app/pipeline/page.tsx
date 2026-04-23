@@ -34,6 +34,17 @@ const PIPELINE_STAGES = [
   { stage: 'lost', color: '#334155' },
 ] as const
 
+function clampWarmthScore(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) return 0
+  return Math.min(100, Math.max(0, Math.round(value)))
+}
+
+function warmthTextClass(score: number) {
+  if (score < 35) return 'text-cyan-400'
+  if (score < 70) return 'text-amber-400'
+  return 'text-red-400'
+}
+
 export default function PipelinePage() {
   const { t, locale } = useLanguage()
   const h = useHeadingCase()
@@ -154,6 +165,9 @@ export default function PipelinePage() {
                   : 'bg-surface/30 border-border-subtle'
               }`}>
                 {stageContacts.map((contact, i) => (
+                  (() => {
+                    const warmthScore = clampWarmthScore(contact.temperature_score)
+                    return (
                   <motion.div
                     layout
                     key={contact.id}
@@ -174,10 +188,12 @@ export default function PipelinePage() {
                     <p className="mt-1 truncate text-xs text-text-tertiary">
                       {[contact.location, contact.profession].filter(Boolean).join(' · ') || (currentLocale === 'tr' ? 'Kontak kaydı' : 'Contact')}
                     </p>
-                    <div className="mt-2 text-sm font-semibold text-warning">
-                      {Math.min(100, Math.max(0, Math.round(contact.temperature_score ?? 0)))} - {t.temperature[contact.temperature]}
+                    <div className={`mt-2 text-sm font-semibold ${warmthTextClass(warmthScore)}`}>
+                      {warmthScore} - {t.temperature[contact.temperature]}
                     </div>
                   </motion.div>
+                    )
+                  })()
                 ))}
                 {stageContacts.length === 0 && (
                   <div className="flex items-center justify-center h-28 text-sm text-text-muted">
