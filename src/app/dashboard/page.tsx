@@ -312,7 +312,8 @@ export default function DashboardPage() {
       value: contacts.length,
       icon: Users,
       route: '/contacts',
-      accentClass: 'border-primary/18 bg-primary/10 text-primary',
+      accentClass: 'from-primary/18 to-primary/5 border-primary/20',
+      iconAccentClass: 'border-primary/18 bg-primary/10 text-primary',
       hint: locale === 'tr' ? 'aktif ilişki havuzu' : 'active relationship pool',
     },
     {
@@ -320,7 +321,8 @@ export default function DashboardPage() {
       value: contacts.filter((contact) => contact.pipeline_stage === 'became_member').length,
       icon: UserRoundCheck,
       route: '/team',
-      accentClass: 'border-secondary/18 bg-secondary/10 text-secondary',
+      accentClass: 'from-error/18 to-error/5 border-error/20',
+      iconAccentClass: 'border-error/18 bg-error/10 text-error',
       hint: locale === 'tr' ? 'ekipte kayıtlı kişi' : 'people currently in team',
     },
     {
@@ -328,7 +330,8 @@ export default function DashboardPage() {
       value: totalCustomers,
       icon: TrendingUp,
       route: '/customers',
-      accentClass: 'border-success/18 bg-success/10 text-success',
+      accentClass: 'from-warning/18 to-warning/5 border-warning/20',
+      iconAccentClass: 'border-warning/18 bg-warning/10 text-warning',
       hint: locale === 'tr' ? 'aktif müşteri kaydı' : 'active customer records',
     },
     {
@@ -336,7 +339,8 @@ export default function DashboardPage() {
       value: products.length,
       icon: Package,
       route: '/products',
-      accentClass: 'border-warning/18 bg-warning/10 text-warning',
+      accentClass: 'from-secondary/18 to-secondary/5 border-secondary/20',
+      iconAccentClass: 'border-secondary/18 bg-secondary/10 text-secondary',
       hint: locale === 'tr' ? 'ürün kataloğunda aktif' : 'active in product catalog',
     },
   ] as const
@@ -404,24 +408,7 @@ export default function DashboardPage() {
                 {h(t.dashboard.greeting)}
                 {fullName ? `, ${fullName}` : ''}
               </h1>
-              <p className="mt-2 sm:mt-3 max-w-2xl text-[13px] sm:text-sm leading-6 text-text-secondary lg:text-base">
-                {focusTasks.length > 0
-                  ? locale === 'tr'
-                    ? `Bugün önce ${focusTasks.length} aksiyona odaklan. ${hotLeads.length} sıcak aday ve ${upcomingSessions.length} yaklaşan oturum görünür durumda.`
-                    : `Start with ${focusTasks.length} actions today. You have ${hotLeads.length} hot prospects and ${upcomingSessions.length} upcoming sessions on deck.`
-                  : locale === 'tr'
-                    ? `Bugün için açık aksiyon baskısı yok. Şimdi sıcak adaylar, süreç kalitesi ve yaklaşan görüşmeler üzerinden ritmi büyütebilirsin.`
-                    : `There is no immediate action pressure today. Use the room to grow momentum across hot prospects, process quality, and upcoming sessions.`}
-              </p>
-              <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-text-tertiary">
-                <span className="rounded-full border border-border-subtle bg-surface/40 px-3 py-1 font-semibold">{heroDateLabel}</span>
-                <span className="rounded-full border border-border-subtle bg-surface/40 px-3 py-1">
-                  {h(locale === 'tr' ? 'Öncelik' : 'Priority')}:{' '}
-                  <span className="font-semibold text-text-primary">
-                    {focusTasks[0]?.title ?? (locale === 'tr' ? 'Ritmi koru' : 'Protect momentum')}
-                  </span>
-                </span>
-              </div>
+              <p className="mt-3 text-sm font-medium text-text-tertiary sm:text-base">{heroDateLabel}</p>
             </div>
           </div>
         </Card>
@@ -429,7 +416,7 @@ export default function DashboardPage() {
 
       <motion.div variants={item} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {isSummaryLoading && Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={`summary-skeleton-${index}`} className="h-[116px]" />
+          <Skeleton key={`summary-skeleton-${index}`} className="h-[128px] sm:h-[148px]" />
         ))}
         {!isSummaryLoading && heroSummaryCards.map((card) => {
           const Icon = card.icon
@@ -438,16 +425,18 @@ export default function DashboardPage() {
             <button
               key={card.label}
               onClick={() => router.push(card.route)}
-              className="group rounded-xl border border-border bg-card/95 p-4 text-left transition-all hover:border-border-strong hover:bg-card-hover"
+              className={`group h-[128px] rounded-2xl border bg-gradient-to-br p-3.5 text-left transition-all hover:border-border-strong sm:h-[148px] sm:p-5 ${card.accentClass}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-text-tertiary">{card.label}</p>
-                  <p className="mt-3 text-3xl font-bold text-text-primary">{card.value}</p>
-                  <p className="mt-2 text-xs text-text-secondary">{card.hint}</p>
+                  <p className="text-xs font-medium text-text-tertiary line-clamp-1">{card.label}</p>
+                  <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-bold text-text-primary">{card.value}</p>
+                  <p className="mt-1.5 sm:mt-2 text-[11px] sm:text-xs leading-5 text-text-secondary line-clamp-2">{card.hint}</p>
                 </div>
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${card.accentClass}`}>
-                  <Icon className="h-5 w-5" />
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <div className={`rounded-xl sm:rounded-2xl border p-2 sm:p-3 shadow-[0_8px_24px_rgba(2,6,23,0.18)] ${card.iconAccentClass}`}>
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </div>
                 </div>
               </div>
             </button>
@@ -477,7 +466,7 @@ export default function DashboardPage() {
               key={kpi.label}
               variants={item}
               whileHover={{ y: -2 }}
-              className={`rounded-2xl border bg-gradient-to-br ${accentClass} p-3.5 sm:p-5 text-left transition-all hover:border-border-strong`}
+              className={`h-[128px] sm:h-[148px] rounded-2xl border bg-gradient-to-br ${accentClass} p-3.5 sm:p-5 text-left transition-all hover:border-border-strong`}
               onClick={() => router.push(kpi.route)}
             >
               <div className="flex items-start justify-between gap-3 sm:gap-4">

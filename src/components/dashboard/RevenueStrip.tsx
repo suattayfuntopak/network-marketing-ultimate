@@ -15,16 +15,16 @@ type RevenueStripProps = {
 export function RevenueStrip({ snapshot, streak }: RevenueStripProps) {
   const { locale } = useLanguage()
   const sparkData = snapshot.sparkline.map((point) => ({ value: point.revenue }))
+  const accentClasses = [
+    'from-primary/18 to-primary/5 border-primary/20',
+    'from-error/18 to-error/5 border-error/20',
+    'from-warning/18 to-warning/5 border-warning/20',
+    'from-secondary/18 to-secondary/5 border-secondary/20',
+  ] as const
 
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-      <Card padding="md" className="relative overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-40"
-          style={{
-            background: 'radial-gradient(ellipse at 85% 0%, rgba(16,185,129,0.16), transparent 60%)',
-          }}
-        />
+      <Card padding="md" className={`relative h-[128px] sm:h-[148px] overflow-hidden border bg-gradient-to-br ${accentClasses[0]}`}>
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-text-tertiary">
@@ -39,13 +39,7 @@ export function RevenueStrip({ snapshot, streak }: RevenueStripProps) {
         </div>
       </Card>
 
-      <Card padding="md" className="relative overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-40"
-          style={{
-            background: 'radial-gradient(ellipse at 85% 0%, rgba(0,212,255,0.16), transparent 60%)',
-          }}
-        />
+      <Card padding="md" className={`relative h-[128px] sm:h-[148px] overflow-hidden border bg-gradient-to-br ${accentClasses[1]}`}>
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-text-tertiary">
@@ -66,13 +60,7 @@ export function RevenueStrip({ snapshot, streak }: RevenueStripProps) {
         </div>
       </Card>
 
-      <Card padding="md" className="relative overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-40"
-          style={{
-            background: 'radial-gradient(ellipse at 85% 0%, rgba(139,92,246,0.16), transparent 60%)',
-          }}
-        />
+      <Card padding="md" className={`relative h-[128px] sm:h-[148px] overflow-hidden border bg-gradient-to-br ${accentClasses[2]}`}>
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-text-tertiary">
@@ -87,13 +75,7 @@ export function RevenueStrip({ snapshot, streak }: RevenueStripProps) {
         </div>
       </Card>
 
-      <Card padding="md" className="relative overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-40"
-          style={{
-            background: 'radial-gradient(ellipse at 85% 0%, rgba(245,158,11,0.16), transparent 60%)',
-          }}
-        />
+      <Card padding="md" className={`relative h-[128px] sm:h-[148px] overflow-hidden border bg-gradient-to-br ${accentClasses[3]}`}>
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-text-tertiary">
