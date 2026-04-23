@@ -8,7 +8,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
-import { getSafeRedirectTarget, syncAuthSessionCookie } from '@/lib/auth'
+import { getSafeRedirectTarget, syncAuthSessionCookies } from '@/lib/auth'
 import { Mail, Lock, User, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export default function SignupPage() {
@@ -46,7 +46,7 @@ export default function SignupPage() {
     // E-posta onayı gerekmeyebilir — önce session kontrol et
     const { data: { session } } = await supabase.auth.getSession()
     if (session) {
-      syncAuthSessionCookie(true)
+      syncAuthSessionCookies(session)
       router.replace(getSafeRedirectTarget(searchParams.get('next')))
     } else {
       setSuccess(true)

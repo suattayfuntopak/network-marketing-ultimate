@@ -8,7 +8,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
-import { getSafeRedirectTarget, syncAuthSessionCookie } from '@/lib/auth'
+import { getSafeRedirectTarget, syncAuthSessionCookies } from '@/lib/auth'
 import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {
@@ -29,13 +29,13 @@ export default function LoginPage() {
       } = await supabase.auth.getSession()
 
       if (session?.user) {
-        return true
+        return session
       }
 
       await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
 
-    return false
+    return null
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -51,14 +51,14 @@ export default function LoginPage() {
       return
     }
 
-    const sessionReady = await waitForSession()
-    if (!sessionReady) {
+    const session = await waitForSession()
+    if (!session) {
       setError(locale === 'tr' ? 'Oturum hazırlanamadı, lütfen tekrar dene.' : 'Session could not be initialized. Please try again.')
       setLoading(false)
       return
     }
 
-    syncAuthSessionCookie(true)
+    syncAuthSessionCookies(session)
     router.replace(getSafeRedirectTarget(searchParams.get('next')))
   }
 

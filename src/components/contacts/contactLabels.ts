@@ -145,10 +145,12 @@ export type ContactTaskFormValues = {
 export const TASK_TYPE_LABELS: Record<TaskRow['type'], { tr: string; en: string }> = {
   follow_up: { tr: 'Takip', en: 'Follow-up' },
   call: { tr: 'Arama', en: 'Call' },
+  message: { tr: 'Mesaj', en: 'Message' },
   meeting: { tr: 'Toplantı', en: 'Meeting' },
   presentation: { tr: 'Sunum', en: 'Presentation' },
   onboarding: { tr: 'Oryantasyon', en: 'Onboarding' },
   training: { tr: 'Eğitim', en: 'Training' },
+  motivation: { tr: 'Motivasyon', en: 'Motivation' },
   custom: { tr: 'Özel', en: 'Custom' },
 }
 
