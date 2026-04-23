@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/serverSupabase'
 
 export const runtime = 'nodejs'
 
@@ -16,6 +16,10 @@ Kullanıcı bir network marketing profesyoneli. Görevin:
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX = 20
 const MAX_TRACKED_USERS = 10_000
+const MAX_REQUEST_BYTES = 16_384
+const MAX_MESSAGES = 12
+const MAX_MESSAGE_CHARS = 2_000
+const MAX_TOTAL_CHARS = 10_000
 const requestTimestamps = new Map<string, number[]>()
 let lastCleanupAt = 0
 
@@ -67,6 +71,96 @@ type AuthSession = {
   accessToken: string
 }
 
+type ChatMessage = {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+function validateMessages(payload: unknown): { ok: true; messages: ChatMessage[] } | { ok: false; error: string; status: number } {
+  if (!payload || typeof payload !== 'object' || !('messages' in payload)) {
+    return {
+      ok: false,
+      error: 'A non-empty messages array is required.',
+      status: 400,
+    }
+  }
+
+  const messages = (payload as { messages?: unknown }).messages
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return {
+      ok: false,
+      error: 'A non-empty messages array is required.',
+      status: 400,
+    }
+  }
+
+  if (messages.length > MAX_MESSAGES) {
+    return {
+      ok: false,
+      error: `A maximum of ${MAX_MESSAGES} messages is allowed per request.`,
+      status: 413,
+    }
+  }
+
+  let totalChars = 0
+
+  for (const message of messages) {
+    if (!message || typeof message !== 'object') {
+      return {
+        ok: false,
+        error: 'Each message must include a valid role and text content.',
+        status: 400,
+      }
+    }
+
+    const role = 'role' in message ? message.role : undefined
+    const content = 'content' in message ? message.content : undefined
+
+    if ((role !== 'user' && role !== 'assistant') || typeof content !== 'string') {
+      return {
+        ok: false,
+        error: 'Each message must include a valid role and text content.',
+        status: 400,
+      }
+    }
+
+    const trimmed = content.trim()
+    if (!trimmed) {
+      return {
+        ok: false,
+        error: 'Message content cannot be empty.',
+        status: 400,
+      }
+    }
+
+    if (trimmed.length > MAX_MESSAGE_CHARS) {
+      return {
+        ok: false,
+        error: `Each message must stay under ${MAX_MESSAGE_CHARS} characters.`,
+        status: 413,
+      }
+    }
+
+    totalChars += trimmed.length
+  }
+
+  if (totalChars > MAX_TOTAL_CHARS) {
+    return {
+      ok: false,
+      error: `The combined message content must stay under ${MAX_TOTAL_CHARS} characters.`,
+      status: 413,
+    }
+  }
+
+  return {
+    ok: true,
+    messages: messages.map((message) => ({
+      role: (message as ChatMessage).role,
+      content: (message as ChatMessage).content.trim(),
+    })),
+  }
+}
+
 async function resolveUserSession(req: NextRequest): Promise<AuthSession | null> {
   const header = req.headers.get('authorization') ?? req.headers.get('Authorization')
   if (!header || !header.toLowerCase().startsWith('bearer ')) {
@@ -76,15 +170,9 @@ async function resolveUserSession(req: NextRequest): Promise<AuthSession | null>
   const token = header.slice(7).trim()
   if (!token) return null
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return null
-  }
+  const client = createServerSupabaseClient(token)
+  if (!client) return null
 
-  const client = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
   const { data, error } = await client.auth.getUser(token)
   if (error || !data.user) {
     return null
@@ -96,18 +184,8 @@ async function resolveUserSession(req: NextRequest): Promise<AuthSession | null>
 }
 
 async function isRateLimitedGlobally(session: AuthSession): Promise<boolean | null> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!supabaseUrl || !supabaseAnonKey) return null
-
-  const db = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: {
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-      },
-    },
-  })
+  const db = createServerSupabaseClient(session.accessToken)
+  if (!db) return null
 
   const windowStartIso = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString()
   const cleanupBeforeIso = new Date(Date.now() - RATE_LIMIT_WINDOW_MS * 10).toISOString()
@@ -163,15 +241,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = (await req.json()) as {
-      messages?: { role: 'user' | 'assistant'; content: string }[]
+    const requestSize = Number(req.headers.get('content-length') ?? 0)
+    if (Number.isFinite(requestSize) && requestSize > MAX_REQUEST_BYTES) {
+      return Response.json(
+        { error: `Request body must stay under ${MAX_REQUEST_BYTES} bytes.` },
+        { status: 413 }
+      )
     }
 
-    if (!Array.isArray(body.messages) || body.messages.length === 0) {
-      return Response.json(
-        { error: 'A non-empty messages array is required.' },
-        { status: 400 }
-      )
+    const body = await req.json()
+    const validation = validateMessages(body)
+    if (!validation.ok) {
+      return Response.json({ error: validation.error }, { status: validation.status })
     }
 
     const client = new Anthropic({ apiKey })
@@ -179,7 +260,7 @@ export async function POST(req: NextRequest) {
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
-      messages: body.messages,
+      messages: validation.messages,
     })
 
     const encoder = new TextEncoder()
@@ -205,7 +286,10 @@ export async function POST(req: NextRequest) {
     })
 
     return new Response(readable, {
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      headers: {
+        'Cache-Control': 'no-store',
+        'Content-Type': 'text/plain; charset=utf-8',
+      },
     })
   } catch (error) {
     const message =

@@ -12,7 +12,7 @@ import { useAppStore } from '@/store/appStore'
 import type { User, UserSettings } from '@/types'
 import type { Database } from '@/lib/database.types'
 import { useLanguage } from '@/components/common/LanguageProvider'
-import { syncAuthSessionCookie } from '@/lib/auth'
+import { syncAuthSessionCookies } from '@/lib/auth'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 
@@ -109,7 +109,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     }
 
     async function applySession(session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']) {
-      syncAuthSessionCookie(Boolean(session?.user))
+      syncAuthSessionCookies(session)
 
       if (!session?.user) {
         if (mounted) {
@@ -124,7 +124,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       } catch {
         if (mounted) {
           setCurrentUser(null)
-          syncAuthSessionCookie(false)
+          syncAuthSessionCookies(null)
         }
       } finally {
         if (mounted) {
@@ -162,7 +162,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       }
       timer = setTimeout(async () => {
         await supabase.auth.signOut()
-        syncAuthSessionCookie(false)
+        syncAuthSessionCookies(null)
         setCurrentUser(null)
         router.replace('/auth/login')
       }, INACTIVITY_MS)

@@ -405,6 +405,21 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['nmu_orders']['Insert']>
         Relationships: []
       }
+
+      // ─── AI RATE LIMITS ───────────────────────────────────
+      nmu_ai_rate_limits: {
+        Row: {
+          id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['nmu_ai_rate_limits']['Insert']>
+        Relationships: []
+      }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }
@@ -429,3 +444,4 @@ export type NMUNotification = Database['public']['Tables']['nmu_notifications'][
 export type NMUUserProfile = Database['public']['Tables']['nmu_user_profiles']['Row']
 export type NMUProduct = Database['public']['Tables']['nmu_products']['Row']
 export type NMUOrder = Database['public']['Tables']['nmu_orders']['Row']
+export type NMUAIRateLimit = Database['public']['Tables']['nmu_ai_rate_limits']['Row']

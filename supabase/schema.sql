@@ -182,7 +182,24 @@ CREATE TABLE IF NOT EXISTS nmu_campaigns (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ─── 9. ÜRÜNLER ──────────────────────────────────────────────
+-- ─── 9. MÜŞTERİ REGISTRY ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS nmu_customers (
+  id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id            UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  contact_id         UUID NOT NULL REFERENCES nmu_contacts(id) ON DELETE CASCADE,
+  is_active          BOOLEAN NOT NULL DEFAULT TRUE,
+  became_customer_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  left_customer_at   TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, contact_id)
+);
+
+CREATE INDEX IF NOT EXISTS nmu_customers_user_idx ON nmu_customers(user_id);
+CREATE INDEX IF NOT EXISTS nmu_customers_active_idx ON nmu_customers(user_id, is_active);
+CREATE INDEX IF NOT EXISTS nmu_customers_contact_idx ON nmu_customers(contact_id);
+
+-- ─── 10. ÜRÜNLER ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS nmu_products (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -201,7 +218,7 @@ CREATE TABLE IF NOT EXISTS nmu_products (
 CREATE INDEX IF NOT EXISTS nmu_products_user_idx ON nmu_products(user_id);
 CREATE INDEX IF NOT EXISTS nmu_products_active_idx ON nmu_products(user_id, is_active);
 
--- ─── 10. SİPARİŞLER ──────────────────────────────────────────
+-- ─── 11. SİPARİŞLER ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS nmu_orders (
   id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id           UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -221,7 +238,7 @@ CREATE INDEX IF NOT EXISTS nmu_orders_user_idx    ON nmu_orders(user_id);
 CREATE INDEX IF NOT EXISTS nmu_orders_contact_idx ON nmu_orders(contact_id);
 CREATE INDEX IF NOT EXISTS nmu_orders_date_idx    ON nmu_orders(order_date);
 
--- ─── 11. AI RATE LIMIT BUCKETS ───────────────────────────────
+-- ─── 12. AI RATE LIMIT BUCKETS ───────────────────────────────
 CREATE TABLE IF NOT EXISTS nmu_ai_rate_limits (
   id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id    UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -246,7 +263,7 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'nmu_user_profiles','nmu_contacts','nmu_tasks',
-    'nmu_events','nmu_campaigns','nmu_products','nmu_orders'
+    'nmu_events','nmu_campaigns','nmu_customers','nmu_products','nmu_orders'
   ] LOOP
     EXECUTE format(
       'DROP TRIGGER IF EXISTS set_updated_at ON %I;
@@ -267,31 +284,38 @@ ALTER TABLE nmu_events        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_event_attendees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_campaigns     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nmu_customers     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_products      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_orders        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nmu_ai_rate_limits ENABLE ROW LEVEL SECURITY;
 
 -- nmu_user_profiles policies
+DROP POLICY IF EXISTS "nmu_profile_own" ON nmu_user_profiles;
 CREATE POLICY "nmu_profile_own" ON nmu_user_profiles
   FOR ALL USING (auth.uid() = id);
 
 -- nmu_contacts policies
+DROP POLICY IF EXISTS "nmu_contacts_own" ON nmu_contacts;
 CREATE POLICY "nmu_contacts_own" ON nmu_contacts
   FOR ALL USING (auth.uid() = user_id);
 
 -- nmu_tasks policies
+DROP POLICY IF EXISTS "nmu_tasks_own" ON nmu_tasks;
 CREATE POLICY "nmu_tasks_own" ON nmu_tasks
   FOR ALL USING (auth.uid() = user_id);
 
 -- nmu_interactions policies
+DROP POLICY IF EXISTS "nmu_interactions_own" ON nmu_interactions;
 CREATE POLICY "nmu_interactions_own" ON nmu_interactions
   FOR ALL USING (auth.uid() = user_id);
 
 -- nmu_events policies
+DROP POLICY IF EXISTS "nmu_events_own" ON nmu_events;
 CREATE POLICY "nmu_events_own" ON nmu_events
   FOR ALL USING (auth.uid() = user_id);
 
 -- nmu_event_attendees: etkinlik sahibi yönetebilir
+DROP POLICY IF EXISTS "nmu_attendees_own" ON nmu_event_attendees;
 CREATE POLICY "nmu_attendees_own" ON nmu_event_attendees
   FOR ALL USING (
     EXISTS (
@@ -302,18 +326,27 @@ CREATE POLICY "nmu_attendees_own" ON nmu_event_attendees
   );
 
 -- nmu_notifications policies
+DROP POLICY IF EXISTS "nmu_notifications_own" ON nmu_notifications;
 CREATE POLICY "nmu_notifications_own" ON nmu_notifications
   FOR ALL USING (auth.uid() = user_id);
 
 -- nmu_campaigns policies
+DROP POLICY IF EXISTS "nmu_campaigns_own" ON nmu_campaigns;
 CREATE POLICY "nmu_campaigns_own" ON nmu_campaigns
   FOR ALL USING (auth.uid() = user_id);
 
+-- nmu_customers policies
+DROP POLICY IF EXISTS "nmu_customers_own" ON nmu_customers;
+CREATE POLICY "nmu_customers_own" ON nmu_customers
+  FOR ALL USING (auth.uid() = user_id);
+
 -- nmu_products policies
+DROP POLICY IF EXISTS "nmu_products_own" ON nmu_products;
 CREATE POLICY "nmu_products_own" ON nmu_products
   FOR ALL USING (auth.uid() = user_id);
 
 -- nmu_orders policies
+DROP POLICY IF EXISTS "nmu_orders_own" ON nmu_orders;
 CREATE POLICY "nmu_orders_own" ON nmu_orders
   FOR ALL USING (auth.uid() = user_id);
 
@@ -347,5 +380,6 @@ CREATE TRIGGER nmu_on_auth_user_created
 -- ─── TAMAMLANDI ───────────────────────────────────────────────
 -- Tablo listesi: nmu_user_profiles, nmu_contacts, nmu_tasks,
 -- nmu_interactions, nmu_events, nmu_event_attendees,
--- nmu_notifications, nmu_campaigns, nmu_products, nmu_orders,
+-- nmu_notifications, nmu_campaigns, nmu_customers,
+-- nmu_products, nmu_orders,
 -- nmu_ai_rate_limits

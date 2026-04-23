@@ -8,7 +8,7 @@ import { useAppStore } from '@/store/appStore'
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useRouter } from 'next/navigation'
-import { syncAuthSessionCookie } from '@/lib/auth'
+import { syncAuthSessionCookies } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { academyLibraryItems, academyObjectionGuides } from '@/data/academyLibrary'
 import { fetchContacts, fetchEvents, fetchTasks } from '@/lib/queries'
@@ -224,7 +224,7 @@ export function Header() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    syncAuthSessionCookie(false)
+    syncAuthSessionCookies(null)
     setCurrentUser(null)
     router.replace('/auth/login')
   }

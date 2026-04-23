@@ -29,17 +29,19 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ANTHROPIC_API_KEY=your-anthropic-key
 ```
 
-3. Initialize the database:
+3. Initialize the database with the current full schema:
 
 ```sql
 supabase/schema.sql
 ```
 
-If you created the base schema earlier and need incremental additions, you can also run:
+If your Supabase project was created from an older NMU schema, run the incremental scripts that match the missing tables/features:
 
 ```sql
+supabase/add_customers_table.sql
 supabase/add_products_table.sql
 supabase/add_orders_table.sql
+supabase/add_ai_rate_limits_table.sql
 ```
 
 4. Start the app:
