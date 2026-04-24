@@ -537,11 +537,12 @@ export default function MotivationPage() {
           <Button
             type="button"
             size="sm"
-            variant="outline"
+            variant="secondary"
+            className="shrink-0"
             onClick={() => setFavoritesOpen(true)}
             icon={<Star className="h-3.5 w-3.5" />}
           >
-            {h(s('Favori Motivasyon Cümleleri', 'Favorite Motivation Sentences'))}
+            {h(s('Favori Motivasyon Mesajları', 'Favorite Motivation Messages'))}
           </Button>
         </div>
       </motion.section>
@@ -1023,7 +1024,7 @@ export default function MotivationPage() {
           setEditingFavoriteId(null)
           setEditingFavoriteText('')
         }}
-        title={h(s('Favori Motivasyon Cümleleri', 'Favorite Motivation Sentences'))}
+        title={h(s('Favori Motivasyon Mesajları', 'Favorite Motivation Messages'))}
         className="max-w-2xl"
       >
         <div className="px-4 pb-4 sm:px-5">
