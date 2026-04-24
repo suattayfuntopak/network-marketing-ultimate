@@ -25,7 +25,6 @@ export interface EventDetailsLabels extends EventFieldLabels {
   delete: string
   cancel: string
   sendNow: string
-  sendChannelLabel: (channel: InviteChannel) => string
   pickerLabels: EventParticipantPickerLabels
   meetingCombobox: EventMeetingUrlComboboxLabels
   locationSearch: EventLocationSearchLabels
@@ -88,6 +87,18 @@ export function EventDetailsModal({
   }
 
   const attendeeNames = selectedAttendeeIds.map((id) => resolveAttendeeName(id, id))
+  const hasPhoneRecipient = selectedAttendeeIds.some((id) => {
+    const row = contacts.find((c) => c.id === id)
+    return (row?.phone?.replace(/\D/g, '').length ?? 0) > 0
+  })
+
+  const sendOptions: Array<{ id: InviteChannel | 'instagram'; label: string; iconUrl?: string; disabled?: boolean }> = [
+    { id: 'whatsapp', label: 'WhatsApp', iconUrl: 'https://cdn.simpleicons.org/whatsapp/25D366' },
+    { id: 'telegram', label: 'Telegram', iconUrl: 'https://cdn.simpleicons.org/telegram/26A5E4' },
+    { id: 'email', label: locale === 'tr' ? 'E-posta' : 'Email', iconUrl: 'https://cdn.simpleicons.org/gmail/EA4335' },
+    { id: 'sms', label: 'SMS', disabled: !hasPhoneRecipient },
+    { id: 'instagram', label: 'Instagram', iconUrl: 'https://cdn.simpleicons.org/instagram/E4405F', disabled: true },
+  ]
 
   return (
     <Modal
@@ -206,7 +217,7 @@ export function EventDetailsModal({
                   <Badge size="sm" variant="default">{selectedAttendeeIds.length}</Badge>
                 </div>
               </div>
-              <p className="text-[11px] text-text-tertiary mb-2">{labels.sendIntro}</p>
+              {labels.sendIntro ? <p className="text-[11px] text-text-tertiary mb-2">{labels.sendIntro}</p> : null}
               <div className="flex flex-wrap gap-2">
                 {attendeeNames.length > 0 ? (
                   <p className="text-sm text-text-secondary">{attendeesSummary(attendeeNames)}</p>
@@ -274,18 +285,26 @@ export function EventDetailsModal({
                     {labels.sendNow}
                   </Button>
                   {sendMenuOpen && (
-                    <div className="absolute right-0 bottom-full mb-1 w-44 overflow-hidden rounded-xl border border-border bg-card py-1 shadow-xl z-20">
-                      {(['whatsapp', 'telegram', 'email', 'sms'] as InviteChannel[]).map((channel) => (
+                    <div className="absolute right-0 bottom-full mb-1 w-56 overflow-hidden rounded-3xl border border-border bg-card py-2 shadow-xl z-20">
+                      {sendOptions.map((opt) => (
                         <button
-                          key={channel}
+                          key={opt.id}
                           type="button"
-                          className="flex w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-hover"
+                          disabled={opt.disabled}
+                          className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-text-primary transition enabled:hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-text-tertiary/60"
                           onClick={() => {
+                            if (opt.disabled || opt.id === 'instagram') return
                             setSendMenuOpen(false)
-                            onProceedSend(channel)
+                            onProceedSend(opt.id as InviteChannel)
                           }}
                         >
-                          {labels.sendChannelLabel(channel)}
+                          {opt.iconUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={opt.iconUrl} alt="" className="h-5 w-5 shrink-0" width={20} height={20} />
+                          ) : (
+                            <span className="h-5 w-5 shrink-0 rounded border border-cyan-500/60" />
+                          )}
+                          {opt.label}
                         </button>
                       ))}
                     </div>

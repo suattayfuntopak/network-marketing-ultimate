@@ -565,25 +565,19 @@ export default function EventsPage() {
           openMap: labels.openMap,
           viewContacts: labels.viewContacts,
           sendIntro: locale === 'tr'
-            ? "Aşağıdaki bilgileri kontrol edin ve her şey tamamsa 'Kişilere Gönder' adımına geçebilirsiniz!"
-            : "Review details below, and continue to 'Send to People' when ready.",
+            ? ''
+            : '',
           delete: labels.delete,
           cancel: t.common.cancel,
           sendNow: locale === 'tr' ? 'Kişilere Gönder' : 'Send to People',
-          sendChannelLabel: (channel: InviteChannel) => {
-            if (channel === 'whatsapp') return 'WhatsApp'
-            if (channel === 'telegram') return 'Telegram'
-            if (channel === 'email') return 'Email'
-            return 'SMS'
-          },
           pickerLabels: locale === 'tr' ? trPicker : enPicker,
           meetingCombobox: meetingComboboxLabels,
           locationSearch: locationSearchLabels,
           stepParticipantsNext: locale === 'tr' ? 'Katılımcı Ekle' : 'Add participants',
           stepParticipantsBack: locale === 'tr' ? 'Geri' : 'Back',
           stepParticipantsHint: locale === 'tr'
-            ? "Aşağıdaki bilgileri kontrol edin ve her şey tamamsa 'Kişilere Gönder' adımına geçebilirsiniz!"
-            : "Review details below, and continue to 'Send to People' when ready.",
+            ? ''
+            : '',
         }}
         eventTypeLabel={eventTypeLabel}
         eventStatusLabel={eventStatusLabel}
