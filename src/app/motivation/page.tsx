@@ -180,18 +180,62 @@ export default function MotivationPage() {
           'Rules: No income/health/guarantee claims, no shaming, fear, or emotional manipulation. Focus effort, consistency, small wins, one next step, trust. Direct-selling appropriate, not spammy.',
         )
       }
+      const audienceContact = segment === 'single' ? singleContact : null
+
       if (tr) {
         lines.push(
           `Kanal: ${channel}. Ton: ${tone}. Amaç: ${purpose}. Uzunluk: ${lengthKey}. Güvenli ses: ${safeVoice}. Emoji yoğunluğu: ${emojiLevel} (0=yok, 1=opsiyonel tek, 2=en fazla iki).`,
         )
         lines.push(`Bireysel notlar: ${contextNotes || '—'}`)
-        if (singleContact) {
+        if (audienceContact) {
           lines.push(
-            `Hedef kişi: ${singleContact.full_name}, meslek: ${singleContact.profession ?? '—'}, şehir: ${singleContact.location ?? '—'}, aşama: ${singleContact.pipeline_stage}, son temas: ${singleContact.last_contact_date ?? 'yok'}.`,
+            `Hedef kişi (TÜR: tek kişi modu, SADECE bu kişi): ${audienceContact.full_name}, meslek: ${audienceContact.profession ?? '—'}, şehir: ${audienceContact.location ?? '—'}, aşama: ${audienceContact.pipeline_stage}, son temas: ${audienceContact.last_contact_date ?? 'yok'}.`,
           )
-        } else {
+        } else if (segment === 'single' && !audienceContact) {
           lines.push(
-            `Segment: ${segment}. ${segment === 'tagged' && tagFilter ? `Etiket: ${tagFilter}` : ''} Tahmini kişi sayısı: ${segmentPool.length || 'n/a'}.`,
+            'Tek kişi modunda kişi seçilmedi: genel, isimsiz ilham cümleleri; gerçek kişi adı kullanma.',
+          )
+        } else if (segment === 'tagged' && tagFilter.trim()) {
+          const tagLine = `Etiket eşleşmesi: "${tagFilter.trim()}" (küçük/büyük harf duyarsız). Eşleşen kişi sayısı: ${segmentPool.length}.`
+          if (segmentPool.length === 0) {
+            lines.push(
+              `${tagLine} Eşleşen kayıt yok; yanıt: kısa, genel ilham cümleleri, kişi adı KULLANMA.`,
+            )
+          } else {
+            const roster = segmentPool
+              .slice(0, 25)
+              .map(
+                (c, i) =>
+                  `${i + 1}) ${c.full_name} — aşama: ${c.pipeline_stage}, meslek: ${c.profession ?? '—'}, şehir: ${c.location ?? '—'}`,
+              )
+              .join('\n')
+            lines.push(tagLine)
+            lines.push('Bu oturumda mesaj aşağıdaki güncel listeden ÜRETİLMELİDİR. Önceki ekran veya farklı hedef modundan kalan isim KULLANILMAYACAK:')
+            lines.push(roster)
+            if (segmentPool.length === 1) {
+              const one = segmentPool[0]!
+              lines.push(
+                `YALNIZCA ${one.full_name} için kişiselleştir. Hitap: isim/uygun unvan. Başka gerçek veya hayali kişi adı ekleme.`,
+              )
+            } else {
+              lines.push(
+                'Birden fazla eşleşme var: ya gruba/çoğul hitap, ya da mesajı isimsiz (genel) tut; istersen üstteki isimlerden sadece bağlama uyan 1 kişiye odakla ve metinde yalnızca onu an.',
+              )
+            }
+          }
+        } else {
+          const sampleRoster = segmentPool
+            .slice(0, 15)
+            .map(
+              (c) =>
+                `${c.full_name} (${c.pipeline_stage})`,
+            )
+            .join(', ')
+          lines.push(
+            `Hedef: segment "${segment}". Tahmini kişi sayısı: ${segmentPool.length || 'n/a'}.`,
+            sampleRoster
+              ? `Bu segmente uygun örnek isimler (yalnızca bağlam): ${sampleRoster}.`
+              : 'Örnek isim yok; genel yön ver.',
           )
         }
       } else {
@@ -199,18 +243,52 @@ export default function MotivationPage() {
           `Channel: ${channel}, tone: ${tone}, purpose: ${purpose}, length: ${lengthKey}, voice: ${safeVoice}, emoji: ${emojiLevel}.`,
         )
         lines.push(`Notes: ${contextNotes || '—'}`)
-        if (singleContact) {
+        if (audienceContact) {
           lines.push(
-            `Target: ${singleContact.full_name}, job: ${singleContact.profession ?? '—'}, city: ${singleContact.location ?? '—'}, stage: ${singleContact.pipeline_stage}, last touch: ${singleContact.last_contact_date ?? 'none'}.`,
+            `Target (single-person mode ONLY this contact): ${audienceContact.full_name}, job: ${audienceContact.profession ?? '—'}, city: ${audienceContact.location ?? '—'}, stage: ${audienceContact.pipeline_stage}, last touch: ${audienceContact.last_contact_date ?? 'none'}.`,
           )
+        } else if (segment === 'single' && !audienceContact) {
+          lines.push('Single-person mode but no contact selected: generic, name-free lines; do not use real person names.')
+        } else if (segment === 'tagged' && tagFilter.trim()) {
+          if (segmentPool.length === 0) {
+            lines.push(
+              `Tag match "${tagFilter.trim()}": no rows. Do not use any person name; short general lines only.`,
+            )
+          } else {
+            const roster = segmentPool
+              .slice(0, 25)
+              .map(
+                (c, i) =>
+                  `${i + 1}) ${c.full_name} — stage: ${c.pipeline_stage}, job: ${c.profession ?? '—'}`,
+              )
+              .join('\n')
+            lines.push(
+              `Tag match "${tagFilter.trim()}": ${segmentPool.length} people. The message must follow THIS live list. Do not reuse a name from a previous session or another mode:`,
+            )
+            lines.push(roster)
+            if (segmentPool.length === 1) {
+              lines.push(
+                `Write only for ${segmentPool[0]!.full_name}. No other first names in the text.`,
+              )
+            } else {
+              lines.push(
+                'Multiple matches: use plural / “you all”, or one clearly chosen name from the list that fits the message.',
+              )
+            }
+          }
         } else {
+          const sampleRoster = segmentPool
+            .slice(0, 15)
+            .map((c) => `${c.full_name} (${c.pipeline_stage})`)
+            .join(', ')
           lines.push(
-            `Segment: ${segment}. ${segment === 'tagged' && tagFilter ? `Tag: ${tagFilter}` : ''} Estimated people: ${segmentPool.length || 'n/a'}.`,
+            `Target segment: ${segment}. Estimated people: ${segmentPool.length || 'n/a'}.`,
+            sampleRoster ? `Sample names in this segment (context only): ${sampleRoster}.` : 'No sample names; stay general.',
           )
         }
       }
       if (target === 'refine' && base) {
-        lines.push(tr ? `Önceki metin (iyileştir): ${base}` : `Previous text: ${base}`)
+        lines.push(tr ? `Önceki metin (iyileştir; yine de yalnızca yukarıdaki hedef geçerli): ${base}` : `Previous text: ${base}`)
       }
       return lines.join('\n')
     },
@@ -225,7 +303,7 @@ export default function MotivationPage() {
       singleContact,
       segment,
       tagFilter,
-      segmentPool.length,
+      segmentPool,
       emojiLevel,
     ],
   )
@@ -453,14 +531,20 @@ export default function MotivationPage() {
                   {h(s('Hızlı kurulum', 'Quick setup'))}
                 </p>
                 <p className={sectionLabelClass}>{h(s('Hedef', 'Target'))}</p>
-                <select
-                  value={segment}
-                  onChange={(e) => setSegment(e.target.value as Segment)}
-                  className={control}
-                >
+              <select
+                value={segment}
+                onChange={(e) => {
+                  const next = e.target.value as Segment
+                  setSegment(next)
+                  if (next !== 'single') {
+                    setSingleId('')
+                  }
+                }}
+                className={control}
+              >
                   <option value="single">{s('Tek kişi', 'One person')}</option>
                   <option value="new_starters">{s('Yeni başlayanlar', 'New starters')}</option>
-                  <option value="rejection_block">{s('Takılda kalan / itiraz', 'Stuck or objections')}</option>
+                  <option value="rejection_block">{s('Akla takılan / itiraz', 'Stuck or objections')}</option>
                   <option value="dormant">{s('Uzun süredir pasif', 'Long-dormant')}</option>
                   <option value="near_goal">{s('Hedefe yakın', 'Close to a milestone')}</option>
                   <option value="leader_pool">{s('Lider adayları / ekip', 'Leaders & team')}</option>

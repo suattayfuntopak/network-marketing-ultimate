@@ -10,6 +10,8 @@ const QUOTE_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['\u2039', '\u203a'], // ‹ ›
   ["'", "'"],
   ['\u2018', '\u2019'], // ‘ ’
+  ['\u201a', '\u2019'], // ‚’ (low-9 + right single)
+  ['`', '`'], // backtick
 ]
 
 export function stripAiMessageQuotes(input: string): string {
