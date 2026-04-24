@@ -365,6 +365,12 @@ export default function MotivationPage() {
 
   const hasVariations = variations.length > 1
 
+  useEffect(() => {
+    if (!hasVariations && previewTab === 'variants') {
+      setPreviewTab('message')
+    }
+  }, [hasVariations, previewTab])
+
   return (
     <motion.div
       variants={container}
@@ -429,89 +435,127 @@ export default function MotivationPage() {
           <div className="grid min-h-0 grid-cols-1 lg:grid-cols-12">
             {/* Sol: hedef & üretim */}
             <div className="flex flex-col gap-3 border-b border-border p-4 sm:p-5 lg:col-span-5 lg:border-b-0 lg:border-r">
-              <h2 className="text-lg font-semibold tracking-tight text-text-primary sm:text-xl">
-                {h(s('Motivasyon mesajı üret', 'Create motivation message'))}
-              </h2>
-
-              <p className={sectionLabelClass}>{h(s('Hedef', 'Target'))}</p>
-              <select
-                value={segment}
-                onChange={(e) => setSegment(e.target.value as Segment)}
-                className={control}
-              >
-                <option value="single">{s('Tek kişi', 'One person')}</option>
-                <option value="new_starters">{s('Yeni başlayanlar', 'New starters')}</option>
-                <option value="rejection_block">{s('Takılda kalan / itiraz', 'Stuck or objections')}</option>
-                <option value="dormant">{s('Uzun süredir pasif', 'Long-dormant')}</option>
-                <option value="near_goal">{s('Hedefe yakın', 'Close to a milestone')}</option>
-                <option value="leader_pool">{s('Lider adayları / ekip', 'Leaders & team')}</option>
-                <option value="small_wins">{s('Küçük başarı sinyali', 'Small-win signals')}</option>
-                <option value="tagged">{s('Etiketli grup', 'Tagged group')}</option>
-              </select>
-              {segment === 'tagged' && (
-                <Input
-                  className="h-9"
-                  value={tagFilter}
-                  onChange={(e) => setTagFilter(e.target.value)}
-                  placeholder={s('Etiket', 'Tag')}
-                />
-              )}
-              {segment === 'single' && (
-                <select
-                  value={singleId}
-                  onChange={(e) => setSingleId(e.target.value)}
-                  className={control}
-                >
-                  <option value="">{s('Kişi seçin', 'Select a person')}</option>
-                  {[...contacts]
-                    .sort((a, b) => a.full_name.localeCompare(b.full_name, tr ? 'tr' : 'en'))
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.full_name}
-                      </option>
-                    ))}
-                </select>
-              )}
-
-              <p className={sectionLabelClass}>{h(s('Amaç & ton', 'Intent & tone'))}</p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <select
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value as Purpose)}
-                  className={control}
-                >
-                  <option value="morale">{s('Moral / destek', 'Support')}</option>
-                  <option value="action">{s('Aksiyon', 'Action')}</option>
-                  <option value="reopen">{s('Yeniden iletişim', 'Re-open')}</option>
-                  <option value="micro_win">{s('Küçük kazanım', 'Small win')}</option>
-                  <option value="rescue">{s('Etik toparlama', 'Gentle rescue')}</option>
-                  <option value="invite">{s('Davet / toplantı', 'Invite')}</option>
-                  <option value="focus">{s('Hedefe odak', 'Focus')}</option>
-                </select>
-                <select
-                  value={tone}
-                  onChange={(e) => setTone(e.target.value as Tone)}
-                  className={control}
-                >
-                  <option value="warm">{s('Sıcak', 'Warm')}</option>
-                  <option value="leader">{s('Liderce', 'Leader')}</option>
-                  <option value="crisp">{s('Kısa & net', 'Crisp')}</option>
-                  <option value="friendly">{s('Samimi', 'Friendly')}</option>
-                  <option value="vision">{s('Vizyon', 'Vision')}</option>
-                  <option value="recovery">{s('Toparlayıcı', 'Recovery')}</option>
-                </select>
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight text-text-primary sm:text-xl">
+                  {h(s('Motivasyon mesajı üret', 'Create motivation message'))}
+                </h2>
+                <p className="mt-1.5 text-xs leading-relaxed text-text-tertiary sm:text-[13px]">
+                  {s(
+                    'Hedef, amaç ve kısa bağlam yeter. Kanal, uzunluk ve emoji için Gelişmiş ayarları aç.',
+                    'Target, intent, and short context are enough. Open Advanced for channel, length, and emoji.',
+                  )}
+                </p>
               </div>
 
-              <div>
-                <p className={sectionLabelClass}>{h(s('Bağlam (kısa)', 'Short context'))}</p>
-                <Textarea
-                  ref={contextNotesRef}
-                  value={contextNotes}
-                  onChange={(e) => setContextNotes(e.target.value)}
-                  rows={2}
-                  placeholder={s('Opsiyonel: son temas, duygu…', 'Optional: last touch, mood…')}
-                  className="min-h-[3.5rem] resize-none rounded-xl border border-border bg-surface py-2.5 text-sm leading-relaxed text-text-primary"
-                />
+              <div className="space-y-3 rounded-2xl border border-border-subtle bg-surface-hover/25 p-3 sm:p-4">
+                <p className={sectionLabelClass}>
+                  {h(s('Hızlı kurulum', 'Quick setup'))}
+                </p>
+                <p className={sectionLabelClass}>{h(s('Hedef', 'Target'))}</p>
+                <select
+                  value={segment}
+                  onChange={(e) => setSegment(e.target.value as Segment)}
+                  className={control}
+                >
+                  <option value="single">{s('Tek kişi', 'One person')}</option>
+                  <option value="new_starters">{s('Yeni başlayanlar', 'New starters')}</option>
+                  <option value="rejection_block">{s('Takılda kalan / itiraz', 'Stuck or objections')}</option>
+                  <option value="dormant">{s('Uzun süredir pasif', 'Long-dormant')}</option>
+                  <option value="near_goal">{s('Hedefe yakın', 'Close to a milestone')}</option>
+                  <option value="leader_pool">{s('Lider adayları / ekip', 'Leaders & team')}</option>
+                  <option value="small_wins">{s('Küçük başarı sinyali', 'Small-win signals')}</option>
+                  <option value="tagged">{s('Etiketli grup', 'Tagged group')}</option>
+                </select>
+                {segment === 'tagged' && (
+                  <Input
+                    className="h-9"
+                    value={tagFilter}
+                    onChange={(e) => setTagFilter(e.target.value)}
+                    placeholder={s('Etiket', 'Tag')}
+                  />
+                )}
+                {segment === 'single' && (
+                  <select
+                    value={singleId}
+                    onChange={(e) => setSingleId(e.target.value)}
+                    className={control}
+                  >
+                    <option value="">{s('Kişi seçin', 'Select a person')}</option>
+                    {[...contacts]
+                      .sort((a, b) => a.full_name.localeCompare(b.full_name, tr ? 'tr' : 'en'))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.full_name}
+                        </option>
+                      ))}
+                  </select>
+                )}
+
+                <p className={sectionLabelClass}>{h(s('Amaç & ton', 'Intent & tone'))}</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <select
+                    value={purpose}
+                    onChange={(e) => setPurpose(e.target.value as Purpose)}
+                    className={control}
+                  >
+                    <option value="morale">{s('Moral / destek', 'Support')}</option>
+                    <option value="action">{s('Aksiyon', 'Action')}</option>
+                    <option value="reopen">{s('Yeniden iletişim', 'Re-open')}</option>
+                    <option value="micro_win">{s('Küçük kazanım', 'Small win')}</option>
+                    <option value="rescue">{s('Etik toparlama', 'Gentle rescue')}</option>
+                    <option value="invite">{s('Davet / toplantı', 'Invite')}</option>
+                    <option value="focus">{s('Hedefe odak', 'Focus')}</option>
+                  </select>
+                  <select
+                    value={tone}
+                    onChange={(e) => setTone(e.target.value as Tone)}
+                    className={control}
+                  >
+                    <option value="warm">{s('Sıcak', 'Warm')}</option>
+                    <option value="leader">{s('Liderce', 'Leader')}</option>
+                    <option value="crisp">{s('Kısa & net', 'Crisp')}</option>
+                    <option value="friendly">{s('Samimi', 'Friendly')}</option>
+                    <option value="vision">{s('Vizyon', 'Vision')}</option>
+                    <option value="recovery">{s('Toparlayıcı', 'Recovery')}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <p className={sectionLabelClass}>{h(s('Bağlam (kısa)', 'Short context'))}</p>
+                  <Textarea
+                    ref={contextNotesRef}
+                    value={contextNotes}
+                    onChange={(e) => setContextNotes(e.target.value)}
+                    rows={2}
+                    placeholder={s('Opsiyonel: son temas, duygu…', 'Optional: last touch, mood…')}
+                    className="min-h-[3.5rem] resize-none rounded-xl border border-border bg-surface py-2.5 text-sm leading-relaxed text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <p className={sectionLabelClass}>{h(s('Varyasyon sayısı', 'Variation count'))}</p>
+                  <div className="mt-1.5 flex gap-1.5">
+                    {([1, 2, 3] as const).map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setVariantCount(n)}
+                        className={cn(
+                          'h-8 min-w-0 flex-1 rounded-full border px-1.5 text-[11px] font-semibold transition sm:text-xs',
+                          variantCount === n
+                            ? 'border-cyan-400 bg-cyan-400 text-slate-950 shadow-sm'
+                            : 'border-white/[0.1] bg-slate-900/50 text-text-secondary/90 hover:border-white/[0.16]',
+                        )}
+                      >
+                        {tr
+                          ? `${n} Mesaj`
+                          : n === 1
+                            ? '1 message'
+                            : `${n} messages`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <button
@@ -620,31 +664,7 @@ export default function MotivationPage() {
                 </div>
               )}
 
-              <div className="mt-auto space-y-3 border-t border-border pt-3">
-                <div>
-                  <p className={sectionLabelClass}>{h(s('Varyasyon sayısı', 'Variation count'))}</p>
-                  <div className="mt-1.5 flex gap-1.5">
-                    {([1, 2, 3] as const).map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setVariantCount(n)}
-                        className={cn(
-                          'h-8 min-w-0 flex-1 rounded-full border px-1.5 text-[11px] font-semibold transition sm:text-xs',
-                          variantCount === n
-                            ? 'border-cyan-400 bg-cyan-400 text-slate-950 shadow-sm'
-                            : 'border-white/[0.1] bg-slate-900/50 text-text-secondary/90 hover:border-white/[0.16]',
-                        )}
-                      >
-                        {tr
-                          ? `${n} Mesaj`
-                          : n === 1
-                            ? '1 message'
-                            : `${n} messages`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              <div className="mt-1 border-t border-border pt-3">
                 <Button
                   type="button"
                   size="lg"
@@ -665,27 +685,40 @@ export default function MotivationPage() {
 
             {/* Sağ: canlı mesaj stüdyosu */}
             <div className="flex min-h-0 flex-col bg-surface-hover/30 lg:col-span-7">
-              <div className="flex shrink-0 border-b border-border px-3 pt-2 sm:px-4">
-                {(
-                  [
-                    { id: 'message' as const, label: h(s('Mesaj', 'Message')) },
-                    { id: 'variants' as const, label: h(s('Varyasyonlar', 'Variants')) },
-                  ] as const
-                ).map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setPreviewTab(t.id)}
-                    className={cn(
-                      '-mb-px border-b-2 px-2 py-2.5 text-sm font-medium transition',
-                      previewTab === t.id
-                        ? 'border-primary text-text-primary'
-                        : 'border-transparent text-text-tertiary hover:text-text-secondary',
-                    )}
-                  >
-                    {t.label}
-                  </button>
-                ))}
+              <div
+                className={cn(
+                  'shrink-0 border-b border-border',
+                  hasVariations
+                    ? 'flex px-3 pt-2 sm:px-4'
+                    : 'px-3 pb-0 pt-2 sm:px-4',
+                )}
+              >
+                {hasVariations ? (
+                  (
+                    [
+                      { id: 'message' as const, label: h(s('Mesaj', 'Message')) },
+                      { id: 'variants' as const, label: h(s('Varyasyonlar', 'Variants')) },
+                    ] as const
+                  ).map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setPreviewTab(t.id)}
+                      className={cn(
+                        '-mb-px border-b-2 px-2 py-2.5 text-sm font-medium transition',
+                        previewTab === t.id
+                          ? 'border-primary text-text-primary'
+                          : 'border-transparent text-text-tertiary hover:text-text-secondary',
+                      )}
+                    >
+                      {t.label}
+                    </button>
+                  ))
+                ) : (
+                  <p className="pb-2.5 text-sm font-semibold text-text-primary">
+                    {h(s('Mesaj', 'Message'))}
+                  </p>
+                )}
               </div>
 
               <div className="relative min-h-0 flex-1 overflow-hidden p-3 sm:p-4">
