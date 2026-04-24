@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useDeleteConfirm } from '@/components/common/DeleteConfirmProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -49,6 +50,7 @@ export function CustomerDetail({ customer, products, userId, onBack }: {
 }) {
   const qc = useQueryClient()
   const { locale } = useLanguage()
+  const { requestDelete } = useDeleteConfirm()
   const h = useHeadingCase()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const [showAddOrder, setShowAddOrder] = useState(false)
@@ -168,8 +170,18 @@ export function CustomerDetail({ customer, products, userId, onBack }: {
                           <option value="delivered">Teslim</option>
                           <option value="cancelled">İptal</option>
                         </select>
-                        <button onClick={() => deleteOrderMutation.mutate(order.id)}
-                          className="p-1 rounded text-text-muted hover:text-error hover:bg-error/10 transition-colors">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            requestDelete({
+                              detail: `${formatTRY(order.total_try)} · ${formatDate(order.order_date)}`,
+                              onConfirm: () => {
+                                deleteOrderMutation.mutate(order.id)
+                              },
+                            })
+                          }}
+                          className="p-1 rounded text-text-muted hover:text-error hover:bg-error/10 transition-colors"
+                        >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>

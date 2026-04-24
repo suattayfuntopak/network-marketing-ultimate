@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useDeleteConfirm } from '@/components/common/DeleteConfirmProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -22,6 +23,7 @@ const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
 export default function ProductsPage() {
   const { locale } = useLanguage()
+  const { requestDelete } = useDeleteConfirm()
   const h = useHeadingCase()
   const qc = useQueryClient()
   const router = useRouter()
@@ -176,7 +178,12 @@ export default function ProductsPage() {
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation()
-                        deleteMutation.mutate(product.id)
+                        requestDelete({
+                          detail: product.name,
+                          onConfirm: () => {
+                            deleteMutation.mutate(product.id)
+                          },
+                        })
                       }}
                       className="rounded-lg border border-border bg-surface/80 p-1.5 text-text-secondary hover:text-error"
                     >

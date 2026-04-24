@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { stageMeta } from '@/components/contacts/contactLabels'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useDeleteConfirm } from '@/components/common/DeleteConfirmProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { consumeAIMessageDraftPreset } from '@/lib/clientStorage'
@@ -148,6 +149,7 @@ const aiCardAccentClasses = [
 export function AIMessageWorkspace() {
   const searchParams = useSearchParams()
   const { locale } = useLanguage()
+  const { requestDelete } = useDeleteConfirm()
   const h = useHeadingCase()
   const currentLocale: 'tr' | 'en' = locale === 'tr' ? 'tr' : 'en'
   const currentUser = useAppStore((state) => state.currentUser)
@@ -525,7 +527,14 @@ export function AIMessageWorkspace() {
                     <button
                       type="button"
                       title={currentLocale === 'tr' ? 'Sil' : 'Delete'}
-                      onClick={() => deleteTemplate(template.id)}
+                      onClick={() => {
+                        requestDelete({
+                          detail: template.name,
+                          onConfirm: () => {
+                            deleteTemplate(template.id)
+                          },
+                        })
+                      }}
                       className="rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface-hover hover:text-error"
                     >
                       <Trash2 className="h-4 w-4" />

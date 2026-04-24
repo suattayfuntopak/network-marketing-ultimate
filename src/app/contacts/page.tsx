@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useDeleteConfirm } from '@/components/common/DeleteConfirmProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { useAppStore } from '@/store/appStore'
 import { AIMessageGeneratorModal } from '@/components/ai/AIMessageGeneratorModal'
@@ -88,6 +89,7 @@ const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
 export default function ContactsPage() {
   const { t, locale } = useLanguage()
+  const { requestDelete } = useDeleteConfirm()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const h = useHeadingCase()
   const { currentUser } = useAppStore()
@@ -805,13 +807,12 @@ export default function ContactsPage() {
             formatDateTime={formatDateTime}
             onBack={closeContactDetail}
             onDelete={() => {
-              const ok = window.confirm(
-                currentLocale === 'tr'
-                  ? 'Bu kaydı gerçekten silmek istiyor musunuz?'
-                  : 'Are you sure you want to permanently delete this record?',
-              )
-              if (!ok) return
-              deleteMutation.mutate(selected.id)
+              requestDelete({
+                detail: selected.full_name,
+                onConfirm: () => {
+                  deleteMutation.mutate(selected.id)
+                },
+              })
             }}
             onOpenAI={(autoGenerate = false) => {
               setAiAutoGenerate(autoGenerate)
@@ -862,16 +863,26 @@ export default function ContactsPage() {
             }}
             onDeleteTask={(taskId) => {
               const task = contactTasks.find((t) => t.id === taskId)
-              deleteTaskMutation.mutate({
-                id: taskId,
-                title: task?.title ?? (currentLocale === 'tr' ? 'Görev' : 'Task'),
+              const title = task?.title ?? (currentLocale === 'tr' ? 'Görev' : 'Task')
+              requestDelete({
+                detail: title,
+                onConfirm: () => {
+                  deleteTaskMutation.mutate({ id: taskId, title })
+                },
               })
             }}
             onUpdateInteraction={(interactionId, content) => {
               updateInteractionMutation.mutate({ id: interactionId, content })
             }}
             onDeleteInteraction={(interactionId) => {
-              deleteInteractionMutation.mutate(interactionId)
+              const row = interactions.find((i) => i.id === interactionId)
+              const preview = row?.content?.trim().slice(0, 160)
+              requestDelete({
+                detail: preview || (currentLocale === 'tr' ? 'Bu iletişim kaydı' : 'This interaction'),
+                onConfirm: () => {
+                  deleteInteractionMutation.mutate(interactionId)
+                },
+              })
             }}
           />
         </motion.div>
@@ -1296,7 +1307,12 @@ export default function ContactsPage() {
                                   type="button"
                                   onClick={() => {
                                     setRowMenuContactId(null)
-                                    deleteMutation.mutate(contact.id)
+                                    requestDelete({
+                                      detail: contact.full_name,
+                                      onConfirm: () => {
+                                        deleteMutation.mutate(contact.id)
+                                      },
+                                    })
                                   }}
                                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-error hover:bg-error/10"
                                 >

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { AvatarGroup } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useDeleteConfirm } from '@/components/common/DeleteConfirmProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { EventInviteSendModal } from '@/components/events/EventInviteSendModal'
 import { EventCreateModal } from '@/components/events/EventCreateModal'
@@ -48,6 +49,7 @@ export default function EventsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { t, locale } = useLanguage()
+  const { requestDelete } = useDeleteConfirm()
   const h = useHeadingCase()
   const { currentUser } = useAppStore()
   const queryClient = useQueryClient()
@@ -418,11 +420,17 @@ export default function EventsPage() {
     }
   }
 
-  async function deleteEvent(eventId: string) {
-    await deleteMutation.mutateAsync(eventId)
-    setInviteOpen(false)
-    setActiveEventId(null)
-    navigateBackIfNeeded()
+  function deleteEvent(eventId: string) {
+    const ev = eventItems.find((e) => e.id === eventId) ?? activeEvent
+    requestDelete({
+      detail: ev?.title,
+      onConfirm: async () => {
+        await deleteMutation.mutateAsync(eventId)
+        setInviteOpen(false)
+        setActiveEventId(null)
+        navigateBackIfNeeded()
+      },
+    })
   }
 
   function openSendModal() {

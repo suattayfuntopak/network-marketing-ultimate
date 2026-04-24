@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useDeleteConfirm } from '@/components/common/DeleteConfirmProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { TaskComposerModal } from '@/components/tasks/TaskComposerModal'
 import { ContactTaskModal } from '@/components/contacts/ContactTaskModal'
@@ -57,6 +58,7 @@ const TYPE_KEY_MAP: Record<string, keyof typeof import('@/lib/i18n').translation
 
 export default function TasksPage() {
   const { t, locale } = useLanguage()
+  const { requestDelete } = useDeleteConfirm()
   const h = useHeadingCase()
   const { currentUser } = useAppStore()
   const qc = useQueryClient()
@@ -286,7 +288,12 @@ export default function TasksPage() {
                     <button
                       onClick={(event) => {
                         event.stopPropagation()
-                        deleteMutation.mutate(task.id)
+                        requestDelete({
+                          detail: task.title,
+                          onConfirm: () => {
+                            deleteMutation.mutate(task.id)
+                          },
+                        })
                       }}
                       className="p-1.5 rounded-lg text-text-muted hover:text-error hover:bg-error/10 opacity-0 group-hover:opacity-100 transition-all"
                     >

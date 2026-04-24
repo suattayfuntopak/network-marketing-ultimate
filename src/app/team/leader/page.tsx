@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Ca
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useDeleteConfirm } from '@/components/common/DeleteConfirmProvider'
 import { stageMeta } from '@/components/contacts/contactLabels'
 import { useAppStore } from '@/store/appStore'
 import { usePersistentState } from '@/hooks/usePersistentState'
@@ -26,6 +27,7 @@ const LEADER_NOTE_PREFIX = '[LIDER_NOTU]'
 
 export default function LeaderPage() {
   const { locale } = useLanguage()
+  const { requestDelete } = useDeleteConfirm()
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const { currentUser } = useAppStore()
   const router = useRouter()
@@ -161,11 +163,21 @@ export default function LeaderPage() {
 
   function deleteSavedNote() {
     if (isGeneralNoteSelected) {
-      setGeneralLeaderNote('')
+      requestDelete({
+        detail: currentLocale === 'tr' ? 'Genel lider notu silinecek.' : 'The general leader note will be cleared.',
+        onConfirm: () => {
+          setGeneralLeaderNote('')
+        },
+      })
       return
     }
     if (!latestLeaderNoteRow) return
-    deleteLeaderNoteMutation.mutate(latestLeaderNoteRow.id)
+    requestDelete({
+      detail: latestLeaderNote?.trim().slice(0, 160),
+      onConfirm: () => {
+        deleteLeaderNoteMutation.mutate(latestLeaderNoteRow.id)
+      },
+    })
   }
 
   function openAiForPerson() {
