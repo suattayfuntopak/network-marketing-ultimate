@@ -145,6 +145,11 @@ export default function EventsPage() {
     ? {
         selectPreset: 'Kayıtlı toplantı linki seç…',
         addNew: 'Yeni toplantı linki ekle…',
+        deleteOption: 'Toplantı sil…',
+        deleteTitle: 'Silinecek toplantı linklerini seç',
+        deleteEmpty: 'Kayıtlı toplantı linki yok.',
+        deleteConfirm: 'Sil',
+        deleteCancel: 'İptal',
         saveNew: 'Kaydet',
         cancelNew: 'Vazgeç',
         namePlaceholder: 'Örn. Zoom — Ekip, Zoom — Müşteriler',
@@ -153,6 +158,11 @@ export default function EventsPage() {
     : {
         selectPreset: 'Choose a saved meeting link…',
         addNew: 'Add new meeting link…',
+        deleteOption: 'Delete meeting links…',
+        deleteTitle: 'Select meeting links to delete',
+        deleteEmpty: 'No saved meeting links.',
+        deleteConfirm: 'Delete',
+        deleteCancel: 'Cancel',
         saveNew: 'Save',
         cancelNew: 'Cancel',
         namePlaceholder: 'e.g. Zoom — Team, Zoom — Clients',
