@@ -133,7 +133,7 @@ export interface ContactDetailPersonViewProps {
   onOpenAI: (autoGenerate?: boolean) => void
   onEdit: () => void
   onArchive: () => void
-  onOpenInteractionModal: () => void
+  onDeleteAllInteractions: () => void
   onOpenTaskModal: () => void
   onQuickNote: (text: string) => Promise<unknown>
   quickNotePending: boolean
@@ -165,7 +165,7 @@ export function ContactDetailPersonView({
   onOpenAI,
   onEdit,
   onArchive,
-  onOpenInteractionModal,
+  onDeleteAllInteractions,
   onOpenTaskModal,
   onQuickNote,
   quickNotePending,
@@ -181,6 +181,7 @@ export function ContactDetailPersonView({
   onUpdateInteraction,
   onDeleteInteraction,
 }: ContactDetailPersonViewProps) {
+  const INTERACTIONS_PAGE_SIZE = 7
   const tr = locale === 'tr'
   const [noteDraft, setNoteDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
@@ -196,6 +197,7 @@ export function ContactDetailPersonView({
   const [editingInteractionId, setEditingInteractionId] = useState<string | null>(null)
   const [editingInteractionContent, setEditingInteractionContent] = useState('')
   const [copiedCoaching, setCopiedCoaching] = useState(false)
+  const [visibleInteractionCount, setVisibleInteractionCount] = useState(INTERACTIONS_PAGE_SIZE)
   const tagInputRef = useRef<HTMLInputElement>(null)
 
   const rawServerWarmth = rawTemperatureFromServer(contact.temperature_score)
@@ -221,12 +223,23 @@ export function ContactDetailPersonView({
   }
 
   const stage = stageMeta(contact.pipeline_stage)
-  const visibleInteractions = useMemo(() => {
-    const sorted = [...interactions].sort(
+  const sortedInteractions = useMemo(() => {
+    return [...interactions].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     )
-    return sorted.slice(0, 10)
   }, [interactions])
+  const visibleInteractions = useMemo(
+    () => sortedInteractions.slice(0, visibleInteractionCount),
+    [sortedInteractions, visibleInteractionCount],
+  )
+
+  useEffect(() => {
+    setVisibleInteractionCount(INTERACTIONS_PAGE_SIZE)
+  }, [contact.id])
+
+  useEffect(() => {
+    setVisibleInteractionCount((current) => Math.min(current, sortedInteractions.length || INTERACTIONS_PAGE_SIZE))
+  }, [sortedInteractions.length])
 
   const openTasks = useMemo(
     () => tasks.filter((task) => task.status !== 'completed' && task.status !== 'skipped'),
@@ -661,9 +674,26 @@ export function ContactDetailPersonView({
                   })}
                 </div>
               )}
-              {interactions.length > 10 && (
-                <div className="mt-2 flex justify-center border-t border-border pt-3">
-                  <Button type="button" variant="ghost" size="sm" onClick={onOpenInteractionModal}>
+              {interactions.length > 0 && (
+                <div className="mt-2 flex items-center justify-between border-t border-border pt-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-error hover:bg-error/10 hover:text-error"
+                    onClick={onDeleteAllInteractions}
+                  >
+                    {tr ? 'Tümünü Sil' : 'Clear All'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setVisibleInteractionCount((current) => Math.min(sortedInteractions.length, current + INTERACTIONS_PAGE_SIZE))
+                    }
+                    disabled={visibleInteractions.length >= sortedInteractions.length}
+                  >
                     {tr ? 'Tümünü Gör' : 'See All'}
                   </Button>
                 </div>

@@ -228,7 +228,7 @@ export default function EventsPage() {
         manageHint: 'Etkinliği düzenle, davet gönder veya gerekirse akıştan kaldır.',
         openMeeting: 'Toplantıyı Aç',
         openMap: 'Haritada Aç',
-        viewContacts: 'Katılımcı Ekle',
+        viewContacts: 'Katılımcı Ekle/Düzenle',
         createDescription: 'Yeni bir sunum, egitim veya ekip bulusmasi planla.',
       }
     : {

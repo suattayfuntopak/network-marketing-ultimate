@@ -417,6 +417,16 @@ export async function deleteInteraction(id: string): Promise<void> {
   if (error) throw error
 }
 
+export async function deleteInteractionsByContact(contactId: string): Promise<void> {
+  const userId = await requireSessionUserId()
+  const { error } = await supabase
+    .from('nmu_interactions')
+    .delete()
+    .eq('contact_id', contactId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
 export async function addContactActivityLog(
   userId: string,
   contactId: string,

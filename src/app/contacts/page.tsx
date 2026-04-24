@@ -50,6 +50,7 @@ import {
   addInteraction,
   updateInteraction,
   deleteInteraction,
+  deleteInteractionsByContact,
   addContactActivityLog,
   fetchTasksByContact,
   addTask,
@@ -275,6 +276,13 @@ export default function ContactsPage() {
 
   const deleteInteractionMutation = useMutation({
     mutationFn: (id: string) => deleteInteraction(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
+    },
+  })
+
+  const deleteAllInteractionsMutation = useMutation({
+    mutationFn: (contactId: string) => deleteInteractionsByContact(contactId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contact-interactions', selectedId] })
     },
@@ -823,9 +831,13 @@ export default function ContactsPage() {
               setFormError('')
             }}
             onArchive={() => archiveContactMutation.mutate(selected.id)}
-            onOpenInteractionModal={() => {
-              setInteractionError('')
-              setShowInteractionModal(true)
+            onDeleteAllInteractions={() => {
+              requestDelete({
+                detail: currentLocale === 'tr' ? 'Tüm etkileşim geçmişi' : 'All interaction history',
+                onConfirm: () => {
+                  deleteAllInteractionsMutation.mutate(selected.id)
+                },
+              })
             }}
             onOpenTaskModal={() => {
               setTaskError('')
