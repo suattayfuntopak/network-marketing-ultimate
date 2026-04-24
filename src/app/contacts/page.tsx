@@ -1279,7 +1279,7 @@ export default function ContactsPage() {
                                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-warning hover:bg-warning/10"
                                 >
                                   <Sparkles className="h-3.5 w-3.5" />
-                                  {currentLocale === 'tr' ? 'AI Mesaj Üret' : 'Generate AI'}
+                                  {currentLocale === 'tr' ? 'YZ Mesajı Üret' : 'Generate AI'}
                                 </button>
                                 <button
                                   type="button"

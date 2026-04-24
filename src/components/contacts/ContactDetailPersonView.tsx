@@ -357,7 +357,7 @@ export function ContactDetailPersonView({
             icon={<Sparkles className="h-3.5 w-3.5" />}
             onClick={() => onOpenAI(false)}
           >
-            {tr ? 'AI Mesaj Üret' : 'AI message'}
+            {tr ? 'YZ Mesajı Üret' : 'AI message'}
           </Button>
           <Button size="sm" variant="outline" icon={<Pencil className="h-3.5 w-3.5" />} onClick={onEdit}>
             {tr ? 'Düzenle' : 'Edit'}
