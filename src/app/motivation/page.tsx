@@ -13,7 +13,7 @@ import { fetchContacts, type ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { CELEBRITY_QUOTES, type MotivationQuote } from '@/app/motivation/motivationData'
 import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
-import { ChevronDown, Copy, Edit3, Share2, Sparkles } from 'lucide-react'
+import { ChevronDown, Copy, Edit3, Sparkles } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.03 } } }
 const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }
@@ -338,11 +338,6 @@ export default function MotivationPage() {
     setQuoteIndex((i) => i + 1)
   }
 
-  const shareQuote = () => {
-    const t = `“${currentQuote.text}” — ${currentQuote.author}`
-    void navigator.clipboard.writeText(t)
-  }
-
   const s = (trTR: string, en: string) => (tr ? trTR : en)
 
   const exampleMessage = useMemo(
@@ -398,7 +393,6 @@ export default function MotivationPage() {
             'shadow-sm',
           )}
         >
-          <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/[0.06]" />
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
             <div className="min-w-0 flex-1">
               <p className={sectionLabelClass}>{h(s("Günün sözü", "Today's line"))}</p>
@@ -412,7 +406,7 @@ export default function MotivationPage() {
                 <p className="text-xs leading-snug text-text-tertiary">{currentQuote.role}</p>
               </footer>
             </div>
-            <div className="flex shrink-0 items-center gap-2 lg:flex-col lg:items-stretch">
+            <div className="flex shrink-0 items-center self-end">
               <Button
                 type="button"
                 size="sm"
@@ -421,16 +415,6 @@ export default function MotivationPage() {
                 className="h-8 border-white/[0.1] bg-transparent px-3 text-xs text-text-secondary hover:bg-white/[0.04]"
               >
                 {s('Yeni söz', 'New quote')}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={shareQuote}
-                className="h-8 gap-1.5 px-3 text-xs text-text-muted/80 hover:text-text-secondary"
-                icon={<Share2 className="h-3.5 w-3.5 opacity-60" />}
-              >
-                {s('Paylaş', 'Share')}
               </Button>
             </div>
           </div>

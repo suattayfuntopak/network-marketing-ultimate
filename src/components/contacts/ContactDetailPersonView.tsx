@@ -189,7 +189,7 @@ export function ContactDetailPersonView({
       ? 'Kişinin şu anki sürecine göre sıradaki adım bağlamında sana önerilen mesajı burada görebilirsin...'
       : 'You can see the AI suggested message for the next step based on this contact’s current journey here...',
   )
-  const [coachingLoading, setCoachingLoading] = useState(false)
+  const [coachingAction, setCoachingAction] = useState<'idle' | 'primary' | 'regenerate'>('idle')
   const [coachingError, setCoachingError] = useState('')
   const [copiedInteractionId, setCopiedInteractionId] = useState<string | null>(null)
   const [editingInteractionId, setEditingInteractionId] = useState<string | null>(null)
@@ -246,8 +246,8 @@ export function ContactDetailPersonView({
     setCoachingError('')
   }, [contact.id, tr])
 
-  async function handleGenerateCoachingMessage() {
-    setCoachingLoading(true)
+  async function handleGenerateCoachingMessage(source: 'primary' | 'regenerate') {
+    setCoachingAction(source)
     setCoachingError('')
 
     const interactionSummary = interactions
@@ -292,7 +292,7 @@ export function ContactDetailPersonView({
     } catch {
       setCoachingError(tr ? 'Mesaj üretilemedi, lütfen tekrar dene.' : 'Could not generate the message, please try again.')
     } finally {
-      setCoachingLoading(false)
+      setCoachingAction('idle')
     }
   }
 
@@ -753,8 +753,8 @@ export function ContactDetailPersonView({
               </p>
               <p className="mt-1 text-sm text-text-secondary">
                 {tr
-                  ? 'Sıradaki en mantıklı adım için aşağıdaki Mesajı Hazırla butonuna bas!'
-                  : 'Press Prepare Message below for the most logical next step!'}
+                  ? 'Sıradaki en mantıklı adım için Üret butonuna bas!'
+                  : 'Press the Generate button below for the most logical next step!'}
               </p>
             </div>
             <div>
@@ -767,12 +767,15 @@ export function ContactDetailPersonView({
               {coachingError ? <p className="mt-2 text-xs text-warning">{coachingError}</p> : null}
             </div>
             <Button
+              type="button"
               size="sm"
-              className="w-full bg-warning/20 text-warning hover:bg-warning/30"
-              onClick={() => void handleGenerateCoachingMessage()}
-              loading={coachingLoading}
+              variant="primary"
+              className="w-full"
+              onClick={() => void handleGenerateCoachingMessage('primary')}
+              loading={coachingAction === 'primary'}
+              icon={<Sparkles className="h-3.5 w-3.5" />}
             >
-              {tr ? 'Mesajı Hazırla' : 'Prepare Message'}
+              {tr ? 'Üret' : 'Generate'}
             </Button>
             <div className="grid w-full grid-cols-3 gap-2">
               <Button
@@ -789,8 +792,8 @@ export function ContactDetailPersonView({
                 type="button"
                 size="sm"
                 className="w-full min-w-0 justify-center px-2 bg-amber-300 text-amber-950 hover:bg-amber-200 shadow-none"
-                onClick={() => void handleGenerateCoachingMessage()}
-                loading={coachingLoading}
+                onClick={() => void handleGenerateCoachingMessage('regenerate')}
+                loading={coachingAction === 'regenerate'}
                 icon={<RefreshCcw className="h-3.5 w-3.5" />}
               >
                 {tr ? 'Yeniden Üret' : 'Regenerate'}

@@ -290,7 +290,7 @@ function AIMessageGeneratorModalContent({
   const [defaultSendChannel] = useState<MessageChannel>(initialChannel)
   const [tone, setTone] = useState<MessageTone>(initialTone)
   const [extraContext, setExtraContext] = useState(initialExtraContext)
-  const [variantCount, setVariantCount] = useState<(typeof VARIANT_COUNT_OPTIONS)[number]>(3)
+  const [variantCount, setVariantCount] = useState<(typeof VARIANT_COUNT_OPTIONS)[number]>(1)
   const [contactSearch, setContactSearch] = useState('')
   const [selectedContactId, setSelectedContactId] = useState<string>(contact?.id ?? 'all')
   const [variants, setVariants] = useState<string[]>([])
