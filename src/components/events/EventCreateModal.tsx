@@ -2,17 +2,22 @@
 
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { EventLocationSearch, type EventLocationSearchLabels } from '@/components/events/EventLocationSearch'
+import { EventMeetingUrlCombobox, type EventMeetingUrlComboboxLabels } from '@/components/events/EventMeetingUrlCombobox'
 import { EVENT_TYPE_KEY, type EventFieldLabels, type EventFormShape } from '@/components/events/eventForm'
 import type { Event } from '@/types'
 
 interface Props {
   open: boolean
   onClose: () => void
+  locale: 'tr' | 'en'
   form: EventFormShape
   onFormChange: (updater: (current: EventFormShape) => EventFormShape) => void
   title: string
   description: string
   labels: EventFieldLabels
+  meetingComboboxLabels: EventMeetingUrlComboboxLabels
+  locationSearchLabels: EventLocationSearchLabels
   eventTypeLabel: (type: string) => string
   onSubmit: () => void
   isSubmitting: boolean
@@ -23,11 +28,14 @@ interface Props {
 export function EventCreateModal({
   open,
   onClose,
+  locale,
   form,
   onFormChange,
   title,
   description,
   labels,
+  meetingComboboxLabels,
+  locationSearchLabels,
   eventTypeLabel,
   onSubmit,
   isSubmitting,
@@ -78,18 +86,19 @@ export function EventCreateModal({
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-medium text-text-secondary">{labels.location}</span>
-            <input
+            <EventLocationSearch
               value={form.location}
-              onChange={(event) => onFormChange((current) => ({ ...current, location: event.target.value }))}
-              className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50"
+              onChange={(next) => onFormChange((current) => ({ ...current, location: next }))}
+              locale={locale}
+              labels={locationSearchLabels}
             />
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-medium text-text-secondary">{labels.meetingUrl}</span>
-            <input
+            <EventMeetingUrlCombobox
               value={form.meetingUrl}
-              onChange={(event) => onFormChange((current) => ({ ...current, meetingUrl: event.target.value }))}
-              className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50"
+              onChange={(next) => onFormChange((current) => ({ ...current, meetingUrl: next }))}
+              labels={meetingComboboxLabels}
             />
           </label>
         </div>

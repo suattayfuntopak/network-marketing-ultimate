@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { EventParticipantPicker, type EventParticipantPickerLabels } from '@/components/events/EventParticipantPicker'
+import { EventLocationSearch, type EventLocationSearchLabels } from '@/components/events/EventLocationSearch'
+import { EventMeetingUrlCombobox, type EventMeetingUrlComboboxLabels } from '@/components/events/EventMeetingUrlCombobox'
 import { EVENT_TYPE_KEY, type EventFieldLabels, type EventFormShape } from '@/components/events/eventForm'
 import type { Event } from '@/types'
 import type { ContactRow } from '@/lib/queries'
-import { MapPin, Send, Trash2, UserPlus, Users, Video } from 'lucide-react'
+import { ArrowRight, MapPin, Send, Trash2, UserPlus, Users, Video } from 'lucide-react'
 
 export interface EventDetailsLabels extends EventFieldLabels {
   manageHint: string
@@ -23,6 +25,11 @@ export interface EventDetailsLabels extends EventFieldLabels {
   cancel: string
   saveChanges: string
   pickerLabels: EventParticipantPickerLabels
+  meetingCombobox: EventMeetingUrlComboboxLabels
+  locationSearch: EventLocationSearchLabels
+  stepParticipantsNext: string
+  stepParticipantsBack: string
+  stepParticipantsHint: string
 }
 
 interface Props {
@@ -69,6 +76,7 @@ export function EventDetailsModal({
   isDeleting,
 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [step, setStep] = useState<1 | 2>(1)
 
   function attendeesSummary(names: string[]) {
     if (names.length <= 4) return names.join(', ')
@@ -87,7 +95,7 @@ export function EventDetailsModal({
       open={open}
       onClose={onClose}
       title={event?.title}
-      description={event ? labels.manageHint : undefined}
+      description={event ? (step === 1 ? labels.manageHint : labels.stepParticipantsHint) : undefined}
     >
       {event && (
         <div className="p-5 space-y-5">
@@ -126,10 +134,11 @@ export function EventDetailsModal({
             </label>
             <label className="space-y-1.5">
               <span className="text-xs font-medium text-text-secondary">{labels.location}</span>
-              <input
+              <EventLocationSearch
                 value={form.location}
-                onChange={(changeEvent) => onFormChange((current) => ({ ...current, location: changeEvent.target.value }))}
-                className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50"
+                onChange={(next) => onFormChange((current) => ({ ...current, location: next }))}
+                locale={locale}
+                labels={labels.locationSearch}
               />
             </label>
             <label className="space-y-1.5">
@@ -152,10 +161,10 @@ export function EventDetailsModal({
             </label>
             <label className="space-y-1.5 sm:col-span-2">
               <span className="text-xs font-medium text-text-secondary">{labels.meetingUrl}</span>
-              <input
+              <EventMeetingUrlCombobox
                 value={form.meetingUrl}
-                onChange={(changeEvent) => onFormChange((current) => ({ ...current, meetingUrl: changeEvent.target.value }))}
-                className="w-full h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary/50"
+                onChange={(next) => onFormChange((current) => ({ ...current, meetingUrl: next }))}
+                labels={labels.meetingCombobox}
               />
             </label>
           </div>
@@ -170,87 +179,110 @@ export function EventDetailsModal({
             />
           </label>
 
-          <div className="rounded-2xl border border-border-subtle bg-surface/40 p-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2 text-sm text-text-primary">
-                <Users className="w-4 h-4 text-primary" />
-                {labels.attendees}
-                <Badge size="sm" variant="default">{selectedAttendeeIds.length}</Badge>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                icon={<Send className="w-3.5 h-3.5" />}
-                onClick={onRequestSend}
-                disabled={sendBlocked}
-                title={sendBlocked ? sendBlockedMessage : undefined}
-              >
-                {labels.invite}
-              </Button>
-            </div>
-            {sendBlocked && (
-              <p className="text-[11px] text-warning mb-2">{labels.sendBlockedHint}</p>
-            )}
-            <div className="flex flex-wrap gap-2">
-              {attendeeNames.length > 0 ? (
-                <p className="text-sm text-text-secondary">{attendeesSummary(attendeeNames)}</p>
-              ) : (
-                <p className="text-sm text-text-tertiary">{labels.attendeesEmpty}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {event.meetingUrl && (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => window.open(event.meetingUrl, '_blank', 'noopener,noreferrer')}
-              >
-                <Video className="w-3.5 h-3.5" /> {labels.openMeeting}
-              </Button>
-            )}
-            {event.location && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location ?? '')}`, '_blank', 'noopener,noreferrer')}
-              >
-                <MapPin className="w-3.5 h-3.5" /> {labels.openMap}
-              </Button>
-            )}
-            <EventParticipantPicker
-              open={pickerOpen}
-              onOpenChange={setPickerOpen}
-              contacts={contacts}
-              selectedIds={selectedAttendeeIds}
-              onSelectedIdsChange={onSelectedAttendeeIdsChange}
-              locale={locale}
-              disabled={false}
-              onRequestSend={() => {
-                onRequestSend()
-              }}
-              renderTrigger={(toggle) => (
-                <Button type="button" variant="ghost" size="sm" onClick={toggle} icon={<UserPlus className="w-3.5 h-3.5" />}>
-                  {labels.viewContacts}
-                </Button>
-              )}
-              labels={labels.pickerLabels}
-            />
-          </div>
-
+          {step === 1 && (
           <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">
             <Button type="button" variant="danger" size="sm" onClick={() => onDelete(event.id)} disabled={isDeleting}>
               <Trash2 className="w-3.5 h-3.5" /> {labels.delete}
             </Button>
             <div className="flex gap-2">
               <Button type="button" variant="ghost" onClick={onClose}>{labels.cancel}</Button>
-              <Button type="button" onClick={onSave} disabled={isSaving}>{labels.saveChanges}</Button>
+              <Button
+                type="button"
+                onClick={() => setStep(2)}
+                iconRight={<ArrowRight className="w-4 h-4" />}
+              >
+                {labels.stepParticipantsNext}
+              </Button>
             </div>
           </div>
+          )}
+
+          {step === 2 && (
+          <Fragment>
+            <div className="rounded-2xl border border-border-subtle bg-surface/40 p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2 text-sm text-text-primary">
+                  <Users className="w-4 h-4 text-primary" />
+                  {labels.attendees}
+                  <Badge size="sm" variant="default">{selectedAttendeeIds.length}</Badge>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  icon={<Send className="w-3.5 h-3.5" />}
+                  onClick={onRequestSend}
+                  disabled={sendBlocked}
+                  title={sendBlocked ? sendBlockedMessage : undefined}
+                >
+                  {labels.invite}
+                </Button>
+              </div>
+              {sendBlocked && (
+                <p className="text-[11px] text-warning mb-2">{labels.sendBlockedHint}</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {attendeeNames.length > 0 ? (
+                  <p className="text-sm text-text-secondary">{attendeesSummary(attendeeNames)}</p>
+                ) : (
+                  <p className="text-sm text-text-tertiary">{labels.attendeesEmpty}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {form.meetingUrl.trim() && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => window.open(form.meetingUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  <Video className="w-3.5 h-3.5" /> {labels.openMeeting}
+                </Button>
+              )}
+              {form.location.trim() && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(form.location.trim())}`, '_blank', 'noopener,noreferrer')}
+                >
+                  <MapPin className="w-3.5 h-3.5" /> {labels.openMap}
+                </Button>
+              )}
+              <EventParticipantPicker
+                open={pickerOpen}
+                onOpenChange={setPickerOpen}
+                contacts={contacts}
+                selectedIds={selectedAttendeeIds}
+                onSelectedIdsChange={onSelectedAttendeeIdsChange}
+                locale={locale}
+                disabled={false}
+                onRequestSend={() => {
+                  onRequestSend()
+                }}
+                renderTrigger={(toggle) => (
+                  <Button type="button" variant="ghost" size="sm" onClick={toggle} icon={<UserPlus className="w-3.5 h-3.5" />}>
+                    {labels.viewContacts}
+                  </Button>
+                )}
+                labels={labels.pickerLabels}
+              />
+            </div>
+
+            <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">
+              <Button type="button" variant="danger" size="sm" onClick={() => onDelete(event.id)} disabled={isDeleting}>
+                <Trash2 className="w-3.5 h-3.5" /> {labels.delete}
+              </Button>
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button type="button" variant="ghost" onClick={() => setStep(1)}>{labels.stepParticipantsBack}</Button>
+                <Button type="button" variant="ghost" onClick={onClose}>{labels.cancel}</Button>
+                <Button type="button" onClick={onSave} disabled={isSaving}>{labels.saveChanges}</Button>
+              </div>
+            </div>
+          </Fragment>
+          )}
         </div>
       )}
     </Modal>

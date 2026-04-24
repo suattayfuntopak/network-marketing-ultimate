@@ -14,6 +14,8 @@ import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { EventInviteSendModal } from '@/components/events/EventInviteSendModal'
 import { EventCreateModal } from '@/components/events/EventCreateModal'
 import { EventDetailsModal } from '@/components/events/EventDetailsModal'
+import type { EventLocationSearchLabels } from '@/components/events/EventLocationSearch'
+import type { EventMeetingUrlComboboxLabels } from '@/components/events/EventMeetingUrlCombobox'
 import {
   EVENT_TYPE_KEY,
   blankEvent,
@@ -131,6 +133,28 @@ export default function EventsPage() {
         meetingUrl: 'Meeting URL',
         description: 'Description',
       }
+
+  const meetingComboboxLabels: EventMeetingUrlComboboxLabels = locale === 'tr'
+    ? {
+        selectPreset: 'Kayıtlı toplantı linki seç…',
+        addNew: 'Yeni toplantı linki ekle…',
+        saveNew: 'Kaydet',
+        cancelNew: 'Vazgeç',
+        namePlaceholder: 'Örn. Zoom — Ekip, Zoom — Müşteriler',
+        urlPlaceholder: 'https://zoom.us/j/… veya başka toplantı adresi',
+      }
+    : {
+        selectPreset: 'Choose a saved meeting link…',
+        addNew: 'Add new meeting link…',
+        saveNew: 'Save',
+        cancelNew: 'Cancel',
+        namePlaceholder: 'e.g. Zoom — Team, Zoom — Clients',
+        urlPlaceholder: 'https://… (Zoom, Meet, etc.)',
+      }
+
+  const locationSearchLabels: EventLocationSearchLabels = locale === 'tr'
+    ? { searching: 'Aranıyor…', noResults: 'Eşleşen yer bulunamadı.' }
+    : { searching: 'Searching…', noResults: 'No matching places.' }
 
   const trPicker: EventParticipantPickerLabels = {
     searchLabel: 'Kontak ara',
@@ -518,11 +542,14 @@ export default function EventsPage() {
       <EventCreateModal
         open={createOpen}
         onClose={closeCreateModal}
+        locale={locale}
         form={createForm}
         onFormChange={setCreateForm}
         title={t.events.createEvent}
         description={labels.createDescription}
         labels={fieldLabels}
+        meetingComboboxLabels={meetingComboboxLabels}
+        locationSearchLabels={locationSearchLabels}
         eventTypeLabel={eventTypeLabel}
         onSubmit={createEvent}
         isSubmitting={createMutation.isPending}
@@ -531,6 +558,7 @@ export default function EventsPage() {
       />
 
       <EventDetailsModal
+        key={activeEventId ?? 'closed'}
         open={Boolean(activeEvent)}
         onClose={closeDetailsModal}
         locale={locale}
@@ -557,6 +585,13 @@ export default function EventsPage() {
           cancel: t.common.cancel,
           saveChanges: t.common.saveChanges,
           pickerLabels: locale === 'tr' ? trPicker : enPicker,
+          meetingCombobox: meetingComboboxLabels,
+          locationSearch: locationSearchLabels,
+          stepParticipantsNext: locale === 'tr' ? 'Katılımcı Ekle' : 'Add participants',
+          stepParticipantsBack: locale === 'tr' ? 'Geri' : 'Back',
+          stepParticipantsHint: locale === 'tr'
+            ? 'Katılımcıları düzenleyin, davet gönderin veya toplantıyı açın; bitince “Değişiklikleri Kaydet”e basın.'
+            : 'Manage attendees, send invites, or open the meeting; then tap “Save changes”.',
         }}
         eventTypeLabel={eventTypeLabel}
         eventStatusLabel={eventStatusLabel}
