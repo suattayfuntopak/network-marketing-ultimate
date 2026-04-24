@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useSyncExternalStore, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -13,10 +14,23 @@ interface ModalProps {
   description?: string
   children: ReactNode
   className?: string
+  /** Yarı saydam arka plan + esnek katman (ör. diğer z-50 modalların üstünde onay) */
+  overlayClassName?: string
 }
 
-export function Modal({ open, onClose, title, description, children, className }: ModalProps) {
+function useIsClient() {
+  return useSyncExternalStore(
+    () => () => {
+      // no subscription
+    },
+    () => true,
+    () => false,
+  )
+}
+
+export function Modal({ open, onClose, title, description, children, className, overlayClassName }: ModalProps) {
   const h = useHeadingCase()
+  const isClient = useIsClient()
   useEffect(() => {
     if (!open) return
 
@@ -30,14 +44,17 @@ export function Modal({ open, onClose, title, description, children, className }
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
-  return (
+  const tree = (
     <AnimatePresence>
       {open && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          className={cn(
+            'fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm',
+            overlayClassName,
+          )}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               onClose()
@@ -72,4 +89,7 @@ export function Modal({ open, onClose, title, description, children, className }
       )}
     </AnimatePresence>
   )
+
+  if (!isClient) return null
+  return createPortal(tree, document.body)
 }

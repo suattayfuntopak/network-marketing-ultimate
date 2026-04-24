@@ -69,6 +69,7 @@ export function DeleteConfirmProvider({ children }: { children: ReactNode }) {
         onClose={close}
         title={t.common.deleteConfirmTitle}
         description={t.common.deleteConfirmDescription}
+        overlayClassName="z-[200]"
       >
         <div className="space-y-4 px-5 pb-2 pt-1 sm:px-6">
           {detail ? (
