@@ -132,6 +132,17 @@ export default function MotivationPage() {
     [contacts, segment, tagFilter],
   )
 
+  const knownContactTags = useMemo(() => {
+    const set = new Set<string>()
+    for (const c of contacts) {
+      for (const t of c.tags ?? []) {
+        const v = t?.trim()
+        if (v) set.add(v)
+      }
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, tr ? 'tr' : 'en', { sensitivity: 'base' }))
+  }, [contacts, tr])
+
   const stagnant7 = useMemo(
     () => contacts.filter((c) => daysSinceLastTouch(c.last_contact_date) >= 7).slice(0, 3),
     [contacts],
@@ -552,12 +563,36 @@ export default function MotivationPage() {
                   <option value="tagged">{s('Etiketli grup', 'Tagged group')}</option>
                 </select>
                 {segment === 'tagged' && (
-                  <Input
-                    className="h-9"
-                    value={tagFilter}
-                    onChange={(e) => setTagFilter(e.target.value)}
-                    placeholder={s('Etiket', 'Tag')}
-                  />
+                  <div className="space-y-1.5">
+                    <Input
+                      className="h-9"
+                      list="nmu-motivation-tag-datalist"
+                      value={tagFilter}
+                      onChange={(e) => setTagFilter(e.target.value)}
+                      autoComplete="off"
+                      placeholder={s('Etiket (yaz veya listeden seç)', 'Tag (type or pick from list)')}
+                    />
+                    <datalist id="nmu-motivation-tag-datalist">
+                      {knownContactTags.map((t) => (
+                        <option key={t} value={t} />
+                      ))}
+                    </datalist>
+                    <p className="text-[11px] leading-relaxed text-text-tertiary">
+                      {tagFilter.trim() === ''
+                        ? s(
+                            'Kayıtlı etiketler aşağı açılır / yazdıkça öneride görünür. Eşleşme için en az bir etiket belirtin.',
+                            'Suggestions come from your contacts’ tags. Set a tag to see who matches.',
+                          )
+                        : segmentPool.length === 0
+                          ? s(
+                              '0 kişi eşleşti. Etiket tam eşleşmeli; yazımı veya farklı bir etiket deneyin.',
+                              '0 people match. The tag must match a contact tag exactly (case-insensitive).',
+                            )
+                          : segmentPool.length === 1
+                            ? s('1 kişi eşleşti.', '1 person matches.')
+                            : s(`${segmentPool.length} kişi eşleşti.`, `${segmentPool.length} people match.`)}
+                    </p>
+                  </div>
                 )}
                 {segment === 'single' && (
                   <select
