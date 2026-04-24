@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input, Textarea } from '@/components/ui/Input'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import type { ContactRow } from '@/lib/queries'
-import { postAiChat } from '@/lib/aiClient'
+import { enforceTurkishAddressConsistency, postAiChat } from '@/lib/aiClient'
 import { stripAiMessageQuotes } from '@/lib/aiMessageText'
 import { getStageLabel } from '@/lib/coach'
 import { cn } from '@/lib/utils'
@@ -328,9 +328,12 @@ export function AIMessageStudio({
 
       const text = await response.text()
       const parsed = splitVariants(text)
+      const normalizedParsed = currentLocale === 'tr'
+        ? await Promise.all(parsed.map((variant) => enforceTurkishAddressConsistency(variant)))
+        : parsed
 
-      if (parsed.length > 0) {
-        setVariants(parsed)
+      if (normalizedParsed.length > 0) {
+        setVariants(normalizedParsed)
         return
       }
 

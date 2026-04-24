@@ -34,7 +34,7 @@ import {
 } from '@/components/contacts/contactLabels'
 import { formatActivityInteractionCopy } from '@/lib/contactActivityLog'
 import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
-import { postAiChat } from '@/lib/aiClient'
+import { enforceTurkishAddressConsistency, postAiChat } from '@/lib/aiClient'
 import { stripAiMessageQuotes } from '@/lib/aiMessageText'
 import { toHeadingCase } from '@/lib/headingCase'
 import { cn } from '@/lib/utils'
@@ -300,7 +300,8 @@ export function ContactDetailPersonView({
     try {
       const response = await postAiChat([{ role: 'user', content: prompt }])
       if (!response.ok) throw new Error('ai-route-error')
-      const text = stripAiMessageQuotes((await response.text()).trim())
+      const rawText = stripAiMessageQuotes((await response.text()).trim())
+      const text = tr ? await enforceTurkishAddressConsistency(rawText) : rawText
       if (!text) throw new Error('empty-ai-response')
       setCoachingMessage(text)
     } catch {

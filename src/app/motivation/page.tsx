@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/Button'
 import { Textarea, Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { useDeleteConfirm } from '@/components/common/DeleteConfirmProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { usePersistentState } from '@/hooks/usePersistentState'
-import { postAiChat } from '@/lib/aiClient'
+import { enforceTurkishAddressConsistency, postAiChat } from '@/lib/aiClient'
 import { stripAiMessageQuotes } from '@/lib/aiMessageText'
 import { fetchContacts, type ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
@@ -60,6 +61,7 @@ function quoteKey(q: MotivationQuote) {
 
 export default function MotivationPage() {
   const { locale } = useLanguage()
+  const { requestDelete } = useDeleteConfirm()
   const h = useHeadingCase()
   const tr = locale === 'tr'
   const { data: contacts = [] } = useQuery<ContactRow[]>({ queryKey: ['contacts'], queryFn: fetchContacts })
@@ -405,12 +407,14 @@ export default function MotivationPage() {
 
         const r = await postAiChat([{ role: 'user', content: baseInstruction.join('\n\n') }])
         if (!r.ok) throw new Error('ai')
-        const text = stripAiMessageQuotes((await r.text()).trim())
+        const rawText = stripAiMessageQuotes((await r.text()).trim())
+        const text = tr ? await enforceTurkishAddressConsistency(rawText) : rawText
         if (isMulti) {
-          const parts = text
+          const parts = await Promise.all(text
             .split(/\n*---\n*/)
             .map((p) => stripAiMessageQuotes(p.trim()))
             .filter(Boolean)
+            .map((p) => (tr ? enforceTurkishAddressConsistency(p) : Promise.resolve(p))))
           const n = count
           const useParts = parts.length >= n ? parts.slice(0, n) : parts.length ? parts : [text]
           setVariations(useParts)
@@ -480,6 +484,15 @@ export default function MotivationPage() {
     setEditingFavoriteId(null)
     setEditingFavoriteText('')
   }, [editingFavoriteId, editingFavoriteText, setFavoriteMessages])
+
+  const deleteFavoriteMessage = useCallback((fav: FavoriteMessage) => {
+    requestDelete({
+      detail: tr ? 'Bu favori motivasyon mesajı silinecek.' : 'This favorite motivation message will be deleted.',
+      onConfirm: () => {
+        setFavoriteMessages((prev) => prev.filter((x) => x.id !== fav.id))
+      },
+    })
+  }, [requestDelete, setFavoriteMessages, tr])
 
   const s = (trTR: string, en: string) => (tr ? trTR : en)
 
@@ -1069,7 +1082,7 @@ export default function MotivationPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setFavoriteMessages((prev) => prev.filter((x) => x.id !== fav.id))}
+                          onClick={() => deleteFavoriteMessage(fav)}
                           className="rounded-md border border-border bg-surface/80 p-1 text-text-tertiary hover:text-error"
                         >
                           <Trash2 className="h-3.5 w-3.5" />

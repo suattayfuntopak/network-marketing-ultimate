@@ -10,7 +10,7 @@ import { Modal } from '@/components/ui/Modal'
 import { stageMeta } from '@/components/contacts/contactLabels'
 import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
 import { cn } from '@/lib/utils'
-import { postAiChat } from '@/lib/aiClient'
+import { enforceTurkishAddressConsistency, postAiChat } from '@/lib/aiClient'
 import { stripAiMessageQuotes } from '@/lib/aiMessageText'
 import { fetchContacts, type ContactRow } from '@/lib/queries'
 import {
@@ -393,12 +393,15 @@ function AIMessageGeneratorModalContent({
             variant,
           }),
       )
+      const consistentVariants = locale === 'tr'
+        ? await Promise.all(normalizedVariants.map((variant) => enforceTurkishAddressConsistency(variant)))
+        : normalizedVariants
 
-      if (normalizedVariants.length === 0) {
+      if (consistentVariants.length === 0) {
         throw new Error('empty-response')
       }
 
-      setVariants(normalizedVariants)
+      setVariants(consistentVariants)
       setSendChannelsByVariant({})
       onGenerated({
         id: crypto.randomUUID(),
@@ -408,8 +411,8 @@ function AIMessageGeneratorModalContent({
         category,
         channel: defaultSendChannel,
         tone,
-        generatedContent: normalizedVariants.join('\n---\n'),
-        variants: normalizedVariants,
+        generatedContent: consistentVariants.join('\n---\n'),
+        variants: consistentVariants,
         finalContent: null,
         wasEdited: false,
         createdAt: new Date().toISOString(),
