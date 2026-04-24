@@ -69,6 +69,7 @@ export default function MotivationPage() {
   const [audienceMode, setAudienceMode] = useState<AudienceMode>('select_person')
   const [tagFilter, setTagFilter] = useState('')
   const [singleId, setSingleId] = useState<string>('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [contactQuery, setContactQuery] = useState('')
   const [contextNotes, setContextNotes] = useState('')
   const [outTitle, setOutTitle] = useState('')
@@ -97,24 +98,47 @@ export default function MotivationPage() {
   const needsSingleSelection =
     audienceMode === 'search_person' || audienceMode === 'select_person' || audienceMode === 'one_recipient'
 
+  const sortedContacts = useMemo(() => {
+    const loc = tr ? 'tr' : 'en'
+    return [...contacts].sort((a, b) => a.full_name.localeCompare(b.full_name, loc))
+  }, [contacts, tr])
+
+  const selectedContacts = useMemo(
+    () => sortedContacts.filter((c) => selectedIds.includes(c.id)),
+    [sortedContacts, selectedIds],
+  )
+
   const contactSearchResults = useMemo(() => {
     const q = contactQuery.trim()
     if (!q) return []
-    const loc = tr ? 'tr' : 'en'
     const needle = q.toLowerCase()
-    return [...contacts]
-      .filter(
-        (c) =>
-          c.full_name.toLowerCase().includes(needle) ||
-          (c.email?.toLowerCase().includes(needle) ?? false) ||
-          (c.phone?.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ?? false),
-      )
-      .sort((a, b) => a.full_name.localeCompare(b.full_name, loc))
+    const phoneNeedle = q.replace(/\D/g, '')
+    return sortedContacts
+      .map((c) => {
+        const name = c.full_name.toLowerCase()
+        const words = name.split(/\s+/).filter(Boolean)
+        const startsWith = name.startsWith(needle)
+        const wordStartsWith = words.some((w) => w.startsWith(needle))
+        const includes = name.includes(needle)
+        const emailIncludes = c.email?.toLowerCase().includes(needle) ?? false
+        const phoneIncludes = phoneNeedle.length > 0 && (c.phone?.replace(/\D/g, '').includes(phoneNeedle) ?? false)
+        const matches = startsWith || wordStartsWith || includes || emailIncludes || phoneIncludes
+        const rank = startsWith ? 0 : wordStartsWith ? 1 : includes ? 2 : emailIncludes ? 3 : phoneIncludes ? 4 : 99
+        return { c, matches, rank }
+      })
+      .filter((x) => x.matches)
+      .sort((a, b) => a.rank - b.rank || a.c.full_name.localeCompare(b.c.full_name, tr ? 'tr' : 'en'))
+      .map((x) => x.c)
       .slice(0, 20)
-  }, [contacts, contactQuery, tr])
+  }, [contactQuery, sortedContacts, tr])
 
   /** Strict WhatsApp/SMS: hedef havuzdaki telefonlu kişiler (grup/segment modunda seçici için). */
   const motivationPhoneRecipients = useMemo((): SendRecipientRow[] => {
+    if (audienceMode === 'select_person') {
+      return selectedContacts
+        .filter((c) => (c.phone?.replace(/\D/g, '')?.length ?? 0) > 0)
+        .map((c) => ({ id: c.id, full_name: c.full_name, phone: c.phone ?? null }))
+    }
     if (needsSingleSelection) {
       if (!singleContact) return []
       if (!(singleContact.phone && singleContact.phone.replace(/\D/g, '').length > 0)) return []
@@ -125,7 +149,7 @@ export default function MotivationPage() {
     return segmentPool
       .filter((c) => (c.phone?.replace(/\D/g, '')?.length ?? 0) > 0)
       .map((c) => ({ id: c.id, full_name: c.full_name, phone: c.phone ?? null }))
-  }, [needsSingleSelection, singleContact, segmentPool])
+  }, [audienceMode, selectedContacts, needsSingleSelection, singleContact, segmentPool])
 
   const knownContactTags = useMemo(() => {
     const set = new Set<string>()
@@ -184,7 +208,7 @@ export default function MotivationPage() {
           case 'search_person':
             return 'Hedef kipi: Kişi ara — kullanıcı arama/sonuçlardan tek kişi seçer; aşağıdaki kişi alanları buna göre. Seçim yoksa gerçek isim KULLANMA, genel ilham cümleleri ver.'
           case 'select_person':
-            return 'Hedef kipi: Kişi seç — açılır listeden bir kişi; mesaj o kişiye kişiselleşsin. Seçim yoksa isim yok, genel ifade.'
+            return 'Hedef kipi: Kişileri seç — listeden bir veya birden fazla kişi seçilebilir. Seçili kişi(ler)e uygun hitapla, yoksa genel yaz.'
           case 'one_recipient':
             return 'Hedef kipi: Tek kişiye gönder — tüm metin yalnızca seçilen alıcıya; bire bir motivasyon. Çoğul/“ekip” dili yalnızca kullanıcı açıkça istediyse.'
           case 'all_contacts':
@@ -200,7 +224,7 @@ export default function MotivationPage() {
           case 'search_person':
             return 'Mode: Search contact — user picks one person from search results; if none selected, no real names, generic lines.'
           case 'select_person':
-            return 'Mode: Select contact — one person from the dropdown; personalize to them, or stay generic if none selected.'
+            return 'Mode: Select contacts — one or more people can be selected. Personalize to selected people, or stay generic if none selected.'
           case 'one_recipient':
             return 'Mode: Send to one person — entire text for that one recipient only unless user asked otherwise.'
           case 'all_contacts':
@@ -218,10 +242,27 @@ export default function MotivationPage() {
         : `User’s instruction for the motivation message (highest priority): ${contextNotes || '—'}`,
     )
 
-    const audienceContact = needsSingleSelection ? singleContact : null
+    const audienceContact = audienceMode === 'select_person' ? null : needsSingleSelection ? singleContact : null
 
     if (tr) {
-      if (audienceContact) {
+      if (audienceMode === 'select_person') {
+        if (!selectedContacts.length) {
+          lines.push('Kişi listesi boş: isim KULLANMA; kısa ve genel motivasyon cümleleri ver.')
+        } else if (selectedContacts.length === 1) {
+          const one = selectedContacts[0]!
+          lines.push(
+            `Seçili kişi (tek): ${one.full_name}, meslek: ${one.profession ?? '—'}, şehir: ${one.location ?? '—'}, aşama: ${one.pipeline_stage}.`,
+          )
+        } else {
+          const roster = selectedContacts
+            .slice(0, 25)
+            .map((c, i) => `${i + 1}) ${c.full_name} — aşama: ${c.pipeline_stage}, meslek: ${c.profession ?? '—'}`)
+            .join('\n')
+          lines.push(`Seçili kişi sayısı: ${selectedContacts.length}. Mesaj bu kişilere uygun olmalı.`)
+          lines.push('Seçili kişi listesi:')
+          lines.push(roster)
+        }
+      } else if (audienceContact) {
         lines.push(
           `Hedef kişi (SADECE bu kişi): ${audienceContact.full_name}, meslek: ${audienceContact.profession ?? '—'}, şehir: ${audienceContact.location ?? '—'}, aşama: ${audienceContact.pipeline_stage}, son temas: ${audienceContact.last_contact_date ?? 'yok'}.`,
         )
@@ -260,7 +301,23 @@ export default function MotivationPage() {
         )
       }
     } else {
-      if (audienceContact) {
+      if (audienceMode === 'select_person') {
+        if (!selectedContacts.length) {
+          lines.push('No contacts selected: no real names; short generic lines.')
+        } else if (selectedContacts.length === 1) {
+          const one = selectedContacts[0]!
+          lines.push(
+            `Selected contact: ${one.full_name}, job: ${one.profession ?? '—'}, city: ${one.location ?? '—'}, stage: ${one.pipeline_stage}.`,
+          )
+        } else {
+          const roster = selectedContacts
+            .slice(0, 25)
+            .map((c, i) => `${i + 1}) ${c.full_name} — stage: ${c.pipeline_stage}, job: ${c.profession ?? '—'}`)
+            .join('\n')
+          lines.push(`Selected contacts: ${selectedContacts.length}. Message should fit these people.`)
+          lines.push(roster)
+        }
+      } else if (audienceContact) {
         lines.push(
           `Target (ONLY this person): ${audienceContact.full_name}, job: ${audienceContact.profession ?? '—'}, city: ${audienceContact.location ?? '—'}, stage: ${audienceContact.pipeline_stage}, last touch: ${audienceContact.last_contact_date ?? 'none'}.`,
         )
@@ -294,7 +351,7 @@ export default function MotivationPage() {
       }
     }
     return lines.join('\n')
-  }, [tr, contextNotes, audienceMode, needsSingleSelection, singleContact, tagFilter, segmentPool])
+  }, [tr, contextNotes, audienceMode, needsSingleSelection, singleContact, selectedContacts, tagFilter, segmentPool])
 
   const runGenerate = useCallback(
     async (mode: 'one' | 'two' | 'three') => {
@@ -497,6 +554,9 @@ export default function MotivationPage() {
                     if (v === 'all_contacts' || v === 'by_tag') {
                       setSingleId('')
                     }
+                    if (v !== 'select_person') {
+                      setSelectedIds([])
+                    }
                     if (v !== 'search_person') {
                       setContactQuery('')
                     }
@@ -504,7 +564,7 @@ export default function MotivationPage() {
                   className={control}
                 >
                   <option value="search_person">{s('Kişi ara', 'Search person')}</option>
-                  <option value="select_person">{s('Kişi seç', 'Select person')}</option>
+                  <option value="select_person">{s('Kişileri seç', 'Select contacts')}</option>
                   <option value="one_recipient">{s('Tek kişiye gönder', 'Send to one person')}</option>
                   <option value="all_contacts">{s('Tüm kişilere gönder', 'Send to all contacts')}</option>
                   <option value="by_tag">{s('Etikete göre gönder', 'Send by tag')}</option>
@@ -559,7 +619,33 @@ export default function MotivationPage() {
                   </div>
                 )}
 
-                {(audienceMode === 'select_person' || audienceMode === 'one_recipient') && (
+                {audienceMode === 'select_person' && (
+                  <div className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-border bg-surface px-2 py-2">
+                    {sortedContacts.map((c) => {
+                      const checked = selectedIds.includes(c.id)
+                      return (
+                        <label
+                          key={c.id}
+                          className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-surface-hover"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setSelectedIds((prev) =>
+                                prev.includes(c.id) ? prev.filter((id) => id !== c.id) : [...prev, c.id],
+                              )
+                            }}
+                            className="h-4 w-4 rounded border-border bg-surface accent-primary"
+                          />
+                          <span className={cn('truncate', checked && 'text-text-primary')}>{c.full_name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {audienceMode === 'one_recipient' && (
                   <select
                     value={singleId}
                     onChange={(e) => setSingleId(e.target.value)}
@@ -618,7 +704,7 @@ export default function MotivationPage() {
                       'Örn. takım grubuna teşekkür ve hafta sonu toparlayıcı motivasyon, ya da Ayşe’ye sadece moral…',
                       'E.g. thank the team and set a warm tone for the week, or a short morale boost for one person…',
                     )}
-                    className="min-h-[5.5rem] resize-none rounded-xl border border-border bg-surface py-2.5 text-sm leading-relaxed text-text-primary"
+                    className="mt-1.5 min-h-[5.5rem] resize-none rounded-xl border border-border bg-surface py-2.5 text-sm leading-relaxed text-text-primary"
                   />
                 </div>
 
@@ -828,8 +914,8 @@ export default function MotivationPage() {
                       label={h(s('Gönder', 'Send'))}
                       locale={tr ? 'tr' : 'en'}
                       linkMode="strict"
-                      phone={singleContact?.phone}
-                      email={singleContact?.email}
+                      phone={audienceMode === 'select_person' ? null : singleContact?.phone}
+                      email={audienceMode === 'select_person' ? null : singleContact?.email}
                       phoneOptions={motivationPhoneRecipients}
                       menuPlacement="up"
                     />
