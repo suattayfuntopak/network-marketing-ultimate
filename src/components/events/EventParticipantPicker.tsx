@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import type { ContactRow } from '@/lib/queries'
-import { Check, Search, Send, Users } from 'lucide-react'
+import { Check, Search, Users } from 'lucide-react'
 
 export type EventParticipantPickerLabels = {
   searchLabel: string
@@ -13,7 +13,6 @@ export type EventParticipantPickerLabels = {
   clear: string
   empty: string
   done: string
-  send: string
   peopleCount: (n: number) => string
 }
 
@@ -23,7 +22,6 @@ type Props = {
   onSelectedIdsChange: (ids: string[]) => void
   open: boolean
   onOpenChange: (open: boolean) => void
-  onRequestSend: () => void
   renderTrigger: (toggle: () => void) => React.ReactNode
   locale: 'tr' | 'en'
   labels: EventParticipantPickerLabels
@@ -36,7 +34,6 @@ export function EventParticipantPicker({
   onSelectedIdsChange,
   open,
   onOpenChange,
-  onRequestSend,
   renderTrigger,
   locale,
   labels,
@@ -167,18 +164,6 @@ export function EventParticipantPicker({
           </div>
 
           <div className="p-2 border-t border-border-subtle flex flex-wrap items-center justify-end gap-1.5 shrink-0">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                onRequestSend()
-                onOpenChange(false)
-              }}
-              icon={<Send className="w-3.5 h-3.5" />}
-            >
-              {labels.send}
-            </Button>
             <Button
               type="button"
               size="sm"

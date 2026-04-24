@@ -10,7 +10,7 @@ import { EventMeetingUrlCombobox, type EventMeetingUrlComboboxLabels } from '@/c
 import { EVENT_TYPE_KEY, type EventFieldLabels, type EventFormShape } from '@/components/events/eventForm'
 import type { Event } from '@/types'
 import type { ContactRow } from '@/lib/queries'
-import { ArrowRight, ChevronDown, MapPin, Trash2, UserPlus, Users, Video } from 'lucide-react'
+import { ArrowRight, ChevronDown, MapPin, MessageSquare, Trash2, UserPlus, Users, Video } from 'lucide-react'
 import type { InviteChannel } from '@/components/events/eventInviteUtils'
 
 export interface EventDetailsLabels extends EventFieldLabels {
@@ -256,9 +256,6 @@ export function EventDetailsModal({
                 onSelectedIdsChange={onSelectedAttendeeIdsChange}
                 locale={locale}
                 disabled={false}
-                onRequestSend={() => {
-                  // picker içindeki gönder butonu bu akışta kullanılmıyor
-                }}
                 renderTrigger={(toggle) => (
                   <Button type="button" variant="ghost" size="sm" onClick={toggle} icon={<UserPlus className="w-3.5 h-3.5" />}>
                     {labels.viewContacts}
@@ -302,7 +299,7 @@ export function EventDetailsModal({
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={opt.iconUrl} alt="" className="h-5 w-5 shrink-0" width={20} height={20} />
                           ) : (
-                            <span className="h-5 w-5 shrink-0 rounded border border-cyan-500/60" />
+                            <MessageSquare className="h-5 w-5 shrink-0 text-cyan-300" />
                           )}
                           {opt.label}
                         </button>

@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import { CELEBRITY_QUOTES, DAILY_SUGGESTION_LINES, type MotivationQuote } from '@/app/motivation/motivationData'
 import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
 import type { SendRecipientRow } from '@/components/ai/ChannelSendRecipientModal'
-import { Copy, Edit3, Heart, Pencil, Sparkles, Star, Trash2 } from 'lucide-react'
+import { Copy, Edit3, Pencil, Sparkles, Star, Trash2 } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.03 } } }
 const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }
@@ -79,6 +79,7 @@ export default function MotivationPage() {
   const [outTitle, setOutTitle] = useState('')
   const [outBody, setOutBody] = useState('')
   const [outHint, setOutHint] = useState('')
+  const [generateWarning, setGenerateWarning] = useState('')
   const [variations, setVariations] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [copyFlash, setCopyFlash] = useState(false)
@@ -506,6 +507,26 @@ export default function MotivationPage() {
   }
 
   const hasVariations = variations.length > 1
+  const generateBlockedMessage = s(
+    'Hedef seçimi yapılmadan mesaj üretimine geçilemez, lütfen hedef seçimi yapınız!',
+    'Message generation cannot continue without selecting a target. Please choose a target first.',
+  )
+
+  function hasValidTargetSelection() {
+    if (audienceMode === 'search_person' || audienceMode === 'one_recipient') {
+      return Boolean(singleId)
+    }
+    if (audienceMode === 'select_person') {
+      return selectedIds.length > 0
+    }
+    if (audienceMode === 'by_tag') {
+      return tagFilter.trim().length > 0 && segmentPool.length > 0
+    }
+    if (audienceMode === 'all_contacts') {
+      return contacts.length > 0
+    }
+    return false
+  }
 
   useEffect(() => {
     if (!hasVariations && previewTab === 'variants') {
@@ -783,6 +804,11 @@ export default function MotivationPage() {
                   className="h-11 w-full border-0 text-[15px] font-semibold text-slate-950 shadow-md"
                   style={{ background: 'linear-gradient(180deg, #22d3ee 0%, #06b6d4 100%)' }}
                   onClick={() => {
+                    if (!hasValidTargetSelection()) {
+                      setGenerateWarning(generateBlockedMessage)
+                      return
+                    }
+                    if (generateWarning) setGenerateWarning('')
                     void runGenerate(
                       variantCount === 1 ? 'one' : variantCount === 2 ? 'two' : 'three',
                     )
@@ -792,6 +818,9 @@ export default function MotivationPage() {
                 >
                   {s('Üret', 'Generate')}
                 </Button>
+                {generateWarning ? (
+                  <p className="mt-2 text-xs text-warning">{generateWarning}</p>
+                ) : null}
               </div>
             </div>
 
@@ -874,20 +903,13 @@ export default function MotivationPage() {
                             <div className="pointer-events-none absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
                               <button
                                 type="button"
-                                onClick={() => copyContent(v)}
-                                className="rounded-md border border-border bg-surface/80 p-1 text-text-tertiary hover:text-text-primary"
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
                                 onClick={() => toggleFavorite(v)}
                                 className={cn(
                                   'rounded-md border border-border bg-surface/80 p-1',
                                   isFavorited(v) ? 'text-primary' : 'text-text-tertiary hover:text-text-primary',
                                 )}
                               >
-                                <Heart className={cn('h-3.5 w-3.5', isFavorited(v) && 'fill-current')} />
+                                <Star className={cn('h-3.5 w-3.5', isFavorited(v) && 'fill-current')} />
                               </button>
                             </div>
                           </div>
@@ -922,20 +944,13 @@ export default function MotivationPage() {
                         <div className="pointer-events-none absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
                           <button
                             type="button"
-                            onClick={() => copyContent(outBody)}
-                            className="rounded-md border border-border bg-surface/80 p-1 text-text-tertiary hover:text-text-primary"
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => toggleFavorite(outBody)}
                             className={cn(
                               'rounded-md border border-border bg-surface/80 p-1',
                               isFavorited(outBody) ? 'text-primary' : 'text-text-tertiary hover:text-text-primary',
                             )}
                           >
-                            <Heart className={cn('h-3.5 w-3.5', isFavorited(outBody) && 'fill-current')} />
+                            <Star className={cn('h-3.5 w-3.5', isFavorited(outBody) && 'fill-current')} />
                           </button>
                         </div>
                       )}

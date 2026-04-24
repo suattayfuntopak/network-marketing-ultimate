@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/Button'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useDeleteConfirm } from '@/components/common/DeleteConfirmProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
-import { EventInviteSendModal } from '@/components/events/EventInviteSendModal'
 import { EventCreateModal } from '@/components/events/EventCreateModal'
 import { EventDetailsModal } from '@/components/events/EventDetailsModal'
 import { EventAttendeeSelectModal } from '@/components/events/EventAttendeeSelectModal'
@@ -43,6 +42,8 @@ import {
 import type { Event } from '@/types'
 import { Calendar, Clock, MapPin, Plus, Video } from 'lucide-react'
 import type { InviteChannel } from '@/components/events/eventInviteUtils'
+import { templateMessage } from '@/components/events/eventInviteUtils'
+import { openMessageOnChannel } from '@/lib/openChannelSend'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -61,12 +62,10 @@ export default function EventsPage() {
   const [activeEventId, setActiveEventId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState(blankEvent)
   const [returnPath, setReturnPath] = useState<string | null>(null)
-  const [inviteOpen, setInviteOpen] = useState(false)
   const [pendingAttendeeIds, setPendingAttendeeIds] = useState<string[]>([])
   const [savingEvent, setSavingEvent] = useState(false)
   const [processedParamsToken, setProcessedParamsToken] = useState<string | null>(null)
   const [detailsInitialStep, setDetailsInitialStep] = useState<1 | 2>(1)
-  const [inviteInitialChannel, setInviteInitialChannel] = useState<InviteChannel>('whatsapp')
 
   const { data: eventItems = [] } = useQuery<Event[]>({
     queryKey: ['events'],
@@ -179,8 +178,7 @@ export default function EventsPage() {
     selectAll: 'Tümünü Seç',
     clear: 'Temizle',
     empty: 'Eşleşen kontak yok.',
-    done: 'Tamam',
-    send: 'Gönder',
+    done: 'Seç',
     peopleCount: (n: number) => (n === 0 ? 'Henüz kimse seçilmedi.' : `${n} kişi seçili.`),
   }
 
@@ -190,8 +188,7 @@ export default function EventsPage() {
     selectAll: 'Select all',
     clear: 'Clear',
     empty: 'No matching contacts.',
-    done: 'Done',
-    send: 'Send',
+    done: 'Select',
     peopleCount: (n: number) => (n === 0 ? 'No one selected yet.' : `${n} selected.`),
   }
 
@@ -326,13 +323,11 @@ export default function EventsPage() {
   function openDetails(event: Event) {
     setDetailsInitialStep(1)
     setActiveEventId(event.id)
-    setInviteOpen(false)
     setEditForm(eventToForm(event))
     setPendingAttendeeIds(event.attendees.map((a) => a.contactId))
   }
 
   function closeDetailsModal() {
-    setInviteOpen(false)
     setActiveEventId(null)
     setPendingAttendeeIds([])
     navigateBackIfNeeded()
@@ -373,10 +368,52 @@ export default function EventsPage() {
     }
   }
 
+  async function sendEventDirect(channel: InviteChannel) {
+    if (!activeEvent) return
+    const selectedContacts = pendingAttendeeIds
+      .map((id) => contacts.find((c) => c.id === id))
+      .filter((c): c is ContactRow => Boolean(c))
+    if (selectedContacts.length === 0) return
+
+    const baseMessage = templateMessage(
+      locale === 'tr'
+        ? 'Merhaba değerli katılımcı, "{eventTitle}" etkinliğine davetlisin. Tarih: {date}, Saat: {time}, Konum: {location}. Toplantı: {meetingUrl}'
+        : 'Hello dear participant, you are invited to "{eventTitle}". Date: {date}, Time: {time}, Location: {location}. Meeting: {meetingUrl}',
+      activeEvent,
+      locale,
+    )
+
+    await syncInvitedContacts(selectedContacts.map((c) => c.id), true)
+
+    if (channel === 'email') {
+      const emails = selectedContacts.map((c) => c.email?.trim()).filter((x): x is string => Boolean(x))
+      if (emails.length === 0) return
+      const first = emails[0]
+      const bcc = emails.slice(1).join(',')
+      const href = `mailto:${first}?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(activeEvent.title)}&body=${encodeURIComponent(baseMessage)}`
+      window.open(href, '_blank', 'noopener,noreferrer')
+      return
+    }
+
+    if (channel === 'whatsapp' || channel === 'sms') {
+      const phones = selectedContacts
+        .map((c) => c.phone?.replace(/\D/g, '') ?? '')
+        .filter((p) => p.length > 0)
+      if (phones.length === 0) return
+      if (phones.length === 1) {
+        openMessageOnChannel(channel, baseMessage, { phone: phones[0], email: null, linkMode: 'strict' })
+        return
+      }
+      openMessageOnChannel(channel, baseMessage, { phone: null, email: null, linkMode: 'loose' })
+      return
+    }
+
+    openMessageOnChannel('telegram', baseMessage, { phone: null, email: null, linkMode: 'loose' })
+  }
+
   async function proceedSendFromDetails(channel: InviteChannel) {
     await saveEvent()
-    setInviteInitialChannel(channel)
-    setInviteOpen(true)
+    await sendEventDirect(channel)
   }
 
   async function saveEvent() {
@@ -421,7 +458,6 @@ export default function EventsPage() {
       detail: ev?.title,
       onConfirm: async () => {
         await deleteMutation.mutateAsync(eventId)
-        setInviteOpen(false)
         setActiveEventId(null)
         navigateBackIfNeeded()
       },
@@ -620,46 +656,8 @@ export default function EventsPage() {
           clear: locale === 'tr' ? 'Temizle' : 'Clear',
           empty: locale === 'tr' ? 'Henüz kimse seçilmedi.' : 'No one selected yet.',
           peopleCount: (n) => (locale === 'tr' ? (n === 0 ? 'Henüz kimse seçilmedi.' : `${n} kişi seçili.`) : (n === 0 ? 'No one selected yet.' : `${n} selected.`)),
-          done: locale === 'tr' ? 'Tamam' : 'Done',
+          done: locale === 'tr' ? 'Seç' : 'Select',
         }}
-      />
-
-      <EventInviteSendModal
-        key={`${activeEvent?.id ?? 'e'}-${String(inviteOpen)}-${inviteInitialChannel}`}
-        open={inviteOpen && Boolean(activeEvent)}
-        onClose={() => setInviteOpen(false)}
-        event={activeEvent}
-        contacts={contacts}
-        recipientIds={pendingAttendeeIds}
-        locale={locale}
-        labels={{
-          title: labels.sendModal.title,
-          description: labels.sendModal.description,
-          sendChannel: labels.sendModal.sendChannel,
-          channelHint: labels.sendModal.channelHint,
-          messageLabel: labels.sendModal.messageLabel,
-          bulkSend: labels.sendModal.bulkSend,
-          sequentialSend: labels.sendModal.sequentialSend,
-          oneByOne: labels.sendModal.oneByOne,
-          openLink: labels.sendModal.openLink,
-          advanced: labels.sendModal.advanced,
-          groupLinksHint: labels.sendModal.groupLinksHint,
-          whatsappGroup: labels.sendModal.whatsappGroup,
-          telegramGroup: labels.sendModal.telegramGroup,
-          templateLabel: labels.sendModal.templateLabel,
-          saveAsTemplate: labels.sendModal.saveAsTemplate,
-          historyTitle: labels.sendModal.historyTitle,
-          noHistory: labels.sendModal.noHistory,
-          selectedCount: labels.sendModal.selectedCount,
-          recipientCount: labels.sendModal.recipientCount,
-          cancel: labels.sendModal.cancel,
-          addedToEvent: labels.sendModal.addedToEvent,
-          sentTo: labels.sendModal.sentTo,
-          noCompatibleContacts: labels.sendModal.noCompatibleContacts,
-        }}
-        isSyncing={attendeesMutation.isPending}
-        onSyncAttendees={syncInvitedContacts}
-        initialChannel={inviteInitialChannel}
       />
     </motion.div>
   )
