@@ -36,11 +36,18 @@ export function ChannelSendRecipientModal({ open, onClose, channel, body, linkMo
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase()
-    if (!t) return recipients
-    return recipients.filter(
+    const base = !t
+      ? recipients
+      : recipients.filter(
       (r) => r.full_name.toLowerCase().includes(t) || digitPhone(r.phone).includes(t),
     )
-  }, [q, recipients])
+    return [...base].sort((a, b) => {
+      const aSelected = selected.has(a.id) ? 0 : 1
+      const bSelected = selected.has(b.id) ? 0 : 1
+      if (aSelected !== bSelected) return aSelected - bSelected
+      return a.full_name.localeCompare(b.full_name, locale === 'tr' ? 'tr-TR' : 'en-US')
+    })
+  }, [q, recipients, selected, locale])
 
   useEffect(() => {
     if (!open) {

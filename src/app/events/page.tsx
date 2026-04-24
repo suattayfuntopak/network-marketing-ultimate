@@ -15,6 +15,7 @@ import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { EventCreateModal } from '@/components/events/EventCreateModal'
 import { EventDetailsModal } from '@/components/events/EventDetailsModal'
 import { EventAttendeeSelectModal } from '@/components/events/EventAttendeeSelectModal'
+import { ChannelSendRecipientModal, type SendRecipientRow } from '@/components/ai/ChannelSendRecipientModal'
 import type { EventLocationSearchLabels } from '@/components/events/EventLocationSearch'
 import type { EventMeetingUrlComboboxLabels } from '@/components/events/EventMeetingUrlCombobox'
 import {
@@ -64,6 +65,11 @@ export default function EventsPage() {
   const [returnPath, setReturnPath] = useState<string | null>(null)
   const [pendingAttendeeIds, setPendingAttendeeIds] = useState<string[]>([])
   const [savingEvent, setSavingEvent] = useState(false)
+  const [directRecipientPicker, setDirectRecipientPicker] = useState<{
+    channel: 'whatsapp' | 'sms'
+    body: string
+    recipients: SendRecipientRow[]
+  } | null>(null)
   const [processedParamsToken, setProcessedParamsToken] = useState<string | null>(null)
   const [detailsInitialStep, setDetailsInitialStep] = useState<1 | 2>(1)
 
@@ -396,15 +402,15 @@ export default function EventsPage() {
     }
 
     if (channel === 'whatsapp' || channel === 'sms') {
-      const phones = selectedContacts
-        .map((c) => c.phone?.replace(/\D/g, '') ?? '')
-        .filter((p) => p.length > 0)
-      if (phones.length === 0) return
-      if (phones.length === 1) {
-        openMessageOnChannel(channel, baseMessage, { phone: phones[0], email: null, linkMode: 'strict' })
+      const recipients = selectedContacts
+        .filter((contact) => (contact.phone?.replace(/\D/g, '').length ?? 0) > 0)
+        .map((contact) => ({ id: contact.id, full_name: contact.full_name, phone: contact.phone ?? null }))
+      if (recipients.length === 0) return
+      if (recipients.length === 1) {
+        openMessageOnChannel(channel, baseMessage, { phone: recipients[0]!.phone, email: null, linkMode: 'strict' })
         return
       }
-      openMessageOnChannel(channel, baseMessage, { phone: null, email: null, linkMode: 'loose' })
+      setDirectRecipientPicker({ channel, body: baseMessage, recipients })
       return
     }
 
@@ -658,6 +664,16 @@ export default function EventsPage() {
           peopleCount: (n) => (locale === 'tr' ? (n === 0 ? 'Henüz kimse seçilmedi.' : `${n} kişi seçili.`) : (n === 0 ? 'No one selected yet.' : `${n} selected.`)),
           done: locale === 'tr' ? 'Seç' : 'Select',
         }}
+      />
+
+      <ChannelSendRecipientModal
+        open={Boolean(directRecipientPicker)}
+        onClose={() => setDirectRecipientPicker(null)}
+        channel={directRecipientPicker?.channel ?? null}
+        body={directRecipientPicker?.body ?? ''}
+        linkMode="strict"
+        locale={locale}
+        recipients={directRecipientPicker?.recipients ?? []}
       />
     </motion.div>
   )
