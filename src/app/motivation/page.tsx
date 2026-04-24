@@ -62,11 +62,9 @@ export default function MotivationPage() {
   const tr = locale === 'tr'
   const { data: contacts = [] } = useQuery<ContactRow[]>({ queryKey: ['contacts'], queryFn: fetchContacts })
 
-  /** SSR/CSR eşleşmesi: ilk kare 0, mount sonrası rastgele (Math.random sadece effect içinde) */
-  const [quoteIndex, setQuoteIndex] = useState(0)
   const [favIds] = usePersistentState<string[]>('nmu-motivation-fav-quotes', [], { version: 1 })
 
-  const [audienceMode, setAudienceMode] = useState<AudienceMode>('select_person')
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>('search_person')
   const [tagFilter, setTagFilter] = useState('')
   const [singleId, setSingleId] = useState<string>('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -84,10 +82,28 @@ export default function MotivationPage() {
   const previewTextRef = useRef<HTMLTextAreaElement | null>(null)
   const contextNotesRef = useRef<HTMLTextAreaElement | null>(null)
 
-  const currentQuote = useMemo(
-    () => pickQuote(quoteIndex, favIds),
-    [quoteIndex, favIds],
-  )
+  const todayKey = useMemo(() => {
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = String(now.getMonth() + 1).padStart(2, '0')
+    const d = String(now.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }, [])
+
+  const daySeed = useMemo(() => {
+    let acc = 0
+    for (let i = 0; i < todayKey.length; i += 1) {
+      acc = (acc * 31 + todayKey.charCodeAt(i)) >>> 0
+    }
+    return acc
+  }, [todayKey])
+
+  const quoteIndex = useMemo(() => {
+    if (!CELEBRITY_QUOTES.length) return 0
+    return daySeed % CELEBRITY_QUOTES.length
+  }, [daySeed])
+
+  const currentQuote = useMemo(() => pickQuote(quoteIndex, favIds), [quoteIndex, favIds])
 
   const singleContact = contacts.find((c) => c.id === singleId) ?? null
   const segmentPool = useMemo(
@@ -162,24 +178,13 @@ export default function MotivationPage() {
     return [...set].sort((a, b) => a.localeCompare(b, tr ? 'tr' : 'en', { sensitivity: 'base' }))
   }, [contacts, tr])
 
-  const [dailySuggestionIndex, setDailySuggestionIndex] = useState(0)
-
   const todaySuggestion = useMemo(() => {
     const list = DAILY_SUGGESTION_LINES
     if (!list.length) return tr ? 'Küçük adımlar, büyük ekip enerjisini biriktirir.' : 'Small steps add up to team energy.'
-    const row = list[((dailySuggestionIndex % list.length) + list.length) % list.length]!
+    const idx = (daySeed + 7) % list.length
+    const row = list[idx]!
     return tr ? row.tr : row.en
-  }, [dailySuggestionIndex, tr])
-
-  useEffect(() => {
-    if (!CELEBRITY_QUOTES.length) return
-    setQuoteIndex(Math.floor(Math.random() * CELEBRITY_QUOTES.length))
-  }, [])
-
-  useEffect(() => {
-    if (!DAILY_SUGGESTION_LINES.length) return
-    setDailySuggestionIndex(Math.floor(Math.random() * DAILY_SUGGESTION_LINES.length))
-  }, [])
+  }, [daySeed, tr])
 
   const buildContextBlock = useCallback(() => {
     const lines: string[] = []
@@ -437,10 +442,6 @@ export default function MotivationPage() {
     window.setTimeout(() => setCopyFlash(false), 1200)
   }
 
-  const newQuote = () => {
-    setQuoteIndex((i) => i + 1)
-  }
-
   const s = (trTR: string, en: string) => (tr ? trTR : en)
 
   const exampleMessage = useMemo(
@@ -502,7 +503,7 @@ export default function MotivationPage() {
             'shadow-sm',
           )}
         >
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
             <div className="min-w-0 flex-1">
               <p className={sectionLabelClass}>{h(s("Günün sözü", "Today's line"))}</p>
               <blockquote className="mt-3 text-lg font-medium leading-relaxed text-text-primary sm:text-xl sm:leading-relaxed">
@@ -514,17 +515,6 @@ export default function MotivationPage() {
                 <p className="text-sm font-semibold text-text-primary">{currentQuote.author}</p>
                 <p className="text-xs leading-snug text-text-tertiary">{currentQuote.role}</p>
               </footer>
-            </div>
-            <div className="flex shrink-0 items-center self-end">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={newQuote}
-                className="h-8 border-white/[0.1] bg-transparent px-3 text-xs text-text-secondary hover:bg-white/[0.04]"
-              >
-                {s('Yeni söz', 'New quote')}
-              </Button>
             </div>
           </div>
         </div>
@@ -844,11 +834,6 @@ export default function MotivationPage() {
                         </p>
                         {outHint && hasDraft && (
                           <p className="mt-1 line-clamp-2 text-xs text-text-tertiary">{outHint}</p>
-                        )}
-                        {!hasDraft && (
-                          <p className="mt-1 text-xs text-text-tertiary/90">
-                            {s('Taslak, üretimle burada belirecek.', 'Your draft will appear when you generate.')}
-                          </p>
                         )}
                       </div>
                       {copyFlash && (

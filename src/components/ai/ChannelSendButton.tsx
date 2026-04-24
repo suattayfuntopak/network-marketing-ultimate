@@ -81,6 +81,9 @@ function titleFor(
     if (!canUsePhone) {
       return locale === 'tr' ? 'Telefonu kayıtlı en az bir kişi gerekir' : 'At least one contact with a phone number is required'
     }
+    if (channel === 'whatsapp' && multiPhonePick && !hasDirectPhone) {
+      return locale === 'tr' ? 'WhatsApp seçim ekranını açar' : 'Opens WhatsApp chat picker'
+    }
     if (multiPhonePick && !hasDirectPhone) {
       return locale === 'tr' ? 'Alıcı listesini açar' : 'Opens recipient picker'
     }
@@ -142,6 +145,12 @@ export function ChannelSendButton({
     if (ch === 'whatsapp' || ch === 'sms') {
       if (linkMode === 'strict' && !canUsePhone) return
       if (linkMode === 'strict') {
+        if (ch === 'whatsapp' && !hasDirectPhone && phoneList.length > 1) {
+          openMessageOnChannel(ch, body, { phone: null, email: null, linkMode: 'loose' })
+          onAfterSend?.(ch)
+          setOpen(false)
+          return
+        }
         if (hasDirectPhone) {
           openMessageOnChannel(ch, body, { phone, email, linkMode })
           onAfterSend?.(ch)
