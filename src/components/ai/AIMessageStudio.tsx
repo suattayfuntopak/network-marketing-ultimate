@@ -8,6 +8,7 @@ import { Input, Textarea } from '@/components/ui/Input'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import type { ContactRow } from '@/lib/queries'
 import { postAiChat } from '@/lib/aiClient'
+import { stripAiMessageQuotes } from '@/lib/aiMessageText'
 import { getStageLabel } from '@/lib/coach'
 import { cn } from '@/lib/utils'
 import {
@@ -199,7 +200,7 @@ function buildFallbackMessage(options: {
 function splitVariants(text: string) {
   return text
     .split(/\n?---+\n?/g)
-    .map((chunk) => chunk.trim())
+    .map((chunk) => stripAiMessageQuotes(chunk.trim()))
     .filter(Boolean)
     .slice(0, 2)
 }

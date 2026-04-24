@@ -35,6 +35,7 @@ import {
 import { formatActivityInteractionCopy } from '@/lib/contactActivityLog'
 import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
 import { postAiChat } from '@/lib/aiClient'
+import { stripAiMessageQuotes } from '@/lib/aiMessageText'
 import { toHeadingCase } from '@/lib/headingCase'
 import { cn } from '@/lib/utils'
 import type { ContactRow, InteractionRow, TaskRow } from '@/lib/queries'
@@ -286,7 +287,7 @@ export function ContactDetailPersonView({
     try {
       const response = await postAiChat([{ role: 'user', content: prompt }])
       if (!response.ok) throw new Error('ai-route-error')
-      const text = (await response.text()).trim()
+      const text = stripAiMessageQuotes((await response.text()).trim())
       if (!text) throw new Error('empty-ai-response')
       setCoachingMessage(text)
     } catch {

@@ -11,6 +11,7 @@ import { stageMeta } from '@/components/contacts/contactLabels'
 import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
 import { cn } from '@/lib/utils'
 import { postAiChat } from '@/lib/aiClient'
+import { stripAiMessageQuotes } from '@/lib/aiMessageText'
 import { fetchContacts, type ContactRow } from '@/lib/queries'
 import {
   Check,
@@ -163,7 +164,7 @@ function normalizeVariantCount(
   fallbackFactory: (variant: number) => string,
 ) {
   const normalized = parsedVariants
-    .map((variant) => variant.trim())
+    .map((variant) => stripAiMessageQuotes(variant.trim()))
     .filter(Boolean)
     .slice(0, variantCount)
 

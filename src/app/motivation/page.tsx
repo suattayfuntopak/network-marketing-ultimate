@@ -9,6 +9,7 @@ import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { postAiChat } from '@/lib/aiClient'
+import { stripAiMessageQuotes } from '@/lib/aiMessageText'
 import { fetchContacts, type ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { CELEBRITY_QUOTES, type MotivationQuote } from '@/app/motivation/motivationData'
@@ -278,7 +279,7 @@ export default function MotivationPage() {
           ]
           const r = await postAiChat([{ role: 'user', content: refinePrompt.join('\n\n') }])
           if (!r.ok) throw new Error('ai')
-          const text = (await r.text()).trim()
+          const text = stripAiMessageQuotes((await r.text()).trim())
           setOutBody(text)
           setOutTitle(tr ? 'Düzenlenmiş mesaj' : 'Refined message')
           setOutHint(
@@ -289,11 +290,11 @@ export default function MotivationPage() {
         } else {
           const r = await postAiChat([{ role: 'user', content: baseInstruction.join('\n\n') }])
           if (!r.ok) throw new Error('ai')
-          const text = (await r.text()).trim()
+          const text = stripAiMessageQuotes((await r.text()).trim())
           if (isMulti) {
             const parts = text
               .split(/\n*---\n*/)
-              .map((p) => p.trim())
+              .map((p) => stripAiMessageQuotes(p.trim()))
               .filter(Boolean)
             const n = count
             const useParts = parts.length >= n ? parts.slice(0, n) : parts.length ? parts : [text]
