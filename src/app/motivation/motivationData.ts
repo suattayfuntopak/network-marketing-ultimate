@@ -86,25 +86,23 @@ export const CELEBRITY_QUOTES: MotivationQuote[] = [
 /** Geriye dönük: sadece ünlü sözler */
 export const MOTIVATION_QUOTES = CELEBRITY_QUOTES
 
-/** "Bugünün önerisi" — görev değil, ekip/kişisel motive edici; sayfa yükü başına rastgele */
+/** "Bugünün önerisi" — kısa, net, ekip/kişisel motive; sayfa açılışında rastgele */
 export const DAILY_SUGGESTION_LINES: { tr: string; en: string }[] = [
-  { tr: 'Küçük bir ilerleme, sessiz bıraktığın ekip arkadaşını yeniden ayağa kaldırmak için yeterlidir.', en: "A small bit of progress is enough to lift a teammate you’ve been leaving behind." },
-  { tr: 'Dinlemeden konuştuğun sürece motive edemezsin; bugün en az birine gerçekten kulak ver.', en: "You can’t truly motivate if you don’t listen—give one person your full attention today." },
-  { tr: 'Başkalarının potansiyelini hatırlatan bir cümle, onların o günkü tüm oyun planını değiştirebilir.', en: "One line that names someone’s potential can change their whole day." },
-  { tr: 'Mükemmel fırsat yok; cesaretlendirdiğin an vardır. Bugün birini o ana davet et.', en: "There is no ‘perfect’ moment—only the moment you choose to encourage. Invite someone into it today." },
-  { tr: 'Büyük konuşmandan çok, son gördüğün kişide bıraktığın his önemlidir.', en: "What matters isn’t the big speech—the feeling you leave with the last person you saw." },
-  { tr: 'Vazgeçmek üzere olan birine, ‘seni gördüm’ demek bazen tüm eğitimden büyüktür.', en: "Saying ‘I see you’ to someone about to quit can outweigh any training." },
-  { tr: 'Lider büyüttüğüne değil, birlikte taşıdığı yükü paylaştığına büyür.', en: "A leader grows not on what they sell, but on the load they help carry—together." },
-  { tr: 'Bugün birine sadece ‘buradasın, iyi ki’ deme cesaretini topla.', en: "Find the courage to tell someone, simply: ‘I’m glad you’re here.’" },
-  { tr: 'Görünmeyen emeği adıyla an, görünen şöhretten çok tokluk verir.', en: "Naming unseen effort feeds people more than any spotlight." },
-  { tr: 'Başkalarını yükselttiğinde kendin de hafifler; ağır taşıyorsan ekiple paylaş.', en: "When you lift others, you get lighter too—share the load with your team." },
-  { tr: 'Bir cümlelik teşekkür, aylar süren şüpheden güçlü olabilir.', en: "A single line of thanks can outweigh months of doubt." },
-  { tr: 'Dün kötü gideni bugün fark eden, yarının güvenen ekibini kurar.', en: "The leader who notices yesterday’s bad day builds tomorrow’s loyal team." },
-  { tr: 'Senin ısındığın oda, ekibin performansıdır. Enerjini bilinçle taşı.', en: "The room you warm is your team’s performance—carry your energy on purpose." },
-  { tr: 'Korku baskıdan değil, birlikte denemekten erir.', en: "Fear dissolves not under pressure, but when people try—together." },
-  { tr: 'Birine ‘yanındayım’ demek, mesafeleri siler.', en: "‘I’m with you’ erases more distance than any strategy." },
-  { tr: 'Bugün bir kişide gördüğün bir erdemi, ona söylemeden geçme.', en: "Don’t let the virtue you see in one person today go unspoken." },
-  { tr: 'İlk adımı çoğu zaman cesaret değil, senin verdiğin inanç verir.', en: "Often it isn’t courage that makes the first step—it’s the belief you hand someone." },
-  { tr: 'Takımda susanları duy: en çok onlar bir kelimeyle ayağa kalkar.', en: "Hear the quiet ones on your team—often one word is enough to bring them up." },
+  { tr: 'Bugün toplantı bitince, tek bir ekip üyesine yüzüne karşı kısaca neyi iyi yaptığını söylemeyi dene.', en: 'After your meeting, try telling one teammate face to face one thing they did well.' },
+  { tr: '“Nasıl yardımcı olabilirim?” sorusu, “acele et” cümlesinden çoğu zaman daha iyi hızlandırır.', en: '“How can I help?” often speeds people up more than “hurry up.”' },
+  { tr: 'Kendi zirveni anlatmadan önce, birinin küçük bir ilerlemesini duyur; ikisi birlikte daha çok hafıza bırakır.', en: 'Before sharing your win, mention someone’s small step—people remember the pair.' },
+  { tr: 'İki cümlelik samimi teşekkür, yarım saatlik genel sohbetten çoğu zaman daha çok değer görür.', en: 'A two-sentence thank-you often lands better than a long generic talk.' },
+  { tr: 'Bir gün sadece dinle: çözüm önerme, sadece özetle; “anladım” dene.', en: 'For one day, just listen, reflect back, and say you understood before you advise.' },
+  { tr: 'Dün aksayan işi, bugün kişi yerine sorun üzerinden konuş: “Neyi zorlaştırdı?” de, “Neden beceremedin?” deme.', en: 'When something went wrong, ask what made it hard—not who failed.' },
+  { tr: 'Ekip toplantısında söz hakkı vermediğin biri varsa, bir sonraki mesaj ona özel olsun.', en: 'If someone stayed quiet in the group chat, your next nudge to them is personal.' },
+  { tr: 'Aynı hatayı ikinci kez eleştirmeden önce, bir kez “birlikte nasıl kapatırız?” diye sor.', en: 'Before a second round of critique on the same mistake, ask how you close it together.' },
+  { tr: 'Cezalandırmadan hemen önce bir nefes; çoğu yanlış cümle o arada söylenmiyor.', en: 'Before you call someone out, pause—most regretful lines never get that pause.' },
+  { tr: 'Hedefi net söyle, şüpheyi açık bırakma; “büyüyoruz” yerine bu ay için tek rakam dene.', en: 'Name one number for this month instead of only “we’re growing.”' },
+  { tr: 'Kendi payına düşen işi söyle; “herkes yapsın” cümlesi çoğu zaman kimsenin yapmaması demek.', en: 'Say your part; “everyone should” often means no one in practice.' },
+  { tr: 'Gün bitmeden, birine “bugün buna odaklandım” de; görünürlük, ekipte güven tohumudur.', en: 'End the day by telling someone what you actually focused on—visibility builds trust.' },
+  { tr: 'Bir ekip lideri olarak her gün aynı enerjide olman gerekmez; dürüst olman yeterli günler de olur.', en: "You don’t have to be high energy every day—honest and steady is enough some days." },
+  { tr: 'Biri çekinerek yazdıysa, kamuya giden yanıtında onu açıkça takdir et; sessizce okuyanlara sinyal verirsin.', en: "If someone wrote timidly, praise them in the public reply—others are watching too." },
+  { tr: 'Hızlı karar: bugün sadece bir kişiye geri dönüş süreni yarı yarıya kısalt; “yarın” deme.', en: 'Today, cut your reply time in half for at least one person—no “I’ll get back later.”' },
+  { tr: 'Son bir ayda hiç vakit ayırmadığın bir ekip üyesine beş dakikalık özel not yazmayı aklında tut.', en: 'Block five minutes to message someone you’ve ignored for a month—short and specific.' },
 ]
 

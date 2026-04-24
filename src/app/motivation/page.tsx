@@ -98,17 +98,18 @@ export default function MotivationPage() {
     audienceMode === 'search_person' || audienceMode === 'select_person' || audienceMode === 'one_recipient'
 
   const contactSearchResults = useMemo(() => {
+    const q = contactQuery.trim()
+    if (!q) return []
     const loc = tr ? 'tr' : 'en'
-    const sorted = [...contacts].sort((a, b) => a.full_name.localeCompare(b.full_name, loc))
-    const q = contactQuery.trim().toLowerCase()
-    if (!q) return sorted.slice(0, 14)
-    return sorted
+    const needle = q.toLowerCase()
+    return [...contacts]
       .filter(
         (c) =>
-          c.full_name.toLowerCase().includes(q) ||
-          (c.email?.toLowerCase().includes(q) ?? false) ||
+          c.full_name.toLowerCase().includes(needle) ||
+          (c.email?.toLowerCase().includes(needle) ?? false) ||
           (c.phone?.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ?? false),
       )
+      .sort((a, b) => a.full_name.localeCompare(b.full_name, loc))
       .slice(0, 20)
   }, [contacts, contactQuery, tr])
 
@@ -510,69 +511,48 @@ export default function MotivationPage() {
                 </select>
 
                 {audienceMode === 'search_person' && (
-                  <p className="text-[11px] leading-relaxed text-text-tertiary">
-                    {s(
-                      'İsim, e-posta veya telefonda ara; aşağıdan bir kişiye tıkla. Mesaj, seçtiğin kişinin kaydındaki bilgilere göre üretilecek.',
-                      'Search by name, email, or phone; click someone below. The draft will use that person’s context.',
-                    )}
-                  </p>
-                )}
-                {audienceMode === 'select_person' && (
-                  <p className="text-[11px] leading-relaxed text-text-tertiary">
-                    {s('Listeden bir kişi seç; aşağıdaki “tarif” alanında ne mesajı istediğini yaz.', 'Pick one person, then describe the message you want in the text area below.')}
-                  </p>
-                )}
-                {audienceMode === 'one_recipient' && (
-                  <p className="text-[11px] leading-relaxed text-text-tertiary">
-                    {s(
-                      'Yalnızca seçtiğin alıcıya bire bir motivasyon. Hitap ve içerik bu kişiye özel olsun; tarif alanındaki niyetine mutlaka uy.',
-                      '1:1 motivation to your chosen contact only. The draft should address them personally and follow your description.',
-                    )}
-                  </p>
-                )}
-                {audienceMode === 'all_contacts' && (
-                  <p className="text-[11px] leading-relaxed text-text-tertiary">
-                    {s(
-                      `Kontak listenin tamamı (${contacts.length} kişi) hedef kitle. Genelde ekip/çoğul veya lider–ekip tonu; tarif alanına göre isim kullanımı isteğe bağlıdır.`,
-                      `All ${contacts.length} contact(s) are the audience. Use team / plural or leader-to-team style unless your description asks otherwise.`,
-                    )}
-                  </p>
-                )}
-
-                {audienceMode === 'search_person' && (
-                  <div className="space-y-2">
-                    <Input
-                      className="h-9"
-                      value={contactQuery}
-                      onChange={(e) => setContactQuery(e.target.value)}
-                      autoComplete="off"
-                      placeholder={s('Ara: isim, e-posta, telefon…', 'Search: name, email, phone…')}
-                    />
-                    <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-border-subtle bg-surface/50 p-1.5">
-                      {contactSearchResults.length === 0 ? (
-                        <p className="px-2 py-2 text-[11px] text-text-tertiary">
-                          {s('Sonuç yok. Aramayı değiştir veya tüm adları listelemek için alanı boş bırak.', 'No matches. Change your search or clear the field to see names.')}
-                        </p>
-                      ) : (
-                        contactSearchResults.map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => setSingleId(c.id)}
-                            className={cn(
-                              'w-full rounded-lg border px-2.5 py-2 text-left text-sm transition',
-                              singleId === c.id
-                                ? 'border-primary/40 bg-primary/10 text-text-primary'
-                                : 'border-transparent text-text-secondary hover:border-border hover:bg-surface-hover',
-                            )}
-                          >
-                            {c.full_name}
-                          </button>
-                        ))
-                      )}
+                  <div className="relative z-20 space-y-1.5">
+                    <div className="relative">
+                      <Input
+                        className="h-9"
+                        value={contactQuery}
+                        onChange={(e) => setContactQuery(e.target.value)}
+                        autoComplete="off"
+                        placeholder={s('Ara: isim, e-posta, telefon…', 'Search: name, email, phone…')}
+                      />
+                      {contactQuery.trim() ? (
+                        <div
+                          className="absolute left-0 right-0 top-full z-30 mt-0.5 max-h-48 overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card py-1 shadow-lg"
+                        >
+                          {contactSearchResults.length === 0 ? (
+                            <p className="px-3 py-2 text-xs text-text-tertiary">
+                              {s('Eşleşme yok', 'No matches')}
+                            </p>
+                          ) : (
+                            contactSearchResults.map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => {
+                                  setSingleId(c.id)
+                                  setContactQuery('')
+                                }}
+                                className={cn(
+                                  'flex w-full px-3 py-2 text-left text-sm transition',
+                                  singleId === c.id
+                                    ? 'bg-primary/10 text-text-primary'
+                                    : 'text-text-secondary hover:bg-surface-hover',
+                                )}
+                              >
+                                {c.full_name}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                     {singleId && singleContact && (
-                      <p className="text-[11px] text-primary">
+                      <p className="text-[11px] text-text-tertiary">
                         {s(`Seçili: ${singleContact.full_name}`, `Selected: ${singleContact.full_name}`)}
                       </p>
                     )}
@@ -611,21 +591,15 @@ export default function MotivationPage() {
                         <option key={t} value={t} />
                       ))}
                     </datalist>
-                    <p className="text-[11px] leading-relaxed text-text-tertiary">
-                      {tagFilter.trim() === ''
-                        ? s(
-                            'Etiket belirle; aynı etiketli kişilere uyan mesaj. Tarif alanına ne hissettirmek istediğini yaz.',
-                            'Set a tag; the copy matches that group. Use the description field for the tone and intent you want.',
-                          )
-                        : segmentPool.length === 0
-                          ? s(
-                              '0 kişi eşleşti. Etiket tam eşleşmeli; yazımı veya farklı bir etiket deneyin.',
-                              '0 people match. The tag must match a contact tag exactly (case-insensitive).',
-                            )
+                    {tagFilter.trim() && (
+                      <p className="text-[11px] text-text-tertiary">
+                        {segmentPool.length === 0
+                          ? s('Eşleşen yok', 'No matches')
                           : segmentPool.length === 1
-                            ? s('1 kişi eşleşti.', '1 person matches.')
-                            : s(`${segmentPool.length} kişi eşleşti.`, `${segmentPool.length} people match.`)}
-                    </p>
+                            ? s('1 kişi', '1 person')
+                            : s(`${segmentPool.length} kişi`, `${segmentPool.length} people`)}
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -633,12 +607,6 @@ export default function MotivationPage() {
                   <p className={sectionLabelClass}>
                     {h(
                       s('İstediğin mesajı yapay zekaya tarif et!', 'Describe the message for the AI'),
-                    )}
-                  </p>
-                  <p className="mb-1.5 text-[11px] leading-relaxed text-text-tertiary">
-                    {s(
-                      'Yukarıdaki hedefe (kişi, grup veya etiket) göre ne söylemek istediğini yaz: ton, vurgu, kısa geçmiş. YZ bu tarife ve seçili hedefe göre metin(ler)i üretecek.',
-                      'Write what you want to convey for the target you chose: tone, emphasis, a bit of context. The model will use this plus your target mode to craft the text.',
                     )}
                   </p>
                   <Textarea
