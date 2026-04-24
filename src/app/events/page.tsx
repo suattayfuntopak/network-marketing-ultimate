@@ -15,6 +15,7 @@ import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { EventInviteSendModal } from '@/components/events/EventInviteSendModal'
 import { EventCreateModal } from '@/components/events/EventCreateModal'
 import { EventDetailsModal } from '@/components/events/EventDetailsModal'
+import { EventAttendeeSelectModal } from '@/components/events/EventAttendeeSelectModal'
 import type { EventLocationSearchLabels } from '@/components/events/EventLocationSearch'
 import type { EventMeetingUrlComboboxLabels } from '@/components/events/EventMeetingUrlCombobox'
 import {
@@ -41,6 +42,7 @@ import {
 } from '@/lib/queries'
 import type { Event } from '@/types'
 import { Calendar, Clock, MapPin, Plus, Video } from 'lucide-react'
+import type { InviteChannel } from '@/components/events/eventInviteUtils'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -54,6 +56,7 @@ export default function EventsPage() {
   const { currentUser } = useAppStore()
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
+  const [createAttendeeOpen, setCreateAttendeeOpen] = useState(false)
   const [createForm, setCreateForm] = useState(blankEvent)
   const [activeEventId, setActiveEventId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState(blankEvent)
@@ -62,6 +65,8 @@ export default function EventsPage() {
   const [pendingAttendeeIds, setPendingAttendeeIds] = useState<string[]>([])
   const [savingEvent, setSavingEvent] = useState(false)
   const [processedParamsToken, setProcessedParamsToken] = useState<string | null>(null)
+  const [detailsInitialStep, setDetailsInitialStep] = useState<1 | 2>(1)
+  const [inviteInitialChannel, setInviteInitialChannel] = useState<InviteChannel>('whatsapp')
 
   const { data: eventItems = [] } = useQuery<Event[]>({
     queryKey: ['events'],
@@ -258,34 +263,6 @@ export default function EventsPage() {
         createDescription: 'Plan a new presentation, training, or team session.',
       }
 
-  const attendeesDirty = useMemo(() => {
-    if (!activeEvent) return false
-    const a = activeEvent.attendees
-      .map((x) => x.contactId)
-      .sort()
-      .join(',')
-    const b = [...pendingAttendeeIds].sort().join(',')
-    return a !== b
-  }, [activeEvent, pendingAttendeeIds])
-
-  const formDirty = useMemo(() => {
-    if (!activeEvent) return false
-    const e = eventToForm(activeEvent)
-    return (
-      editForm.title !== e.title
-      || editForm.description !== e.description
-      || editForm.type !== e.type
-      || editForm.startDate !== e.startDate
-      || editForm.endDate !== e.endDate
-      || editForm.location !== e.location
-      || editForm.meetingUrl !== e.meetingUrl
-      || editForm.maxAttendees !== e.maxAttendees
-      || editForm.status !== e.status
-    )
-  }, [activeEvent, editForm])
-
-  const sendBlocked = formDirty || attendeesDirty
-
   const eventTypeLabel = (type: string) => {
     const key = EVENT_TYPE_KEY[type]
     const mapped = key ? (t.events.types as Record<string, string>)[key] : null
@@ -337,6 +314,7 @@ export default function EventsPage() {
   }
 
   function openDetails(event: Event) {
+    setDetailsInitialStep(1)
     setActiveEventId(event.id)
     setInviteOpen(false)
     setEditForm(eventToForm(event))
@@ -381,7 +359,14 @@ export default function EventsPage() {
       setActiveEventId(created.id)
       setEditForm(eventToForm(created))
       setPendingAttendeeIds(created.attendees.map((a) => a.contactId))
+      setCreateAttendeeOpen(true)
     }
+  }
+
+  async function proceedSendFromDetails(channel: InviteChannel) {
+    await saveEvent()
+    setInviteInitialChannel(channel)
+    setInviteOpen(true)
   }
 
   async function saveEvent() {
@@ -431,12 +416,6 @@ export default function EventsPage() {
         navigateBackIfNeeded()
       },
     })
-  }
-
-  function openSendModal() {
-    if (!activeEvent) return
-    if (sendBlocked) return
-    setInviteOpen(true)
   }
 
   async function syncInvitedContacts(contactIds: string[], markAsSent: boolean) {
@@ -562,12 +541,12 @@ export default function EventsPage() {
         onSubmit={createEvent}
         isSubmitting={createMutation.isPending}
         cancelLabel={t.common.cancel}
-        submitLabel={t.common.create}
+        submitLabel={locale === 'tr' ? 'Oluştur ve Katılımcı Ekle' : 'Create and Add Participants'}
       />
 
       <EventDetailsModal
-        key={activeEventId ?? 'closed'}
-        open={Boolean(activeEvent)}
+        key={`${activeEventId ?? 'closed'}-${detailsInitialStep}`}
+        open={Boolean(activeEvent) && !createAttendeeOpen}
         onClose={closeDetailsModal}
         locale={locale}
         event={activeEvent}
@@ -576,9 +555,6 @@ export default function EventsPage() {
         onFormChange={setEditForm}
         selectedAttendeeIds={pendingAttendeeIds}
         onSelectedAttendeeIdsChange={setPendingAttendeeIds}
-        onRequestSend={openSendModal}
-        sendBlocked={sendBlocked}
-        sendBlockedMessage={labels.sendBlockedHint}
         labels={{
           ...fieldLabels,
           manageHint: labels.manageHint,
@@ -588,29 +564,64 @@ export default function EventsPage() {
           openMeeting: labels.openMeeting,
           openMap: labels.openMap,
           viewContacts: labels.viewContacts,
-          sendBlockedHint: labels.sendBlockedHint,
+          sendIntro: locale === 'tr'
+            ? "Aşağıdaki bilgileri kontrol edin ve her şey tamamsa 'Kişilere Gönder' adımına geçebilirsiniz!"
+            : "Review details below, and continue to 'Send to People' when ready.",
           delete: labels.delete,
           cancel: t.common.cancel,
-          saveChanges: t.common.saveChanges,
+          sendNow: locale === 'tr' ? 'Kişilere Gönder' : 'Send to People',
+          sendChannelLabel: (channel: InviteChannel) => {
+            if (channel === 'whatsapp') return 'WhatsApp'
+            if (channel === 'telegram') return 'Telegram'
+            if (channel === 'email') return 'Email'
+            return 'SMS'
+          },
           pickerLabels: locale === 'tr' ? trPicker : enPicker,
           meetingCombobox: meetingComboboxLabels,
           locationSearch: locationSearchLabels,
           stepParticipantsNext: locale === 'tr' ? 'Katılımcı Ekle' : 'Add participants',
           stepParticipantsBack: locale === 'tr' ? 'Geri' : 'Back',
           stepParticipantsHint: locale === 'tr'
-            ? 'Katılımcıları düzenleyin, davet gönderin veya toplantıyı açın; bitince “Değişiklikleri Kaydet”e basın.'
-            : 'Manage attendees, send invites, or open the meeting; then tap “Save changes”.',
+            ? "Aşağıdaki bilgileri kontrol edin ve her şey tamamsa 'Kişilere Gönder' adımına geçebilirsiniz!"
+            : "Review details below, and continue to 'Send to People' when ready.",
         }}
         eventTypeLabel={eventTypeLabel}
         eventStatusLabel={eventStatusLabel}
-        onSave={saveEvent}
+        onProceedSend={proceedSendFromDetails}
         onDelete={deleteEvent}
         isSaving={savingEvent || updateMutation.isPending || attendeesMutation.isPending}
         isDeleting={deleteMutation.isPending}
+        initialStep={detailsInitialStep}
+      />
+
+      <EventAttendeeSelectModal
+        open={createAttendeeOpen}
+        onClose={() => {
+          setCreateAttendeeOpen(false)
+          setDetailsInitialStep(2)
+        }}
+        onDone={(ids) => {
+          setPendingAttendeeIds(ids)
+          setCreateAttendeeOpen(false)
+          setDetailsInitialStep(2)
+        }}
+        contacts={contacts}
+        selectedIds={pendingAttendeeIds}
+        locale={locale}
+        labels={{
+          title: locale === 'tr' ? 'Katılımcı Ekle' : 'Add Participants',
+          searchLabel: locale === 'tr' ? 'Kontak ara' : 'Search contacts',
+          searchPlaceholder: locale === 'tr' ? 'İsim, rol veya konum...' : 'Name, role, or location...',
+          selectAll: locale === 'tr' ? 'Tümünü Seç' : 'Select all',
+          clear: locale === 'tr' ? 'Temizle' : 'Clear',
+          empty: locale === 'tr' ? 'Henüz kimse seçilmedi.' : 'No one selected yet.',
+          peopleCount: (n) => (locale === 'tr' ? (n === 0 ? 'Henüz kimse seçilmedi.' : `${n} kişi seçili.`) : (n === 0 ? 'No one selected yet.' : `${n} selected.`)),
+          done: locale === 'tr' ? 'Tamam' : 'Done',
+        }}
       />
 
       <EventInviteSendModal
-        key={`${activeEvent?.id ?? 'e'}-${String(inviteOpen)}`}
+        key={`${activeEvent?.id ?? 'e'}-${String(inviteOpen)}-${inviteInitialChannel}`}
         open={inviteOpen && Boolean(activeEvent)}
         onClose={() => setInviteOpen(false)}
         event={activeEvent}
@@ -644,6 +655,7 @@ export default function EventsPage() {
         }}
         isSyncing={attendeesMutation.isPending}
         onSyncAttendees={syncInvitedContacts}
+        initialChannel={inviteInitialChannel}
       />
     </motion.div>
   )

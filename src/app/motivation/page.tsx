@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 import { Textarea, Input } from '@/components/ui/Input'
+import { Modal } from '@/components/ui/Modal'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { usePersistentState } from '@/hooks/usePersistentState'
@@ -15,7 +16,7 @@ import { cn } from '@/lib/utils'
 import { CELEBRITY_QUOTES, DAILY_SUGGESTION_LINES, type MotivationQuote } from '@/app/motivation/motivationData'
 import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
 import type { SendRecipientRow } from '@/components/ai/ChannelSendRecipientModal'
-import { Copy, Edit3, Sparkles } from 'lucide-react'
+import { Copy, Edit3, Heart, Pencil, Sparkles, Star, Trash2 } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.03 } } }
 const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }
@@ -27,6 +28,7 @@ const sectionLabelClass = 'text-xs font-semibold text-text-tertiary'
 
 /** Kullanıcı hedefi: üst açılır; havuz/kişi seçimi buna göre yönetilir. */
 type AudienceMode = 'search_person' | 'select_person' | 'one_recipient' | 'all_contacts' | 'by_tag'
+type FavoriteMessage = { id: string; text: string; updatedAt: string }
 
 function getSegmentPool(contacts: ContactRow[], mode: AudienceMode, tag: string) {
   if (mode === 'all_contacts') return contacts
@@ -70,6 +72,10 @@ export default function MotivationPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [contactQuery, setContactQuery] = useState('')
   const [contextNotes, setContextNotes] = useState('')
+  const [favoriteMessages, setFavoriteMessages] = usePersistentState<FavoriteMessage[]>('nmu-motivation-favorite-messages', [], { version: 1 })
+  const [favoritesOpen, setFavoritesOpen] = useState(false)
+  const [editingFavoriteId, setEditingFavoriteId] = useState<string | null>(null)
+  const [editingFavoriteText, setEditingFavoriteText] = useState('')
   const [outTitle, setOutTitle] = useState('')
   const [outBody, setOutBody] = useState('')
   const [outHint, setOutHint] = useState('')
@@ -442,6 +448,38 @@ export default function MotivationPage() {
     window.setTimeout(() => setCopyFlash(false), 1200)
   }
 
+  const isFavorited = useCallback((text: string) => {
+    const normalized = text.trim()
+    if (!normalized) return false
+    return favoriteMessages.some((m) => m.text.trim() === normalized)
+  }, [favoriteMessages])
+
+  const toggleFavorite = useCallback((text: string) => {
+    const normalized = text.trim()
+    if (!normalized) return
+    setFavoriteMessages((prev) => {
+      const existing = prev.find((m) => m.text.trim() === normalized)
+      if (existing) return prev.filter((m) => m.id !== existing.id)
+      return [{ id: crypto.randomUUID(), text: normalized, updatedAt: new Date().toISOString() }, ...prev]
+    })
+  }, [setFavoriteMessages])
+
+  const startEditFavorite = useCallback((fav: FavoriteMessage) => {
+    setEditingFavoriteId(fav.id)
+    setEditingFavoriteText(fav.text)
+  }, [])
+
+  const saveFavoriteEdit = useCallback(() => {
+    if (!editingFavoriteId) return
+    const normalized = editingFavoriteText.trim()
+    if (!normalized) return
+    setFavoriteMessages((prev) => prev.map((m) => (
+      m.id === editingFavoriteId ? { ...m, text: normalized, updatedAt: new Date().toISOString() } : m
+    )))
+    setEditingFavoriteId(null)
+    setEditingFavoriteText('')
+  }, [editingFavoriteId, editingFavoriteText, setFavoriteMessages])
+
   const s = (trTR: string, en: string) => (tr ? trTR : en)
 
   const exampleMessage = useMemo(
@@ -484,15 +522,28 @@ export default function MotivationPage() {
     >
       {/* 1) Başlık — Akademi ile aynı hiyerarşi */}
       <motion.section variants={item} className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
-          {h(s('Motivasyon', 'Motivation'))}
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-text-secondary">
-          {s(
-            'Ekibini motive etmek için yapay zekanın gücünden yararlan!',
-            'Use AI to motivate your team!',
-          )}
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
+              {h(s('Motivasyon', 'Motivation'))}
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-text-secondary">
+              {s(
+                'Ekibini motive etmek için yapay zekanın gücünden yararlan!',
+                'Use AI to motivate your team!',
+              )}
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setFavoritesOpen(true)}
+            icon={<Star className="h-3.5 w-3.5" />}
+          >
+            {h(s('Favori Motivasyon Cümleleri', 'Favorite Motivation Sentences'))}
+          </Button>
+        </div>
       </motion.section>
 
       {/* 2) Günün sözü — tam genişlik */}
@@ -797,25 +848,48 @@ export default function MotivationPage() {
                     ) : (
                       <div className="space-y-2">
                         {variations.map((v, i) => (
-                          <button
+                          <div
                             key={`${i}-${v.slice(0, 10)}`}
-                            type="button"
-                            onClick={() => {
-                              setVariantIndex(i)
-                              setOutBody(v)
-                            }}
                             className={cn(
-                              'w-full rounded-xl border p-3 text-left transition',
+                              'group relative w-full rounded-xl border transition',
                               variantIndex === i
                                 ? 'border-primary/30 bg-primary/5'
                                 : 'border-border bg-surface hover:border-primary/20',
                             )}
                           >
-                            <p className="text-xs font-medium text-text-tertiary">#{i + 1}</p>
-                            <p className="mt-0.5 max-h-24 overflow-y-auto text-sm leading-relaxed text-text-primary">
-                              {v}
-                            </p>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVariantIndex(i)
+                                setOutBody(v)
+                              }}
+                              className="w-full p-3 text-left"
+                            >
+                              <p className="text-xs font-medium text-text-tertiary">#{i + 1}</p>
+                              <p className="mt-0.5 max-h-24 overflow-y-auto text-sm leading-relaxed text-text-primary">
+                                {v}
+                              </p>
+                            </button>
+                            <div className="pointer-events-none absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
+                              <button
+                                type="button"
+                                onClick={() => copyContent(v)}
+                                className="rounded-md border border-border bg-surface/80 p-1 text-text-tertiary hover:text-text-primary"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => toggleFavorite(v)}
+                                className={cn(
+                                  'rounded-md border border-border bg-surface/80 p-1',
+                                  isFavorited(v) ? 'text-primary' : 'text-text-tertiary hover:text-text-primary',
+                                )}
+                              >
+                                <Heart className={cn('h-3.5 w-3.5', isFavorited(v) && 'fill-current')} />
+                              </button>
+                            </div>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -842,7 +916,28 @@ export default function MotivationPage() {
                         </span>
                       )}
                     </div>
-                    <div className="mt-2 min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface">
+                    <div className="group relative mt-2 min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface">
+                      {hasDraft && (
+                        <div className="pointer-events-none absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={() => copyContent(outBody)}
+                            className="rounded-md border border-border bg-surface/80 p-1 text-text-tertiary hover:text-text-primary"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleFavorite(outBody)}
+                            className={cn(
+                              'rounded-md border border-border bg-surface/80 p-1',
+                              isFavorited(outBody) ? 'text-primary' : 'text-text-tertiary hover:text-text-primary',
+                            )}
+                          >
+                            <Heart className={cn('h-3.5 w-3.5', isFavorited(outBody) && 'fill-current')} />
+                          </button>
+                        </div>
+                      )}
                       <div
                         className={cn(
                           'max-h-[min(38vh,19rem)] min-h-[8rem] w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain',
@@ -920,6 +1015,78 @@ export default function MotivationPage() {
         <p className={sectionLabelClass}>{h(s("Bugünün önerisi", "Today's suggestion"))}</p>
         <p className="mt-2 text-sm leading-relaxed text-text-secondary">{todaySuggestion}</p>
       </motion.div>
+
+      <Modal
+        open={favoritesOpen}
+        onClose={() => {
+          setFavoritesOpen(false)
+          setEditingFavoriteId(null)
+          setEditingFavoriteText('')
+        }}
+        title={h(s('Favori Motivasyon Cümleleri', 'Favorite Motivation Sentences'))}
+        className="max-w-2xl"
+      >
+        <div className="px-4 pb-4 sm:px-5">
+          {!favoriteMessages.length ? (
+            <p className="text-sm text-text-tertiary">{s('Henüz favori mesaj yok.', 'No favorite messages yet.')}</p>
+          ) : (
+            <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+              {favoriteMessages.map((fav) => {
+                const editing = editingFavoriteId === fav.id
+                return (
+                  <div key={fav.id} className="group rounded-xl border border-border bg-surface p-3">
+                    <div className="mb-2 flex justify-end">
+                      <div className="pointer-events-none flex gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
+                        <button
+                          type="button"
+                          onClick={() => copyContent(fav.text)}
+                          className="rounded-md border border-border bg-surface/80 p-1 text-text-tertiary hover:text-text-primary"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startEditFavorite(fav)}
+                          className="rounded-md border border-border bg-surface/80 p-1 text-text-tertiary hover:text-text-primary"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFavoriteMessages((prev) => prev.filter((x) => x.id !== fav.id))}
+                          className="rounded-md border border-border bg-surface/80 p-1 text-text-tertiary hover:text-error"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    {editing ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editingFavoriteText}
+                          onChange={(e) => setEditingFavoriteText(e.target.value)}
+                          rows={3}
+                          className="resize-none rounded-xl border border-border bg-surface py-2.5 text-sm leading-relaxed text-text-primary"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button type="button" size="sm" variant="ghost" onClick={() => setEditingFavoriteId(null)}>
+                            {s('İptal', 'Cancel')}
+                          </Button>
+                          <Button type="button" size="sm" onClick={saveFavoriteEdit}>
+                            {s('Kaydet', 'Save')}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-primary">{fav.text}</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </Modal>
     </motion.div>
   )
 }

@@ -10,7 +10,8 @@ import { EventMeetingUrlCombobox, type EventMeetingUrlComboboxLabels } from '@/c
 import { EVENT_TYPE_KEY, type EventFieldLabels, type EventFormShape } from '@/components/events/eventForm'
 import type { Event } from '@/types'
 import type { ContactRow } from '@/lib/queries'
-import { ArrowRight, MapPin, Send, Trash2, UserPlus, Users, Video } from 'lucide-react'
+import { ArrowRight, ChevronDown, MapPin, Trash2, UserPlus, Users, Video } from 'lucide-react'
+import type { InviteChannel } from '@/components/events/eventInviteUtils'
 
 export interface EventDetailsLabels extends EventFieldLabels {
   manageHint: string
@@ -20,10 +21,11 @@ export interface EventDetailsLabels extends EventFieldLabels {
   openMeeting: string
   openMap: string
   viewContacts: string
-  sendBlockedHint: string
+  sendIntro: string
   delete: string
   cancel: string
-  saveChanges: string
+  sendNow: string
+  sendChannelLabel: (channel: InviteChannel) => string
   pickerLabels: EventParticipantPickerLabels
   meetingCombobox: EventMeetingUrlComboboxLabels
   locationSearch: EventLocationSearchLabels
@@ -43,15 +45,13 @@ interface Props {
   labels: EventDetailsLabels
   eventTypeLabel: (type: string) => string
   eventStatusLabel: (status: Event['status']) => string
-  onSave: () => void
+  onProceedSend: (channel: InviteChannel) => void
   onDelete: (eventId: string) => void
-  onRequestSend: () => void
-  sendBlocked: boolean
-  sendBlockedMessage?: string
   selectedAttendeeIds: string[]
   onSelectedAttendeeIdsChange: (ids: string[]) => void
   isSaving: boolean
   isDeleting: boolean
+  initialStep?: 1 | 2
 }
 
 export function EventDetailsModal({
@@ -65,18 +65,17 @@ export function EventDetailsModal({
   labels,
   eventTypeLabel,
   eventStatusLabel,
-  onSave,
+  onProceedSend,
   onDelete,
-  onRequestSend,
-  sendBlocked,
-  sendBlockedMessage,
   selectedAttendeeIds,
   onSelectedAttendeeIdsChange,
   isSaving,
   isDeleting,
+  initialStep = 1,
 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [step, setStep] = useState<1 | 2>(1)
+  const [step, setStep] = useState<1 | 2>(initialStep)
+  const [sendMenuOpen, setSendMenuOpen] = useState(false)
 
   function attendeesSummary(names: string[]) {
     if (names.length <= 4) return names.join(', ')
@@ -206,21 +205,8 @@ export function EventDetailsModal({
                   {labels.attendees}
                   <Badge size="sm" variant="default">{selectedAttendeeIds.length}</Badge>
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  icon={<Send className="w-3.5 h-3.5" />}
-                  onClick={onRequestSend}
-                  disabled={sendBlocked}
-                  title={sendBlocked ? sendBlockedMessage : undefined}
-                >
-                  {labels.invite}
-                </Button>
               </div>
-              {sendBlocked && (
-                <p className="text-[11px] text-warning mb-2">{labels.sendBlockedHint}</p>
-              )}
+              <p className="text-[11px] text-text-tertiary mb-2">{labels.sendIntro}</p>
               <div className="flex flex-wrap gap-2">
                 {attendeeNames.length > 0 ? (
                   <p className="text-sm text-text-secondary">{attendeesSummary(attendeeNames)}</p>
@@ -260,7 +246,7 @@ export function EventDetailsModal({
                 locale={locale}
                 disabled={false}
                 onRequestSend={() => {
-                  onRequestSend()
+                  // picker içindeki gönder butonu bu akışta kullanılmıyor
                 }}
                 renderTrigger={(toggle) => (
                   <Button type="button" variant="ghost" size="sm" onClick={toggle} icon={<UserPlus className="w-3.5 h-3.5" />}>
@@ -278,7 +264,33 @@ export function EventDetailsModal({
               <div className="flex flex-wrap gap-2 justify-end">
                 <Button type="button" variant="ghost" onClick={() => setStep(1)}>{labels.stepParticipantsBack}</Button>
                 <Button type="button" variant="ghost" onClick={onClose}>{labels.cancel}</Button>
-                <Button type="button" onClick={onSave} disabled={isSaving}>{labels.saveChanges}</Button>
+                <div className="relative">
+                  <Button
+                    type="button"
+                    onClick={() => setSendMenuOpen((v) => !v)}
+                    disabled={isSaving}
+                    iconRight={<ChevronDown className="w-3.5 h-3.5" />}
+                  >
+                    {labels.sendNow}
+                  </Button>
+                  {sendMenuOpen && (
+                    <div className="absolute right-0 bottom-full mb-1 w-44 overflow-hidden rounded-xl border border-border bg-card py-1 shadow-xl z-20">
+                      {(['whatsapp', 'telegram', 'email', 'sms'] as InviteChannel[]).map((channel) => (
+                        <button
+                          key={channel}
+                          type="button"
+                          className="flex w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-hover"
+                          onClick={() => {
+                            setSendMenuOpen(false)
+                            onProceedSend(channel)
+                          }}
+                        >
+                          {labels.sendChannelLabel(channel)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </Fragment>

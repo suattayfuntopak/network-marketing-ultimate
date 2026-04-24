@@ -56,6 +56,7 @@ interface Props {
   labels: EventInviteSendModalLabels
   isSyncing: boolean
   onSyncAttendees: (contactIds: string[], markAsSent: boolean) => Promise<void>
+  initialChannel?: InviteChannel
 }
 
 function defaultTemplates(locale: 'tr' | 'en'): InviteTemplate[] {
@@ -89,8 +90,9 @@ export function EventInviteSendModal({
   labels,
   isSyncing,
   onSyncAttendees,
+  initialChannel = 'whatsapp',
 }: Props) {
-  const [inviteChannel, setInviteChannel] = useState<InviteChannel>('whatsapp')
+  const [inviteChannel, setInviteChannel] = useState<InviteChannel>(initialChannel)
   const [inviteFeedback, setInviteFeedback] = useState('')
   const [activeTemplateId, setActiveTemplateId] = useState('default')
   const [messageBody, setMessageBody] = useState(() =>
