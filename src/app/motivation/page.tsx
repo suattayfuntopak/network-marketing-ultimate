@@ -520,9 +520,9 @@ export default function MotivationPage() {
       {/* 3) Ana kahraman: motivasyon akış stüdyosu */}
       <motion.section variants={item} className="min-w-0">
         <div
-          className={cn('overflow-hidden rounded-2xl border border-border bg-surface shadow-sm')}
+          className={cn('min-w-0 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm')}
         >
-          <div className="grid min-h-0 grid-cols-1 lg:grid-cols-12">
+          <div className="grid min-h-0 min-w-0 grid-cols-1 lg:grid-cols-12">
             {/* Sol: hedef & üretim */}
             <div className="flex flex-col gap-3 border-b border-border p-4 sm:p-5 lg:col-span-5 lg:border-b-0 lg:border-r">
               <div>
@@ -804,7 +804,7 @@ export default function MotivationPage() {
             </div>
 
             {/* Sağ: canlı mesaj stüdyosu */}
-            <div className="flex min-h-0 flex-col bg-surface-hover/30 lg:col-span-7">
+            <div className="flex min-h-0 min-w-0 flex-col bg-surface-hover/30 lg:col-span-7">
               <div
                 className={cn(
                   'shrink-0 border-b border-border',
@@ -841,7 +841,7 @@ export default function MotivationPage() {
                 )}
               </div>
 
-              <div className="relative min-h-0 flex-1 overflow-hidden p-3 sm:p-4">
+              <div className="relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-hidden p-3 sm:p-4">
                 {loading && (
                   <div className="absolute inset-0 z-20 flex items-center justify-center bg-surface/80 backdrop-blur-sm">
                     <p className="text-sm text-text-tertiary">{s('Üretiliyor…', 'Creating…')}</p>
@@ -886,8 +886,8 @@ export default function MotivationPage() {
                 )}
 
                 {previewTab === 'message' && (
-                  <div className="flex h-full min-h-[15rem] flex-col">
-                    <div className="flex items-start justify-between gap-2 border-b border-border pb-2">
+                  <div className="flex h-full min-h-0 min-w-0 flex-col [min-height:15rem]">
+                    <div className="flex min-w-0 items-start justify-between gap-2 border-b border-border pb-2">
                       <div className="min-w-0">
                         <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
                           {hasDraft ? (outTitle || s('Taslak', 'Draft')) : s('Önizleme', 'Preview')}
@@ -907,23 +907,30 @@ export default function MotivationPage() {
                         </span>
                       )}
                     </div>
-                    <div
-                      className={cn(
-                        'mt-2 flex-1 overflow-hidden rounded-xl border border-border bg-surface p-3',
-                      )}
-                    >
-                      {hasDraft ? (
-                        <Textarea
-                          ref={previewTextRef}
-                          value={outBody}
-                          onChange={(e) => setOutBody(e.target.value)}
-                          className="min-h-[8rem] w-full max-h-[min(38vh,19rem)] resize-none border-0 bg-transparent p-0 text-sm leading-relaxed text-text-primary placeholder:text-text-tertiary focus:ring-0"
-                        />
-                      ) : (
-                        <p className="pointer-events-none min-h-[8rem] max-h-[min(38vh,19rem)] overflow-y-auto text-sm leading-relaxed text-text-tertiary/90">
-                          {exampleMessage}
-                        </p>
-                      )}
+                    <div className="mt-2 min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface">
+                      <div
+                        className={cn(
+                          'max-h-[min(38vh,19rem)] min-h-[8rem] w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain',
+                          'px-4 py-3.5 sm:px-5 sm:py-4 [scrollbar-gutter:stable]',
+                        )}
+                      >
+                        {hasDraft ? (
+                          <textarea
+                            ref={previewTextRef}
+                            value={outBody}
+                            onChange={(e) => setOutBody(e.target.value)}
+                            spellCheck={tr}
+                            className={cn(
+                              'box-border block min-h-[8rem] w-full min-w-0 resize-none border-0 bg-transparent',
+                              'p-0 text-sm leading-relaxed text-text-primary outline-none focus:ring-0 focus-visible:outline-none',
+                            )}
+                          />
+                        ) : (
+                          <p className="pointer-events-none min-h-[8rem] text-sm leading-relaxed whitespace-pre-wrap break-words text-text-tertiary/90">
+                            {exampleMessage}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     {hasDraft && (
                       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 border-t border-border pt-2">
