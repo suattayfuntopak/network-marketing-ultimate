@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { openMessageOnChannel, type MessageSendChannel } from '@/lib/openChannelSend'
+import { ChannelSendRecipientModal, type SendRecipientRow } from '@/components/ai/ChannelSendRecipientModal'
 import { ChevronDown, MessageSquare, SendHorizontal } from 'lucide-react'
 
 const CHANNELS: readonly {
@@ -24,6 +25,12 @@ type Props = {
   linkMode: 'strict' | 'loose'
   phone?: string | null
   email?: string | null
+  /**
+   * When the primary `phone` is empty, strict WhatsApp/SMS can use this list
+   * (e.g. motivation “tagged group” or multi-target segments).
+   * Rows without digits are ignored.
+   */
+  phoneOptions?: readonly SendRecipientRow[] | null
   onAfterSend?: (channel: MessageSendChannel) => void
   size?: 'sm' | 'md' | 'lg'
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success'
@@ -41,12 +48,25 @@ function labelFor(channel: MessageSendChannel, locale: 'tr' | 'en') {
   return 'Instagram'
 }
 
+function hasDigits(phone?: string | null) {
+  return (phone?.replace(/\D/g, '')?.length ?? 0) > 0
+}
+
+function useValidPhoneList(options: readonly SendRecipientRow[] | null | undefined) {
+  return useMemo(
+    () => (options ?? []).filter((r) => hasDigits(r.phone)),
+    [options],
+  )
+}
+
 function titleFor(
   channel: MessageSendChannel,
   locale: 'tr' | 'en',
-  hasPhone: boolean,
   hasEmail: boolean,
   linkMode: 'strict' | 'loose',
+  canUsePhone: boolean,
+  hasDirectPhone: boolean,
+  multiPhonePick: boolean,
 ): string | undefined {
   if (linkMode === 'loose') {
     if (channel === 'email' && !hasEmail) {
@@ -57,8 +77,13 @@ function titleFor(
     }
     return undefined
   }
-  if ((channel === 'whatsapp' || channel === 'sms') && !hasPhone) {
-    return locale === 'tr' ? 'Tek kişi ve telefon gerekir' : 'Need a person with phone'
+  if (channel === 'whatsapp' || channel === 'sms') {
+    if (!canUsePhone) {
+      return locale === 'tr' ? 'Telefonu kayıtlı en az bir kişi gerekir' : 'At least one contact with a phone number is required'
+    }
+    if (multiPhonePick && !hasDirectPhone) {
+      return locale === 'tr' ? 'Alıcı listesini açar' : 'Opens recipient picker'
+    }
   }
   if (channel === 'email' && !hasEmail) {
     return locale === 'tr' ? 'Genel e-posta istemcisi açılır' : 'Opens default mail client'
@@ -72,10 +97,10 @@ function titleFor(
 function channelDisabled(
   channel: MessageSendChannel,
   linkMode: 'strict' | 'loose',
-  hasPhone: boolean,
+  canUsePhone: boolean,
 ): boolean {
   if (linkMode === 'loose') return false
-  if (channel === 'whatsapp' || channel === 'sms') return !hasPhone
+  if (channel === 'whatsapp' || channel === 'sms') return !canUsePhone
   return false
 }
 
@@ -86,6 +111,7 @@ export function ChannelSendButton({
   linkMode,
   phone,
   email,
+  phoneOptions = null,
   onAfterSend,
   size = 'md',
   variant = 'primary',
@@ -94,8 +120,12 @@ export function ChannelSendButton({
   menuPlacement = 'down',
 }: Props) {
   const [open, setOpen] = useState(false)
+  const [pickerChannel, setPickerChannel] = useState<'whatsapp' | 'sms' | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
-  const hasPhone = (phone?.replace(/\D/g, '')?.length ?? 0) > 0
+  const hasDirectPhone = hasDigits(phone)
+  const phoneList = useValidPhoneList(phoneOptions ?? undefined)
+  const canUsePhone = hasDirectPhone || phoneList.length > 0
+  const multiPhonePick = !hasDirectPhone && phoneList.length > 1
   const hasEmail = Boolean(email?.trim())
   const hasDraft = body.trim().length > 0
 
@@ -109,7 +139,28 @@ export function ChannelSendButton({
   }, [open])
 
   const pick = (ch: MessageSendChannel) => {
-    if (channelDisabled(ch, linkMode, hasPhone)) return
+    if (ch === 'whatsapp' || ch === 'sms') {
+      if (linkMode === 'strict' && !canUsePhone) return
+      if (linkMode === 'strict') {
+        if (hasDirectPhone) {
+          openMessageOnChannel(ch, body, { phone, email, linkMode })
+          onAfterSend?.(ch)
+          setOpen(false)
+          return
+        }
+        if (phoneList.length === 0) return
+        if (phoneList.length === 1) {
+          const only = phoneList[0]!
+          openMessageOnChannel(ch, body, { phone: only.phone, email: null, linkMode })
+          onAfterSend?.(ch)
+          setOpen(false)
+          return
+        }
+        setPickerChannel(ch)
+        setOpen(false)
+        return
+      }
+    }
     openMessageOnChannel(ch, body, { phone, email, linkMode })
     onAfterSend?.(ch)
     setOpen(false)
@@ -137,12 +188,20 @@ export function ChannelSendButton({
           )}
         >
           {CHANNELS.map((c) => {
-            const dis = channelDisabled(c.id, linkMode, hasPhone)
+            const dis = channelDisabled(c.id, linkMode, canUsePhone)
             return (
               <li key={c.id}>
                 <button
                   type="button"
-                  title={titleFor(c.id, locale, hasPhone, hasEmail, linkMode)}
+                  title={titleFor(
+                    c.id,
+                    locale,
+                    hasEmail,
+                    linkMode,
+                    canUsePhone,
+                    hasDirectPhone,
+                    multiPhonePick && (c.id === 'whatsapp' || c.id === 'sms'),
+                  )}
                   disabled={dis}
                   onClick={() => pick(c.id)}
                   className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-text-primary transition enabled:hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
@@ -160,6 +219,17 @@ export function ChannelSendButton({
           })}
         </ul>
       )}
+
+      <ChannelSendRecipientModal
+        open={Boolean(pickerChannel)}
+        onClose={() => setPickerChannel(null)}
+        channel={pickerChannel}
+        body={body}
+        linkMode={linkMode}
+        locale={locale}
+        recipients={phoneList}
+        onAfterSend={pickerChannel ? (ch) => onAfterSend?.(ch) : undefined}
+      />
     </div>
   )
 }

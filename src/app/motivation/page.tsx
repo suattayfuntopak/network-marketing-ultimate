@@ -14,6 +14,7 @@ import { fetchContacts, type ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { CELEBRITY_QUOTES, type MotivationQuote } from '@/app/motivation/motivationData'
 import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
+import type { SendRecipientRow } from '@/components/ai/ChannelSendRecipientModal'
 import { ChevronDown, Copy, Edit3, Sparkles } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.03 } } }
@@ -131,6 +132,20 @@ export default function MotivationPage() {
     () => filterBySegment(contacts, segment, tagFilter),
     [contacts, segment, tagFilter],
   )
+
+  /** Strict WhatsApp/SMS: hedef havuzdaki telefonlu kişiler (grup/segment modunda seçici için). */
+  const motivationPhoneRecipients = useMemo((): SendRecipientRow[] => {
+    if (segment === 'single') {
+      if (!singleContact) return []
+      if (!(singleContact.phone && singleContact.phone.replace(/\D/g, '').length > 0)) return []
+      return [
+        { id: singleContact.id, full_name: singleContact.full_name, phone: singleContact.phone },
+      ]
+    }
+    return segmentPool
+      .filter((c) => (c.phone?.replace(/\D/g, '')?.length ?? 0) > 0)
+      .map((c) => ({ id: c.id, full_name: c.full_name, phone: c.phone ?? null }))
+  }, [segment, singleContact, segmentPool])
 
   const knownContactTags = useMemo(() => {
     const set = new Set<string>()
@@ -911,7 +926,7 @@ export default function MotivationPage() {
                       <div
                         className={cn(
                           'max-h-[min(38vh,19rem)] min-h-[8rem] w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain',
-                          'px-4 py-3.5 sm:px-5 sm:py-4 [scrollbar-gutter:stable]',
+                          'px-5 py-4 sm:px-6 sm:py-4 [scrollbar-gutter:stable]',
                         )}
                       >
                         {hasDraft ? (
@@ -984,6 +999,7 @@ export default function MotivationPage() {
                       linkMode="strict"
                       phone={singleContact?.phone}
                       email={singleContact?.email}
+                      phoneOptions={motivationPhoneRecipients}
                       menuPlacement="up"
                     />
                   </div>
