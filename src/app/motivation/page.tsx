@@ -12,10 +12,10 @@ import { postAiChat } from '@/lib/aiClient'
 import { stripAiMessageQuotes } from '@/lib/aiMessageText'
 import { fetchContacts, type ContactRow } from '@/lib/queries'
 import { cn } from '@/lib/utils'
-import { CELEBRITY_QUOTES, type MotivationQuote } from '@/app/motivation/motivationData'
+import { CELEBRITY_QUOTES, DAILY_SUGGESTION_LINES, type MotivationQuote } from '@/app/motivation/motivationData'
 import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
 import type { SendRecipientRow } from '@/components/ai/ChannelSendRecipientModal'
-import { ChevronDown, Copy, Edit3, Sparkles } from 'lucide-react'
+import { Copy, Edit3, Sparkles } from 'lucide-react'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.03 } } }
 const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }
@@ -25,49 +25,17 @@ const control =
 /** Bölüm etiketleri: baş harf büyük (toHeadingCase ile) — tamamı büyük harf değil */
 const sectionLabelClass = 'text-xs font-semibold text-text-tertiary'
 
-type Segment = 'single' | 'new_starters' | 'rejection_block' | 'dormant' | 'near_goal' | 'leader_pool' | 'small_wins' | 'tagged'
-type Channel = 'whatsapp' | 'dm' | 'voice_script' | 'team_group' | 'one_on_one' | 'morning' | 'weekly_wrap'
-type Tone = 'warm' | 'leader' | 'crisp' | 'friendly' | 'vision' | 'recovery'
-type Purpose = 'morale' | 'action' | 'reopen' | 'micro_win' | 'rescue' | 'invite' | 'focus'
-type LengthKey = 'micro' | 'short' | 'medium'
-type SafeVoice = 'grounded' | 'high_energy' | 'emotional' | 'corporate'
-type Personalize = 'same' | 'light'
+/** Kullanıcı hedefi: üst açılır; havuz/kişi seçimi buna göre yönetilir. */
+type AudienceMode = 'search_person' | 'select_person' | 'one_recipient' | 'all_contacts' | 'by_tag'
 
-function daysSinceLastTouch(iso: string | null | undefined) {
-  if (!iso) return 999
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return 999
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  d.setHours(0, 0, 0, 0)
-  return Math.floor((today.getTime() - d.getTime()) / 86_400_000)
-}
-
-function filterBySegment(contacts: ContactRow[], segment: Segment, tag: string) {
-  const t = tag.trim().toLowerCase()
-  return contacts.filter((c) => {
-    switch (segment) {
-      case 'single':
-        return false
-      case 'new_starters':
-        return ['new', 'contact_planned', 'first_contact', 'interested'].includes(c.pipeline_stage)
-      case 'rejection_block':
-        return c.pipeline_stage === 'objection_handling' || c.pipeline_stage === 'nurture_later' || c.temperature === 'cold'
-      case 'dormant':
-        return c.pipeline_stage === 'dormant' || daysSinceLastTouch(c.last_contact_date) >= 14
-      case 'near_goal':
-        return (c.relationship_strength ?? 0) >= 65
-      case 'leader_pool':
-        return c.pipeline_stage === 'became_member' || c.pipeline_stage === 'ready_to_join'
-      case 'small_wins':
-        return (c.tags?.length ?? 0) > 0 || c.pipeline_stage === 'became_customer'
-      case 'tagged':
-        if (!t) return false
-        return (c.tags ?? []).some((x) => x.toLowerCase() === t)
-      default:
-        return false
-    }
-  })
+function getSegmentPool(contacts: ContactRow[], mode: AudienceMode, tag: string) {
+  if (mode === 'all_contacts') return contacts
+  if (mode === 'by_tag') {
+    const t = tag.trim().toLowerCase()
+    if (!t) return []
+    return contacts.filter((c) => (c.tags ?? []).some((x) => x.toLowerCase() === t))
+  }
+  return []
 }
 
 function pickQuote(index: number, saved: string[]) {
@@ -97,19 +65,12 @@ export default function MotivationPage() {
   /** SSR/CSR eşleşmesi: ilk kare 0, mount sonrası rastgele (Math.random sadece effect içinde) */
   const [quoteIndex, setQuoteIndex] = useState(0)
   const [favIds] = usePersistentState<string[]>('nmu-motivation-fav-quotes', [], { version: 1 })
-  const [showAdvanced, setShowAdvanced] = useState(false)
 
-  const [segment, setSegment] = useState<Segment>('single')
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>('select_person')
   const [tagFilter, setTagFilter] = useState('')
   const [singleId, setSingleId] = useState<string>('')
-  const [channel, setChannel] = useState<Channel>('whatsapp')
-  const [tone, setTone] = useState<Tone>('warm')
-  const [purpose, setPurpose] = useState<Purpose>('morale')
-  const [lengthKey, setLengthKey] = useState<LengthKey>('short')
-  const [safeVoice, setSafeVoice] = useState<SafeVoice>('grounded')
+  const [contactQuery, setContactQuery] = useState('')
   const [contextNotes, setContextNotes] = useState('')
-  const [emojiLevel, setEmojiLevel] = useState<0 | 1 | 2>(0)
-  const [personalize, setPersonalize] = useState<Personalize>('light')
   const [outTitle, setOutTitle] = useState('')
   const [outBody, setOutBody] = useState('')
   const [outHint, setOutHint] = useState('')
@@ -129,13 +90,31 @@ export default function MotivationPage() {
 
   const singleContact = contacts.find((c) => c.id === singleId) ?? null
   const segmentPool = useMemo(
-    () => filterBySegment(contacts, segment, tagFilter),
-    [contacts, segment, tagFilter],
+    () => getSegmentPool(contacts, audienceMode, tagFilter),
+    [contacts, audienceMode, tagFilter],
   )
+
+  const needsSingleSelection =
+    audienceMode === 'search_person' || audienceMode === 'select_person' || audienceMode === 'one_recipient'
+
+  const contactSearchResults = useMemo(() => {
+    const loc = tr ? 'tr' : 'en'
+    const sorted = [...contacts].sort((a, b) => a.full_name.localeCompare(b.full_name, loc))
+    const q = contactQuery.trim().toLowerCase()
+    if (!q) return sorted.slice(0, 14)
+    return sorted
+      .filter(
+        (c) =>
+          c.full_name.toLowerCase().includes(q) ||
+          (c.email?.toLowerCase().includes(q) ?? false) ||
+          (c.phone?.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ?? false),
+      )
+      .slice(0, 20)
+  }, [contacts, contactQuery, tr])
 
   /** Strict WhatsApp/SMS: hedef havuzdaki telefonlu kişiler (grup/segment modunda seçici için). */
   const motivationPhoneRecipients = useMemo((): SendRecipientRow[] => {
-    if (segment === 'single') {
+    if (needsSingleSelection) {
       if (!singleContact) return []
       if (!(singleContact.phone && singleContact.phone.replace(/\D/g, '').length > 0)) return []
       return [
@@ -145,7 +124,7 @@ export default function MotivationPage() {
     return segmentPool
       .filter((c) => (c.phone?.replace(/\D/g, '')?.length ?? 0) > 0)
       .map((c) => ({ id: c.id, full_name: c.full_name, phone: c.phone ?? null }))
-  }, [segment, singleContact, segmentPool])
+  }, [needsSingleSelection, singleContact, segmentPool])
 
   const knownContactTags = useMemo(() => {
     const set = new Set<string>()
@@ -158,191 +137,171 @@ export default function MotivationPage() {
     return [...set].sort((a, b) => a.localeCompare(b, tr ? 'tr' : 'en', { sensitivity: 'base' }))
   }, [contacts, tr])
 
-  const stagnant7 = useMemo(
-    () => contacts.filter((c) => daysSinceLastTouch(c.last_contact_date) >= 7).slice(0, 3),
-    [contacts],
-  )
+  const [dailySuggestionIndex, setDailySuggestionIndex] = useState(0)
 
-  const toRecognize = useMemo(() => {
-    const pool = contacts.filter(
-      (c) => c.pipeline_stage === 'first_contact' || c.temperature === 'warm' || c.temperature === 'hot',
-    )
-    if (!pool.length) return null
-    const loc = tr ? 'tr' : 'en'
-    return [...pool].sort((a, b) => a.full_name.localeCompare(b.full_name, loc))[0] ?? null
-  }, [contacts, tr])
-
-  const insightLine = useMemo(() => {
-    if (stagnant7.length) {
-      const n = stagnant7[0]!.full_name
-      return tr
-        ? `Son 7 gündür sessiz kalanlardan biriyle (${n}) kısa ve sıcak bir sohbet başlat.`
-        : `Start a short, warm chat with someone quiet for 7+ days (e.g. ${n.split(' ')[0]}).`
-    }
-    if (toRecognize) {
-      return tr
-        ? `Kutlanacak küçük ilerleme: ${toRecognize.full_name} — samimi bir not yeter.`
-        : `A small win to celebrate: ${toRecognize.full_name} — one genuine note.`
-    }
-    return tr
-      ? 'Sakin bir nefes, net bir cümle; bugün yalnızca bir kişiye gerçekten kulak ver.'
-      : 'Breathe, one clear line—today, truly listen to one person.'
-  }, [tr, stagnant7, toRecognize])
+  const todaySuggestion = useMemo(() => {
+    const list = DAILY_SUGGESTION_LINES
+    if (!list.length) return tr ? 'Küçük adımlar, büyük ekip enerjisini biriktirir.' : 'Small steps add up to team energy.'
+    const row = list[((dailySuggestionIndex % list.length) + list.length) % list.length]!
+    return tr ? row.tr : row.en
+  }, [dailySuggestionIndex, tr])
 
   useEffect(() => {
     if (!CELEBRITY_QUOTES.length) return
     setQuoteIndex(Math.floor(Math.random() * CELEBRITY_QUOTES.length))
   }, [])
 
-  const buildContextBlock = useCallback(
-    (target: 'generate' | 'refine', base?: string) => {
-      const lines: string[] = []
-      if (tr) {
-        lines.push(
-          'Aşağıdaki kurallara KESİNLİKLE uy: Garanti gelir, kesin başarı, kısa sürede zengin olma, yanıltıcı tanık, korku/utanç/baskı, duygusal manipülasyon, sağlık veya yasal vaat yok. Emek, istikrar, öğrenme, güven, küçük ilerleme, net adım, ilişki tonu. Network marketing & doğrudan satış: spam hissi, abartı kapak dili, “herkes başarır” türü boş genelleme yok. Saygılı, etik, güvenli.',
-        )
-      } else {
-        lines.push(
-          'Rules: No income/health/guarantee claims, no shaming, fear, or emotional manipulation. Focus effort, consistency, small wins, one next step, trust. Direct-selling appropriate, not spammy.',
-        )
-      }
-      const audienceContact = segment === 'single' ? singleContact : null
+  useEffect(() => {
+    if (!DAILY_SUGGESTION_LINES.length) return
+    setDailySuggestionIndex(Math.floor(Math.random() * DAILY_SUGGESTION_LINES.length))
+  }, [])
 
-      if (tr) {
+  const buildContextBlock = useCallback(() => {
+    const lines: string[] = []
+    if (tr) {
+      lines.push(
+        'Aşağıdaki kurallara KESİNLİKLE uy: Garanti gelir, kesin başarı, kısa sürede zengin olma, yanıltıcı tanık, korku/utanç/baskı, duygusal manipülasyon, sağlık veya yasal vaat yok. Emek, istikrar, öğrenme, güven, küçük ilerleme, net adım, ilişki tonu. Network marketing & doğrudan satış: spam hissi, abartı kapak dili, “herkes başarır” türü boş genelleme yok. Saygılı, etik, güvenli.',
+      )
+    } else {
+      lines.push(
+        'Rules: No income/health/guarantee claims, no shaming, fear, or emotional manipulation. Focus effort, consistency, small wins, one next step, trust. Direct-selling appropriate, not spammy.',
+      )
+    }
+    if (tr) {
+      lines.push(
+        'Çıktı stili (sabit): WhatsApp’e uygun, kısa veya kısa-orta, sıcak ve saygılı; en çok 0-1 emoji; abartı ve “garanti kazanç” dili yok.',
+      )
+    } else {
+      lines.push(
+        'Fixed output style: WhatsApp-friendly, short or short–medium, warm, respectful, at most 0-1 emoji; no hype or income claims.',
+      )
+    }
+
+    if (tr) {
+      const modeLine = (() => {
+        switch (audienceMode) {
+          case 'search_person':
+            return 'Hedef kipi: Kişi ara — kullanıcı arama/sonuçlardan tek kişi seçer; aşağıdaki kişi alanları buna göre. Seçim yoksa gerçek isim KULLANMA, genel ilham cümleleri ver.'
+          case 'select_person':
+            return 'Hedef kipi: Kişi seç — açılır listeden bir kişi; mesaj o kişiye kişiselleşsin. Seçim yoksa isim yok, genel ifade.'
+          case 'one_recipient':
+            return 'Hedef kipi: Tek kişiye gönder — tüm metin yalnızca seçilen alıcıya; bire bir motivasyon. Çoğul/“ekip” dili yalnızca kullanıcı açıkça istediyse.'
+          case 'all_contacts':
+            return 'Hedef kipi: Tüm kişilere — listenin tamamına uygun, çoğul/ekip havası veya liderden ekibe; tek gerçek isim zorunlu değil; kullanıcının tarifine göre.'
+          case 'by_tag':
+            return 'Hedef kipi: Etikete göre — yalnızca etiketle eşleşen gruba uygun; aşağıdaki rostere ve kullanıcının isteğine uy.'
+        }
+      })()
+      lines.push(`Mod açıklaması: ${modeLine}`)
+    } else {
+      const modeEn = (() => {
+        switch (audienceMode) {
+          case 'search_person':
+            return 'Mode: Search contact — user picks one person from search results; if none selected, no real names, generic lines.'
+          case 'select_person':
+            return 'Mode: Select contact — one person from the dropdown; personalize to them, or stay generic if none selected.'
+          case 'one_recipient':
+            return 'Mode: Send to one person — entire text for that one recipient only unless user asked otherwise.'
+          case 'all_contacts':
+            return 'Mode: All contacts — suitable for a broad team message; no single name required unless user asks.'
+          case 'by_tag':
+            return 'Mode: By tag — only people matching the tag; follow the roster and user’s instructions.'
+        }
+      })()
+      lines.push(`Mode: ${modeEn}`)
+    }
+
+    lines.push(
+      tr
+        ? `Kullanıcının, üretilecek motivasyon metni hakkındaki tarifi (en yüksek öncelik): ${contextNotes || '—'}`
+        : `User’s instruction for the motivation message (highest priority): ${contextNotes || '—'}`,
+    )
+
+    const audienceContact = needsSingleSelection ? singleContact : null
+
+    if (tr) {
+      if (audienceContact) {
         lines.push(
-          `Kanal: ${channel}. Ton: ${tone}. Amaç: ${purpose}. Uzunluk: ${lengthKey}. Güvenli ses: ${safeVoice}. Emoji yoğunluğu: ${emojiLevel} (0=yok, 1=opsiyonel tek, 2=en fazla iki).`,
+          `Hedef kişi (SADECE bu kişi): ${audienceContact.full_name}, meslek: ${audienceContact.profession ?? '—'}, şehir: ${audienceContact.location ?? '—'}, aşama: ${audienceContact.pipeline_stage}, son temas: ${audienceContact.last_contact_date ?? 'yok'}.`,
         )
-        lines.push(`Bireysel notlar: ${contextNotes || '—'}`)
-        if (audienceContact) {
-          lines.push(
-            `Hedef kişi (TÜR: tek kişi modu, SADECE bu kişi): ${audienceContact.full_name}, meslek: ${audienceContact.profession ?? '—'}, şehir: ${audienceContact.location ?? '—'}, aşama: ${audienceContact.pipeline_stage}, son temas: ${audienceContact.last_contact_date ?? 'yok'}.`,
-          )
-        } else if (segment === 'single' && !audienceContact) {
-          lines.push(
-            'Tek kişi modunda kişi seçilmedi: genel, isimsiz ilham cümleleri; gerçek kişi adı kullanma.',
-          )
-        } else if (segment === 'tagged' && tagFilter.trim()) {
-          const tagLine = `Etiket eşleşmesi: "${tagFilter.trim()}" (küçük/büyük harf duyarsız). Eşleşen kişi sayısı: ${segmentPool.length}.`
-          if (segmentPool.length === 0) {
-            lines.push(
-              `${tagLine} Eşleşen kayıt yok; yanıt: kısa, genel ilham cümleleri, kişi adı KULLANMA.`,
-            )
-          } else {
-            const roster = segmentPool
-              .slice(0, 25)
-              .map(
-                (c, i) =>
-                  `${i + 1}) ${c.full_name} — aşama: ${c.pipeline_stage}, meslek: ${c.profession ?? '—'}, şehir: ${c.location ?? '—'}`,
-              )
-              .join('\n')
-            lines.push(tagLine)
-            lines.push('Bu oturumda mesaj aşağıdaki güncel listeden ÜRETİLMELİDİR. Önceki ekran veya farklı hedef modundan kalan isim KULLANILMAYACAK:')
-            lines.push(roster)
-            if (segmentPool.length === 1) {
-              const one = segmentPool[0]!
-              lines.push(
-                `YALNIZCA ${one.full_name} için kişiselleştir. Hitap: isim/uygun unvan. Başka gerçek veya hayali kişi adı ekleme.`,
-              )
-            } else {
-              lines.push(
-                'Birden fazla eşleşme var: ya gruba/çoğul hitap, ya da mesajı isimsiz (genel) tut; istersen üstteki isimlerden sadece bağlama uyan 1 kişiye odakla ve metinde yalnızca onu an.',
-              )
-            }
-          }
+      } else if (needsSingleSelection && !audienceContact) {
+        lines.push('Kişi henüz seçilmedi: gerçek isim KULLANMA; kısa, genel motivasyon/ilham cümleleri ver.')
+      } else if (audienceMode === 'by_tag' && tagFilter.trim()) {
+        const tagLine = `Etiket eşleşmesi: "${tagFilter.trim()}" (büyük/küçük harf duyarsız). Eşleşen: ${segmentPool.length} kişi.`
+        if (segmentPool.length === 0) {
+          lines.push(`${tagLine} Eşleşen yok; isim KULLANMA, genel cümleler.`)
         } else {
-          const sampleRoster = segmentPool
-            .slice(0, 15)
+          const roster = segmentPool
+            .slice(0, 25)
             .map(
-              (c) =>
-                `${c.full_name} (${c.pipeline_stage})`,
+              (c, i) =>
+                `${i + 1}) ${c.full_name} — aşama: ${c.pipeline_stage}, meslek: ${c.profession ?? '—'}, şehir: ${c.location ?? '—'}`,
             )
-            .join(', ')
-          lines.push(
-            `Hedef: segment "${segment}". Tahmini kişi sayısı: ${segmentPool.length || 'n/a'}.`,
-            sampleRoster
-              ? `Bu segmente uygun örnek isimler (yalnızca bağlam): ${sampleRoster}.`
-              : 'Örnek isim yok; genel yön ver.',
-          )
-        }
-      } else {
-        lines.push(
-          `Channel: ${channel}, tone: ${tone}, purpose: ${purpose}, length: ${lengthKey}, voice: ${safeVoice}, emoji: ${emojiLevel}.`,
-        )
-        lines.push(`Notes: ${contextNotes || '—'}`)
-        if (audienceContact) {
-          lines.push(
-            `Target (single-person mode ONLY this contact): ${audienceContact.full_name}, job: ${audienceContact.profession ?? '—'}, city: ${audienceContact.location ?? '—'}, stage: ${audienceContact.pipeline_stage}, last touch: ${audienceContact.last_contact_date ?? 'none'}.`,
-          )
-        } else if (segment === 'single' && !audienceContact) {
-          lines.push('Single-person mode but no contact selected: generic, name-free lines; do not use real person names.')
-        } else if (segment === 'tagged' && tagFilter.trim()) {
-          if (segmentPool.length === 0) {
-            lines.push(
-              `Tag match "${tagFilter.trim()}": no rows. Do not use any person name; short general lines only.`,
-            )
+            .join('\n')
+          lines.push(tagLine)
+          lines.push('Mesaj, bu canlı listeye uymalı. Önceki ekrandan kalan isim KULLANILMAYACAK:')
+          lines.push(roster)
+          if (segmentPool.length === 1) {
+            const one = segmentPool[0]!
+            lines.push(`Yalnızca ${one.full_name} için kişiselleştir.`)
           } else {
-            const roster = segmentPool
-              .slice(0, 25)
-              .map(
-                (c, i) =>
-                  `${i + 1}) ${c.full_name} — stage: ${c.pipeline_stage}, job: ${c.profession ?? '—'}`,
-              )
-              .join('\n')
-            lines.push(
-              `Tag match "${tagFilter.trim()}": ${segmentPool.length} people. The message must follow THIS live list. Do not reuse a name from a previous session or another mode:`,
-            )
-            lines.push(roster)
-            if (segmentPool.length === 1) {
-              lines.push(
-                `Write only for ${segmentPool[0]!.full_name}. No other first names in the text.`,
-              )
-            } else {
-              lines.push(
-                'Multiple matches: use plural / “you all”, or one clearly chosen name from the list that fits the message.',
-              )
-            }
+            lines.push('Birden çok kişi: çoğul hitap, veya isimsiz genel, veya listeye uyan tek bir isimle odak (kullanıcının tarifine göre).')
           }
+        }
+      } else if (audienceMode === 'all_contacts') {
+        const sampleRoster = segmentPool
+          .slice(0, 15)
+          .map((c) => `${c.full_name} (${c.pipeline_stage})`)
+          .join(', ')
+        lines.push(
+          `Tüm liste: ${segmentPool.length} kişi.`,
+          sampleRoster ? `Örnek (bağlam): ${sampleRoster}.` : 'Örnek yok; genel ekip/çoğul tonu tercih et.',
+        )
+      }
+    } else {
+      if (audienceContact) {
+        lines.push(
+          `Target (ONLY this person): ${audienceContact.full_name}, job: ${audienceContact.profession ?? '—'}, city: ${audienceContact.location ?? '—'}, stage: ${audienceContact.pipeline_stage}, last touch: ${audienceContact.last_contact_date ?? 'none'}.`,
+        )
+      } else if (needsSingleSelection && !audienceContact) {
+        lines.push('No person selected: no real names; short generic lines.')
+      } else if (audienceMode === 'by_tag' && tagFilter.trim()) {
+        if (segmentPool.length === 0) {
+          lines.push(`Tag "${tagFilter.trim()}": 0 people. No names; general lines only.`)
         } else {
-          const sampleRoster = segmentPool
-            .slice(0, 15)
-            .map((c) => `${c.full_name} (${c.pipeline_stage})`)
-            .join(', ')
+          const roster = segmentPool
+            .slice(0, 25)
+            .map((c, i) => `${i + 1}) ${c.full_name} — stage: ${c.pipeline_stage}, job: ${c.profession ?? '—'}`)
+            .join('\n')
           lines.push(
-            `Target segment: ${segment}. Estimated people: ${segmentPool.length || 'n/a'}.`,
-            sampleRoster ? `Sample names in this segment (context only): ${sampleRoster}.` : 'No sample names; stay general.',
+            `Tag "${tagFilter.trim()}": ${segmentPool.length} people. Follow this list; do not reuse stale names from another screen:`,
+            roster,
+            segmentPool.length === 1
+              ? `Write only for ${segmentPool[0]!.full_name}.`
+              : 'Plural, anonymous, or one chosen name as fits the user’s instruction.',
           )
         }
+      } else if (audienceMode === 'all_contacts') {
+        const sampleRoster = segmentPool
+          .slice(0, 15)
+          .map((c) => `${c.full_name} (${c.pipeline_stage})`)
+          .join(', ')
+        lines.push(
+          `All contacts: ${segmentPool.length} people.`,
+          sampleRoster ? `Sample (context): ${sampleRoster}.` : 'Stay general/team tone.',
+        )
       }
-      if (target === 'refine' && base) {
-        lines.push(tr ? `Önceki metin (iyileştir; yine de yalnızca yukarıdaki hedef geçerli): ${base}` : `Previous text: ${base}`)
-      }
-      return lines.join('\n')
-    },
-    [
-      tr,
-      channel,
-      tone,
-      purpose,
-      lengthKey,
-      safeVoice,
-      contextNotes,
-      singleContact,
-      segment,
-      tagFilter,
-      segmentPool,
-      emojiLevel,
-    ],
-  )
+    }
+    return lines.join('\n')
+  }, [tr, contextNotes, audienceMode, needsSingleSelection, singleContact, tagFilter, segmentPool])
 
   const runGenerate = useCallback(
-    async (mode: 'one' | 'two' | 'three' | 'refine', refineHint?: string) => {
+    async (mode: 'one' | 'two' | 'three') => {
       setLoading(true)
-      if (mode !== 'refine') {
-        setOutHint('')
-        setVariations([])
-      }
+      setOutHint('')
+      setVariations([])
       try {
-        const count = mode === 'one' ? 1 : mode === 'two' ? 2 : mode === 'three' ? 3 : 0
+        const count = mode === 'one' ? 1 : mode === 'two' ? 2 : 3
         const isMulti = count > 1
         if (mode === 'one' || isMulti) setVariantIndex(0)
 
@@ -364,63 +323,44 @@ export default function MotivationPage() {
           ? [
               'Sen, doğrudan satış liderlerine kısa, gönderilebilir motivasyon metinleri yazan profesyonel bir uygunsun.',
               trMultiLine,
-              buildContextBlock('generate'),
-              'Mesaj: kişiyi gördüğünü hissettir, mümkünse küçük bir ilerlemeyi veya niteliği takdir et, baskı olmadan tek net adım veya yumuşak çağrı, sıcak kapanış. Klişe “sen yaparsın, garanti kazanç” dili yok.',
+              buildContextBlock(),
+              'Mesaj: kişiyi gördüğünü hissettir, mümkünse küçük bir ilerlemeyi veya niteliği takdir et, baskı olmadan tek net adım veya yumuşak çağrı, sıcak kapanış. Klişe “sen yaparsın, garanti kazanç” dili yok. Kullanıcının yukarıdaki tarifine sadık kal.',
             ]
           : [
               'You write send-ready, respectful motivation for direct selling leaders.',
               enMultiLine,
-              buildContextBlock('generate'),
+              buildContextBlock(),
+              'Match the user’s description above. Encourage without hype.',
             ]
 
-        if (refineHint) {
-          const prev = outBody
-          const refinePrompt = [
-            ...baseInstruction,
-            tr ? `İyileştirme: ${refineHint}` : `Refine: ${refineHint}`,
-            tr ? 'Önceki metin:' : 'Previous text:',
-            prev,
-          ]
-          const r = await postAiChat([{ role: 'user', content: refinePrompt.join('\n\n') }])
-          if (!r.ok) throw new Error('ai')
-          const text = stripAiMessageQuotes((await r.text()).trim())
-          setOutBody(text)
-          setOutTitle(tr ? 'Düzenlenmiş mesaj' : 'Refined message')
+        const r = await postAiChat([{ role: 'user', content: baseInstruction.join('\n\n') }])
+        if (!r.ok) throw new Error('ai')
+        const text = stripAiMessageQuotes((await r.text()).trim())
+        if (isMulti) {
+          const parts = text
+            .split(/\n*---\n*/)
+            .map((p) => stripAiMessageQuotes(p.trim()))
+            .filter(Boolean)
+          const n = count
+          const useParts = parts.length >= n ? parts.slice(0, n) : parts.length ? parts : [text]
+          setVariations(useParts)
+          setOutTitle(tr ? 'Varyasyonlar' : 'Variants')
+          setOutBody(useParts[0] ?? text)
+          setPreviewTab(useParts.length > 1 ? 'variants' : 'message')
           setOutHint(
             tr
-              ? 'Metin, daha sakin ve eylem odaklı olacak şekilde törpülendi. Göndermeden kendi tonunu ekle.'
-              : 'The draft was nudged toward calmer, action clarity. Add your own voice before sending.',
+              ? 'Taslakları seç veya birleştir. Küçük ilerleme odağı, baskısız davet.'
+              : 'Pick or merge. Visible progress, zero-pressure invitation.',
           )
         } else {
-          const r = await postAiChat([{ role: 'user', content: baseInstruction.join('\n\n') }])
-          if (!r.ok) throw new Error('ai')
-          const text = stripAiMessageQuotes((await r.text()).trim())
-          if (isMulti) {
-            const parts = text
-              .split(/\n*---\n*/)
-              .map((p) => stripAiMessageQuotes(p.trim()))
-              .filter(Boolean)
-            const n = count
-            const useParts = parts.length >= n ? parts.slice(0, n) : parts.length ? parts : [text]
-            setVariations(useParts)
-            setOutTitle(tr ? 'Varyasyonlar' : 'Variants')
-            setOutBody(useParts[0] ?? text)
-            setPreviewTab(useParts.length > 1 ? 'variants' : 'message')
-            setOutHint(
-              tr
-                ? 'Taslakları seç veya birleştir. Küçük ilerleme odağı, baskısız davet.'
-                : 'Pick or merge. Visible progress, zero-pressure invitation.',
-            )
-          } else {
-            setOutBody(text)
-            setOutTitle(tr ? 'Hazır mesaj' : 'Message')
-            setPreviewTab('message')
-            setOutHint(
-              tr
-                ? 'Bu taslak, ilişki kalitesi ve net sonraki adıma vurgu yapar; istersen kısalt veya yumuşat.'
-                : 'This draft emphasizes relationship quality and a clear, gentle next step.',
-            )
-          }
+          setOutBody(text)
+          setOutTitle(tr ? 'Hazır mesaj' : 'Message')
+          setPreviewTab('message')
+          setOutHint(
+            tr
+              ? 'Bu taslak, yukarıdaki tarifine ve hedef kipine göre üretildi; istersen metni düzenle.'
+              : 'Draft matches your target mode and description; edit as needed.',
+          )
         }
       } catch {
         setOutHint(tr ? 'YZ yanıtı alınamadı.' : 'AI unavailable.')
@@ -429,7 +369,7 @@ export default function MotivationPage() {
         setLoading(false)
       }
     },
-    [tr, buildContextBlock, outBody],
+    [tr, buildContextBlock],
   )
 
   const copyContent = (t: string) => {
@@ -490,8 +430,8 @@ export default function MotivationPage() {
         </h1>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-text-secondary">
           {s(
-            'İlham al, hedefini netleştir, saniyeler içinde motivasyon mesajları hazırla!',
-            'Get inspired, clarify your goal, and prep motivation messages in seconds!',
+            'Ekibini motive etmek için yapay zekanın gücünden yararlan!',
+            'Use AI to motivate your team!',
           )}
         </p>
       </motion.section>
@@ -542,42 +482,121 @@ export default function MotivationPage() {
             <div className="flex flex-col gap-3 border-b border-border p-4 sm:p-5 lg:col-span-5 lg:border-b-0 lg:border-r">
               <div>
                 <h2 className="text-lg font-semibold tracking-tight text-text-primary sm:text-xl">
-                  {h(s('Motivasyon mesajı üret', 'Create motivation message'))}
+                  {h(s('Motivasyon mesaj(lar)ı üret', 'Generate motivation message(s)'))}
                 </h2>
-                <p className="mt-1.5 text-xs leading-relaxed text-text-tertiary sm:text-[13px]">
-                  {s(
-                    'Hedef, amaç ve kısa bağlam yeter. Kanal, uzunluk ve emoji için Gelişmiş ayarları aç.',
-                    'Target, intent, and short context are enough. Open Advanced for channel, length, and emoji.',
-                  )}
-                </p>
               </div>
 
               <div className="space-y-3 rounded-2xl border border-border-subtle bg-surface-hover/25 p-3 sm:p-4">
-                <p className={sectionLabelClass}>
-                  {h(s('Hızlı kurulum', 'Quick setup'))}
-                </p>
                 <p className={sectionLabelClass}>{h(s('Hedef', 'Target'))}</p>
-              <select
-                value={segment}
-                onChange={(e) => {
-                  const next = e.target.value as Segment
-                  setSegment(next)
-                  if (next !== 'single') {
-                    setSingleId('')
-                  }
-                }}
-                className={control}
-              >
-                  <option value="single">{s('Tek kişi', 'One person')}</option>
-                  <option value="new_starters">{s('Yeni başlayanlar', 'New starters')}</option>
-                  <option value="rejection_block">{s('Akla takılan / itiraz', 'Stuck or objections')}</option>
-                  <option value="dormant">{s('Uzun süredir pasif', 'Long-dormant')}</option>
-                  <option value="near_goal">{s('Hedefe yakın', 'Close to a milestone')}</option>
-                  <option value="leader_pool">{s('Lider adayları / ekip', 'Leaders & team')}</option>
-                  <option value="small_wins">{s('Küçük başarı sinyali', 'Small-win signals')}</option>
-                  <option value="tagged">{s('Etiketli grup', 'Tagged group')}</option>
+                <select
+                  value={audienceMode}
+                  onChange={(e) => {
+                    const v = e.target.value as AudienceMode
+                    setAudienceMode(v)
+                    if (v === 'all_contacts' || v === 'by_tag') {
+                      setSingleId('')
+                    }
+                    if (v !== 'search_person') {
+                      setContactQuery('')
+                    }
+                  }}
+                  className={control}
+                >
+                  <option value="search_person">{s('Kişi ara', 'Search person')}</option>
+                  <option value="select_person">{s('Kişi seç', 'Select person')}</option>
+                  <option value="one_recipient">{s('Tek kişiye gönder', 'Send to one person')}</option>
+                  <option value="all_contacts">{s('Tüm kişilere gönder', 'Send to all contacts')}</option>
+                  <option value="by_tag">{s('Etikete göre gönder', 'Send by tag')}</option>
                 </select>
-                {segment === 'tagged' && (
+
+                {audienceMode === 'search_person' && (
+                  <p className="text-[11px] leading-relaxed text-text-tertiary">
+                    {s(
+                      'İsim, e-posta veya telefonda ara; aşağıdan bir kişiye tıkla. Mesaj, seçtiğin kişinin kaydındaki bilgilere göre üretilecek.',
+                      'Search by name, email, or phone; click someone below. The draft will use that person’s context.',
+                    )}
+                  </p>
+                )}
+                {audienceMode === 'select_person' && (
+                  <p className="text-[11px] leading-relaxed text-text-tertiary">
+                    {s('Listeden bir kişi seç; aşağıdaki “tarif” alanında ne mesajı istediğini yaz.', 'Pick one person, then describe the message you want in the text area below.')}
+                  </p>
+                )}
+                {audienceMode === 'one_recipient' && (
+                  <p className="text-[11px] leading-relaxed text-text-tertiary">
+                    {s(
+                      'Yalnızca seçtiğin alıcıya bire bir motivasyon. Hitap ve içerik bu kişiye özel olsun; tarif alanındaki niyetine mutlaka uy.',
+                      '1:1 motivation to your chosen contact only. The draft should address them personally and follow your description.',
+                    )}
+                  </p>
+                )}
+                {audienceMode === 'all_contacts' && (
+                  <p className="text-[11px] leading-relaxed text-text-tertiary">
+                    {s(
+                      `Kontak listenin tamamı (${contacts.length} kişi) hedef kitle. Genelde ekip/çoğul veya lider–ekip tonu; tarif alanına göre isim kullanımı isteğe bağlıdır.`,
+                      `All ${contacts.length} contact(s) are the audience. Use team / plural or leader-to-team style unless your description asks otherwise.`,
+                    )}
+                  </p>
+                )}
+
+                {audienceMode === 'search_person' && (
+                  <div className="space-y-2">
+                    <Input
+                      className="h-9"
+                      value={contactQuery}
+                      onChange={(e) => setContactQuery(e.target.value)}
+                      autoComplete="off"
+                      placeholder={s('Ara: isim, e-posta, telefon…', 'Search: name, email, phone…')}
+                    />
+                    <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-border-subtle bg-surface/50 p-1.5">
+                      {contactSearchResults.length === 0 ? (
+                        <p className="px-2 py-2 text-[11px] text-text-tertiary">
+                          {s('Sonuç yok. Aramayı değiştir veya tüm adları listelemek için alanı boş bırak.', 'No matches. Change your search or clear the field to see names.')}
+                        </p>
+                      ) : (
+                        contactSearchResults.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => setSingleId(c.id)}
+                            className={cn(
+                              'w-full rounded-lg border px-2.5 py-2 text-left text-sm transition',
+                              singleId === c.id
+                                ? 'border-primary/40 bg-primary/10 text-text-primary'
+                                : 'border-transparent text-text-secondary hover:border-border hover:bg-surface-hover',
+                            )}
+                          >
+                            {c.full_name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                    {singleId && singleContact && (
+                      <p className="text-[11px] text-primary">
+                        {s(`Seçili: ${singleContact.full_name}`, `Selected: ${singleContact.full_name}`)}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {(audienceMode === 'select_person' || audienceMode === 'one_recipient') && (
+                  <select
+                    value={singleId}
+                    onChange={(e) => setSingleId(e.target.value)}
+                    className={control}
+                  >
+                    <option value="">{s('Kişi seçin', 'Select a person')}</option>
+                    {[...contacts]
+                      .sort((a, b) => a.full_name.localeCompare(b.full_name, tr ? 'tr' : 'en'))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.full_name}
+                        </option>
+                      ))}
+                  </select>
+                )}
+
+                {audienceMode === 'by_tag' && (
                   <div className="space-y-1.5">
                     <Input
                       className="h-9"
@@ -595,8 +614,8 @@ export default function MotivationPage() {
                     <p className="text-[11px] leading-relaxed text-text-tertiary">
                       {tagFilter.trim() === ''
                         ? s(
-                            'Kayıtlı etiketler aşağı açılır / yazdıkça öneride görünür. Eşleşme için en az bir etiket belirtin.',
-                            'Suggestions come from your contacts’ tags. Set a tag to see who matches.',
+                            'Etiket belirle; aynı etiketli kişilere uyan mesaj. Tarif alanına ne hissettirmek istediğini yaz.',
+                            'Set a tag; the copy matches that group. Use the description field for the tone and intent you want.',
                           )
                         : segmentPool.length === 0
                           ? s(
@@ -609,61 +628,29 @@ export default function MotivationPage() {
                     </p>
                   </div>
                 )}
-                {segment === 'single' && (
-                  <select
-                    value={singleId}
-                    onChange={(e) => setSingleId(e.target.value)}
-                    className={control}
-                  >
-                    <option value="">{s('Kişi seçin', 'Select a person')}</option>
-                    {[...contacts]
-                      .sort((a, b) => a.full_name.localeCompare(b.full_name, tr ? 'tr' : 'en'))
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.full_name}
-                        </option>
-                      ))}
-                  </select>
-                )}
-
-                <p className={sectionLabelClass}>{h(s('Amaç & ton', 'Intent & tone'))}</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <select
-                    value={purpose}
-                    onChange={(e) => setPurpose(e.target.value as Purpose)}
-                    className={control}
-                  >
-                    <option value="morale">{s('Moral / destek', 'Support')}</option>
-                    <option value="action">{s('Aksiyon', 'Action')}</option>
-                    <option value="reopen">{s('Yeniden iletişim', 'Re-open')}</option>
-                    <option value="micro_win">{s('Küçük kazanım', 'Small win')}</option>
-                    <option value="rescue">{s('Etik toparlama', 'Gentle rescue')}</option>
-                    <option value="invite">{s('Davet / toplantı', 'Invite')}</option>
-                    <option value="focus">{s('Hedefe odak', 'Focus')}</option>
-                  </select>
-                  <select
-                    value={tone}
-                    onChange={(e) => setTone(e.target.value as Tone)}
-                    className={control}
-                  >
-                    <option value="warm">{s('Sıcak', 'Warm')}</option>
-                    <option value="leader">{s('Liderce', 'Leader')}</option>
-                    <option value="crisp">{s('Kısa & net', 'Crisp')}</option>
-                    <option value="friendly">{s('Samimi', 'Friendly')}</option>
-                    <option value="vision">{s('Vizyon', 'Vision')}</option>
-                    <option value="recovery">{s('Toparlayıcı', 'Recovery')}</option>
-                  </select>
-                </div>
 
                 <div>
-                  <p className={sectionLabelClass}>{h(s('Bağlam (kısa)', 'Short context'))}</p>
+                  <p className={sectionLabelClass}>
+                    {h(
+                      s('İstediğin mesajı yapay zekaya tarif et!', 'Describe the message for the AI'),
+                    )}
+                  </p>
+                  <p className="mb-1.5 text-[11px] leading-relaxed text-text-tertiary">
+                    {s(
+                      'Yukarıdaki hedefe (kişi, grup veya etiket) göre ne söylemek istediğini yaz: ton, vurgu, kısa geçmiş. YZ bu tarife ve seçili hedefe göre metin(ler)i üretecek.',
+                      'Write what you want to convey for the target you chose: tone, emphasis, a bit of context. The model will use this plus your target mode to craft the text.',
+                    )}
+                  </p>
                   <Textarea
                     ref={contextNotesRef}
                     value={contextNotes}
                     onChange={(e) => setContextNotes(e.target.value)}
-                    rows={2}
-                    placeholder={s('Opsiyonel: son temas, duygu…', 'Optional: last touch, mood…')}
-                    className="min-h-[3.5rem] resize-none rounded-xl border border-border bg-surface py-2.5 text-sm leading-relaxed text-text-primary"
+                    rows={4}
+                    placeholder={s(
+                      'Örn. takım grubuna teşekkür ve hafta sonu toparlayıcı motivasyon, ya da Ayşe’ye sadece moral…',
+                      'E.g. thank the team and set a warm tone for the week, or a short morale boost for one person…',
+                    )}
+                    className="min-h-[5.5rem] resize-none rounded-xl border border-border bg-surface py-2.5 text-sm leading-relaxed text-text-primary"
                   />
                 </div>
 
@@ -692,112 +679,6 @@ export default function MotivationPage() {
                   </div>
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowAdvanced((o) => !o)}
-                className="flex h-9 w-full items-center justify-between rounded-xl border border-dashed border-border bg-surface/50 px-3 text-left text-xs text-text-secondary transition hover:border-primary/25"
-              >
-                <span>{h(s('Gelişmiş ayarlar', 'Advanced settings'))}</span>
-                <ChevronDown className={cn('h-3.5 w-3.5 transition', showAdvanced && 'rotate-180')} />
-              </button>
-
-              {showAdvanced && (
-                <div
-                  className="space-y-2.5 rounded-xl border border-border bg-surface-hover/40 p-3"
-                >
-                  <div>
-                    <p className="text-xs font-medium text-text-tertiary">{h(s('Kanal', 'Channel'))}</p>
-                    <select
-                      value={channel}
-                      onChange={(e) => setChannel(e.target.value as Channel)}
-                      className={cn(control, 'mt-1 h-8')}
-                    >
-                      <option value="whatsapp">WhatsApp</option>
-                      <option value="dm">{s('Kısa DM', 'Short DM')}</option>
-                      <option value="voice_script">{s('Ses notu', 'Voice script')}</option>
-                      <option value="team_group">{s('Takım', 'Team group')}</option>
-                      <option value="one_on_one">1:1</option>
-                      <option value="morning">{s('Sabah', 'Morning')}</option>
-                      <option value="weekly_wrap">{s('Haftalık', 'Weekly')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-text-tertiary">{h(s('Uzunluk', 'Length'))}</p>
-                    <select
-                      value={lengthKey}
-                      onChange={(e) => setLengthKey(e.target.value as LengthKey)}
-                      className={cn(control, 'mt-1 h-8')}
-                    >
-                      <option value="micro">{s('Çok kısa', 'Micro')}</option>
-                      <option value="short">{s('Kısa', 'Short')}</option>
-                      <option value="medium">{s('Orta', 'Medium')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-text-tertiary">{h(s('Dil / güvenli mod', 'Language / safe mode'))}</p>
-                    <select
-                      value={safeVoice}
-                      onChange={(e) => setSafeVoice(e.target.value as SafeVoice)}
-                      className={cn(control, 'mt-1 h-8')}
-                    >
-                      <option value="grounded">{s('Abartısız', 'Grounded')}</option>
-                      <option value="high_energy">{s('Enerjik', 'Energetic')}</option>
-                      <option value="emotional">{s('Duygusal', 'Emotional')}</option>
-                      <option value="corporate">{s('Profesyonel', 'Pro')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-text-tertiary">{h(s('Emoji', 'Emoji'))}</p>
-                    <div className="mt-1 flex gap-1">
-                      {([0, 1, 2] as const).map((n) => (
-                        <button
-                          key={n}
-                          type="button"
-                          onClick={() => setEmojiLevel(n)}
-                          className={cn(
-                            'h-7 flex-1 rounded-md border text-[10px] transition',
-                            emojiLevel === n
-                              ? 'border-cyan-500/30 bg-cyan-500/10 text-text-primary'
-                              : 'border-white/[0.08] text-text-muted/80 hover:bg-white/[0.04]',
-                          )}
-                        >
-                          {n}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {segment !== 'single' && (
-                    <div>
-                      <p className="text-xs font-medium text-text-tertiary">
-                        {h(s('Toplu kişiselleştirme', 'Bulk personalize'))}
-                      </p>
-                      <div className="mt-1 flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setPersonalize('same')}
-                          className={cn(
-                            'h-7 flex-1 rounded-md border text-[10px] transition',
-                            personalize === 'same' ? 'border-cyan-500/25 bg-white/[0.04]' : 'border-white/[0.08] text-text-muted/70',
-                          )}
-                        >
-                          {s('Aynı metin', 'Same')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPersonalize('light')}
-                          className={cn(
-                            'h-7 flex-1 rounded-md border text-[10px] transition',
-                            personalize === 'light' ? 'border-cyan-500/25 bg-white/[0.04]' : 'border-white/[0.08] text-text-muted/70',
-                          )}
-                        >
-                          {s('+ İsim', '+ Name')}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               <div className="mt-1 border-t border-border pt-3">
                 <Button
@@ -947,24 +828,6 @@ export default function MotivationPage() {
                         )}
                       </div>
                     </div>
-                    {hasDraft && (
-                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 border-t border-border pt-2">
-                        {[
-                          { l: s('Kısalt', 'Tighter'), h: s('Daha kısa yap', 'Shorter') as string },
-                          { l: s('Sıcak', 'Warmer'), h: s('Daha samimi yap', 'More human') as string },
-                          { l: s('Sakin', 'Calmer'), h: s('Daha sakin, liderce', 'Calmer, leaderly') as string },
-                        ].map((x) => (
-                          <button
-                            key={x.h}
-                            type="button"
-                            onClick={() => void runGenerate('refine', x.h)}
-                            className="text-xs text-text-tertiary transition hover:text-primary"
-                          >
-                            {x.l}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -1016,7 +879,7 @@ export default function MotivationPage() {
         className="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5"
       >
         <p className={sectionLabelClass}>{h(s("Bugünün önerisi", "Today's suggestion"))}</p>
-        <p className="mt-2 text-sm leading-relaxed text-text-secondary">{insightLine}</p>
+        <p className="mt-2 text-sm leading-relaxed text-text-secondary">{todaySuggestion}</p>
       </motion.div>
     </motion.div>
   )
