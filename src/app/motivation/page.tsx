@@ -1053,7 +1053,7 @@ export default function MotivationPage() {
           setEditingFavoriteText('')
         }}
         title={h(s('Favori Motivasyon Mesajları', 'Favorite Motivation Messages'))}
-        className="max-w-2xl"
+        className="max-w-2xl overflow-visible"
       >
         <div className="px-4 pb-4 sm:px-5">
           {!favoriteMessages.length ? (
@@ -1096,7 +1096,7 @@ export default function MotivationPage() {
                         size="sm"
                         variant="secondary"
                         className="w-[10.5rem] max-w-full shrink-0 opacity-100 transition sm:flex-none md:opacity-0 md:group-hover:opacity-100"
-                        menuPlacement="down"
+                        menuPlacement="up"
                       />
                     </div>
                     {editing ? (
