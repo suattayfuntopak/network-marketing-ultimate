@@ -515,7 +515,7 @@ export function AIMessageWorkspace() {
             </p>
           ) : (
             templates.map((template) => (
-              <div key={template.id} className="space-y-3 rounded-xl border border-border-subtle bg-surface/25 p-4">
+              <div key={template.id} className="group space-y-3 rounded-xl border border-border-subtle bg-surface/25 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-text-primary">{template.name}</p>
@@ -523,7 +523,7 @@ export function AIMessageWorkspace() {
                       {new Date(template.createdAt).toLocaleDateString(currentLocale === 'tr' ? 'tr-TR' : 'en-US')}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="pointer-events-none flex items-center gap-1.5 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
                     <button
                       type="button"
                       title={currentLocale === 'tr' ? 'Sil' : 'Delete'}
