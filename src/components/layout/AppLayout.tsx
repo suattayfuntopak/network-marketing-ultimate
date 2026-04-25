@@ -154,7 +154,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!authReady || !currentUser || isAuthRoute) return
 
-    const INACTIVITY_MS = 30 * 60 * 1000
+    const INACTIVITY_MS = 3 * 60 * 1000
     let timer: ReturnType<typeof setTimeout> | null = null
 
     const resetTimer = () => {
