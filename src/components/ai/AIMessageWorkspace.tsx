@@ -504,7 +504,7 @@ export function AIMessageWorkspace() {
         onClose={() => setShowSavedMessages(false)}
         title={currentLocale === 'tr' ? 'Kaydedilen mesajlar' : 'Saved messages'}
         description={currentLocale === 'tr' ? 'Kaydettiğin mesaj şablonları burada listelenir.' : 'Your saved message templates are listed here.'}
-        className="max-w-3xl"
+        className="max-w-3xl overflow-visible"
       >
         <div className="space-y-3 p-5">
           {templates.length === 0 ? (
@@ -563,6 +563,7 @@ export function AIMessageWorkspace() {
                       size="sm"
                       variant="secondary"
                       className="w-[10.5rem] shrink-0"
+                      menuPlacement="up"
                       onAfterSend={() => setCopiedTemplateId(template.id)}
                     />
                   </div>
