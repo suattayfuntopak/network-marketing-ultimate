@@ -1064,8 +1064,8 @@ export default function MotivationPage() {
                 const editing = editingFavoriteId === fav.id
                 return (
                   <div key={fav.id} className="group rounded-xl border border-border bg-surface p-3">
-                    <div className="mb-2 flex justify-end">
-                      <div className="pointer-events-none flex gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
+                    <div className="mb-2 flex flex-wrap items-start justify-end gap-1.5">
+                      <div className="flex items-center gap-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
                         <button
                           type="button"
                           onClick={() => copyContent(fav.text)}
@@ -1088,6 +1088,16 @@ export default function MotivationPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
+                      <ChannelSendButton
+                        body={fav.text}
+                        label={h(s('Gönder', 'Send'))}
+                        locale={tr ? 'tr' : 'en'}
+                        linkMode="loose"
+                        size="sm"
+                        variant="secondary"
+                        className="w-[10.5rem] shrink-0 opacity-100 transition md:opacity-0 md:group-hover:opacity-100"
+                        menuPlacement="down"
+                      />
                     </div>
                     {editing ? (
                       <div className="space-y-2">
