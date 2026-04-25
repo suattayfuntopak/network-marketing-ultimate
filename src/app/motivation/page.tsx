@@ -1059,7 +1059,7 @@ export default function MotivationPage() {
           {!favoriteMessages.length ? (
             <p className="text-sm text-text-tertiary">{s('Henüz favori mesaj yok.', 'No favorite messages yet.')}</p>
           ) : (
-            <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+            <div className="max-h-[60vh] space-y-2 overflow-visible pr-1">
               {favoriteMessages.map((fav) => {
                 const editing = editingFavoriteId === fav.id
                 return (
@@ -1095,7 +1095,7 @@ export default function MotivationPage() {
                         linkMode="loose"
                         size="sm"
                         variant="secondary"
-                        className="w-[10.5rem] shrink-0 opacity-100 transition md:opacity-0 md:group-hover:opacity-100"
+                        className="w-[10.5rem] max-w-full shrink-0 opacity-100 transition sm:flex-none md:opacity-0 md:group-hover:opacity-100"
                         menuPlacement="down"
                       />
                     </div>
