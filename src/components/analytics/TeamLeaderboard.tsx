@@ -14,7 +14,7 @@ type TeamLeaderboardProps = {
 const MEDAL_ICONS = [Crown, Trophy, Medal]
 
 export function TeamLeaderboard({ rows }: TeamLeaderboardProps) {
-  const { locale } = useLanguage()
+  const { t, locale } = useLanguage()
   const maxScore = rows[0]?.score ?? 1
 
   return (
@@ -23,12 +23,10 @@ export function TeamLeaderboard({ rows }: TeamLeaderboardProps) {
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="h-4 w-4 text-accent" />
-            {locale === 'tr' ? 'Ekip Liderlik Tablosu' : 'Team Leaderboard'}
+            {t.analytics.membersActivity}
           </CardTitle>
           <CardDescription className="mt-1">
-            {locale === 'tr'
-              ? 'Seçili dönemde ekip üyelerinin puan, aktivite ve ritim karşılaştırması.'
-              : 'Member-level score, activity, and rhythm for the selected period.'}
+            {t.analytics.membersActivityHint}
           </CardDescription>
         </div>
       </CardHeader>

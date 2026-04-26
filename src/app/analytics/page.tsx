@@ -33,14 +33,18 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import {
+  fetchActiveCustomers,
+  fetchAiUsageSeries,
   fetchAllInteractions,
   fetchAllOrders,
   fetchContacts,
   fetchEvents,
+  fetchProducts,
   fetchTasks,
   type ContactRow,
   type InteractionRow,
   type OrderRow,
+  type ProductRow,
   type TaskRow,
 } from '@/lib/queries'
 import type { Event } from '@/types'
@@ -49,9 +53,14 @@ import { Sparkline } from '@/components/dashboard/Sparkline'
 import { buildPipelineSegments } from '@/components/dashboard/dashboardMetrics'
 import {
   buildCohortTable,
+  buildCustomerInsights,
+  buildEngagementMetrics,
   buildEventPerformance,
   buildInteractionMix,
+  buildOverdueSeries,
+  buildProductPerformance,
   buildRevenueSeries,
+  buildTeamAddsSeries,
   buildTeamLeaderboard,
   buildTopProducts,
   buildTrendSeries,
@@ -70,6 +79,10 @@ import { InteractionMix } from '@/components/analytics/InteractionMix'
 import { EventPerformance } from '@/components/analytics/EventPerformance'
 import { CohortTable } from '@/components/analytics/CohortTable'
 import { TeamLeaderboard } from '@/components/analytics/TeamLeaderboard'
+import { CustomerInsights } from '@/components/analytics/CustomerInsights'
+import { ProductPerformance } from '@/components/analytics/ProductPerformance'
+import { EngagementMetrics } from '@/components/analytics/EngagementMetrics'
+import { ErrorCard } from '@/components/analytics/ErrorCard'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -164,12 +177,49 @@ export default function AnalyticsPage() {
   })
   const events = eventsQuery.data ?? []
 
+  const productsQuery = useQuery<ProductRow[]>({
+    queryKey: ['products'],
+    queryFn: fetchProducts,
+    staleTime: 60_000,
+  })
+  const products = productsQuery.data ?? []
+
+  const customersQuery = useQuery({
+    queryKey: ['active-customers-summary'],
+    queryFn: fetchActiveCustomers,
+    staleTime: 60_000,
+  })
+
+  const aiUsageQuery = useQuery({
+    queryKey: ['ai-usage-series', 90],
+    queryFn: () => fetchAiUsageSeries(90),
+    staleTime: 60_000,
+  })
+
   const isInitialLoading =
     (contactsQuery.isPending && !contactsQuery.data) ||
     (tasksQuery.isPending && !tasksQuery.data) ||
     (ordersQuery.isPending && !ordersQuery.data) ||
     (interactionsQuery.isPending && !interactionsQuery.data) ||
     (eventsQuery.isPending && !eventsQuery.data)
+
+  const hasFatalError =
+    contactsQuery.isError &&
+    tasksQuery.isError &&
+    ordersQuery.isError &&
+    interactionsQuery.isError &&
+    eventsQuery.isError
+
+  const handleRetry = () => {
+    contactsQuery.refetch()
+    tasksQuery.refetch()
+    ordersQuery.refetch()
+    interactionsQuery.refetch()
+    eventsQuery.refetch()
+    productsQuery.refetch()
+    customersQuery.refetch()
+    aiUsageQuery.refetch()
+  }
 
   const today = startOfDay(new Date())
   const { start, end, previousStart, previousEnd } = getRangeBounds(range, today)
@@ -237,9 +287,27 @@ export default function AnalyticsPage() {
   const revenueSeries = buildRevenueSeries(range, locale, orders, end)
   const interactionSeries = buildInteractionMix(range, locale, interactions, end)
   const topProducts = buildTopProducts(orders, currentBounds, 6)
-  const cohortRows = buildCohortTable(contacts, locale, 6)
+  const teamAddsSeries = buildTeamAddsSeries(range, contacts, end)
+  const overdueSeries = buildOverdueSeries(range, tasks, end)
+  const cohortMonths = range === '7d' ? 3 : range === '30d' ? 6 : range === '90d' ? 9 : 12
+  const cohortRows = buildCohortTable(contacts, locale, cohortMonths)
   const eventRows = buildEventPerformance(events, 6)
   const teamRows = buildTeamLeaderboard(contacts, tasks, currentBounds, today, 6)
+
+  const productMeta = new Map(
+    products.map((product) => [product.id, { name: product.name, reorder_cycle_days: product.reorder_cycle_days ?? null }] as const),
+  )
+  const productPerformance = buildProductPerformance(orders, currentBounds, productMeta, 8)
+  const customerInsights = buildCustomerInsights(
+    range,
+    locale,
+    customersQuery.data?.customerIds ?? null,
+    contacts,
+    orders,
+    currentBounds,
+    end,
+  )
+  const engagement = buildEngagementMetrics(range, locale, aiUsageQuery.data ?? [], end)
 
   const gaugeEntries = [
     {
@@ -319,7 +387,7 @@ export default function AnalyticsPage() {
       value: currentRecruits.length,
       delta: formatDelta(currentRecruits.length, previousBounds ? previousRecruits.length : null, locale),
       icon: UserPlus,
-      sparkData: trendSeries.map(() => ({ value: 0 })),
+      sparkData: teamAddsSeries,
       sparkColor: '#f59e0b',
       sparkId: 'kpi-recruits',
     },
@@ -328,12 +396,20 @@ export default function AnalyticsPage() {
       value: currentOverdueTasks.length,
       delta: formatDelta(currentOverdueTasks.length, previousBounds ? previousOverdueTasks.length : null, locale),
       icon: Clock3,
-      sparkData: trendSeries.map((point) => ({ value: point.presentations })),
+      sparkData: overdueSeries,
       sparkColor: '#ef4444',
       sparkId: 'kpi-overdue',
       inverseDelta: true,
     },
   ]
+
+  if (hasFatalError) {
+    return (
+      <div className="mx-auto max-w-[1600px] space-y-6">
+        <ErrorCard onRetry={handleRetry} />
+      </div>
+    )
+  }
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="mx-auto max-w-[1600px] space-y-6">
@@ -557,6 +633,18 @@ export default function AnalyticsPage() {
       </motion.div>
 
       <motion.div variants={item}>
+        <CustomerInsights summary={customerInsights} contacts={contacts} />
+      </motion.div>
+
+      <motion.div variants={item}>
+        <ProductPerformance rows={productPerformance} />
+      </motion.div>
+
+      <motion.div variants={item}>
+        <EngagementMetrics engagement={engagement} />
+      </motion.div>
+
+      <motion.div variants={item}>
         <Card padding="lg">
           <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
             <div>
@@ -570,60 +658,69 @@ export default function AnalyticsPage() {
                   : 'Track how raw contact volume cascades into real conversion.'}
               </CardDescription>
             </div>
+            <Badge variant="default">{t.analytics.selectedPeriod} · {periodLabel(range, locale)}</Badge>
           </CardHeader>
 
           <div className="space-y-2">
-            {[
-              { stage: t.analytics.totalLeads, value: contacts.length, color: '#00d4ff' },
-              { stage: t.analytics.contacted, value: contacts.filter((contact) => Boolean(contact.last_contact_date)).length, color: '#3b82f6' },
-              {
-                stage: t.analytics.interested,
-                value: contacts.filter((contact) =>
-                  ['interested', 'invited', 'presentation_sent', 'presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy'].includes(contact.pipeline_stage),
-                ).length,
-                color: '#8b5cf6',
-              },
-              {
-                stage: t.analytics.presented,
-                value: contacts.filter((contact) =>
-                  ['presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy', 'became_customer', 'became_member'].includes(contact.pipeline_stage),
-                ).length,
-                color: '#f59e0b',
-              },
-              {
-                stage: t.analytics.converted,
-                value: (pipelineCounts.became_customer ?? 0) + (pipelineCounts.became_member ?? 0),
-                color: '#10b981',
-              },
-            ]
-              .map((step, index, array) => {
-                const pct = percent(step.value, Math.max(contacts.length, 1))
-                const dropFromPrev = index === 0 ? null : array[index - 1].value - step.value
-                return { ...step, pct, dropFromPrev }
-              })
-              .map((step, index) => (
-                <div key={step.stage} className="rounded-2xl border border-border-subtle bg-surface/35 p-2.5 sm:p-3">
-                  <div className="flex items-center gap-2 sm:gap-4">
-                    <div className="w-20 sm:w-28 shrink-0 text-[11px] sm:text-xs font-semibold text-text-secondary line-clamp-2 leading-tight">{step.stage}</div>
-                    <div className="relative h-8 sm:h-9 flex-1 overflow-hidden rounded-xl sm:rounded-2xl bg-background/70">
-                      <motion.div
-                        className="h-full rounded-xl sm:rounded-2xl"
-                        style={{ backgroundColor: step.color }}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.max(step.pct, step.value > 0 ? 8 : 0)}%` }}
-                        transition={{ duration: 0.8, delay: index * 0.08 }}
-                      />
-                      <span className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-[11px] sm:text-xs font-semibold text-text-primary">{step.value}</span>
+            {(() => {
+              const cohort = range === 'all'
+                ? contacts
+                : contacts.filter((contact) => inDateRange(contact.created_at, currentBounds))
+              const baseSteps = [
+                { stage: t.analytics.totalLeads, value: cohort.length, color: '#00d4ff' },
+                { stage: t.analytics.contacted, value: cohort.filter((contact) => Boolean(contact.last_contact_date)).length, color: '#3b82f6' },
+                {
+                  stage: t.analytics.interested,
+                  value: cohort.filter((contact) =>
+                    ['interested', 'invited', 'presentation_sent', 'presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy'].includes(contact.pipeline_stage),
+                  ).length,
+                  color: '#8b5cf6',
+                },
+                {
+                  stage: t.analytics.presented,
+                  value: cohort.filter((contact) =>
+                    ['presentation_done', 'followup_pending', 'objection_handling', 'ready_to_buy', 'became_customer', 'became_member'].includes(contact.pipeline_stage),
+                  ).length,
+                  color: '#f59e0b',
+                },
+                {
+                  stage: t.analytics.converted,
+                  value: cohort.filter((contact) =>
+                    ['became_customer', 'became_member'].includes(contact.pipeline_stage),
+                  ).length,
+                  color: '#10b981',
+                },
+              ]
+              return baseSteps
+                .map((step, index, array) => {
+                  const pct = percent(step.value, Math.max(cohort.length, 1))
+                  const dropFromPrev = index === 0 ? null : array[index - 1].value - step.value
+                  return { ...step, pct, dropFromPrev }
+                })
+                .map((step, index) => (
+                  <div key={step.stage} className="rounded-2xl border border-border-subtle bg-surface/35 p-2.5 sm:p-3">
+                    <div className="flex items-center gap-2 sm:gap-4">
+                      <div className="w-20 sm:w-28 shrink-0 text-[11px] sm:text-xs font-semibold text-text-secondary line-clamp-2 leading-tight">{step.stage}</div>
+                      <div className="relative h-8 sm:h-9 flex-1 overflow-hidden rounded-xl sm:rounded-2xl bg-background/70">
+                        <motion.div
+                          className="h-full rounded-xl sm:rounded-2xl"
+                          style={{ backgroundColor: step.color }}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.max(step.pct, step.value > 0 ? 8 : 0)}%` }}
+                          transition={{ duration: 0.8, delay: index * 0.08 }}
+                        />
+                        <span className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-[11px] sm:text-xs font-semibold text-text-primary">{step.value}</span>
+                      </div>
+                      <div className="w-10 sm:w-16 text-right text-[11px] sm:text-xs font-semibold text-text-primary">%{step.pct}</div>
                     </div>
-                    <div className="w-10 sm:w-16 text-right text-[11px] sm:text-xs font-semibold text-text-primary">%{step.pct}</div>
+                    {step.dropFromPrev !== null && step.dropFromPrev > 0 && (
+                      <p className="mt-1.5 sm:mt-2 pl-[92px] sm:pl-[132px] text-[10px] text-text-tertiary">
+                        ↓ {step.dropFromPrev} {locale === 'tr' ? 'kişi önceki aşamadan devam etmedi' : 'dropped from previous stage'}
+                      </p>
+                    )}
                   </div>
-                  {step.dropFromPrev !== null && step.dropFromPrev > 0 && (
-                    <p className="mt-1.5 sm:mt-2 pl-[92px] sm:pl-[132px] text-[10px] text-text-tertiary">
-                      ↓ {step.dropFromPrev} {locale === 'tr' ? 'kişi önceki aşamadan devam etmedi' : 'dropped from previous stage'}
-                    </p>
-                  )}
-                </div>
-              ))}
+                ))
+            })()}
           </div>
         </Card>
       </motion.div>

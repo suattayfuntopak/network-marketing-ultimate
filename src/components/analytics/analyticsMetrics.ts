@@ -435,3 +435,291 @@ export function buildTeamLeaderboard(
 
   return rows.sort((left, right) => right.score - left.score).slice(0, limit)
 }
+
+type Bucket = { start: Date; end: Date }
+
+function bucketsForRange(range: RangeOption, end: Date): Bucket[] {
+  if (range === 'all') {
+    return Array.from({ length: 6 }).map((_, index) => {
+      const start = startOfDay(addMonths(new Date(end), -(5 - index)))
+      start.setDate(1)
+      const bucketEnd = endOfDay(addMonths(start, 1))
+      bucketEnd.setDate(0)
+      return { start, end: bucketEnd }
+    })
+  }
+
+  const bucketSize = range === '7d' ? 1 : range === '30d' ? 5 : 15
+  const bucketCount = range === '7d' ? 7 : 6
+
+  return Array.from({ length: bucketCount }).map((_, index) => {
+    const bucketStart = startOfDay(addDays(end, -((bucketCount - 1 - index) * bucketSize)))
+    const normalizedStart = range === '7d' ? bucketStart : startOfDay(addDays(bucketStart, -(bucketSize - 1)))
+    const bucketEnd = endOfDay(range === '7d' ? bucketStart : addDays(normalizedStart, bucketSize - 1))
+    return { start: normalizedStart, end: bucketEnd }
+  })
+}
+
+export function buildTeamAddsSeries(
+  range: RangeOption,
+  contacts: ContactRow[],
+  end: Date,
+): { value: number }[] {
+  const buckets = bucketsForRange(range, end)
+  return buckets.map((bucket) => ({
+    value: contacts.filter((contact) => {
+      if (contact.pipeline_stage !== 'became_member') return false
+      const movedAt = parseDate(contact.updated_at) ?? parseDate(contact.created_at)
+      if (!movedAt) return false
+      return movedAt >= bucket.start && movedAt <= bucket.end
+    }).length,
+  }))
+}
+
+export function buildOverdueSeries(
+  range: RangeOption,
+  tasks: TaskRow[],
+  end: Date,
+): { value: number }[] {
+  const buckets = bucketsForRange(range, end)
+  return buckets.map((bucket) => {
+    const moment = bucket.end.getTime()
+    return {
+      value: tasks.filter((task) => {
+        if (task.status === 'skipped') return false
+        if (task.status === 'completed') {
+          if (!task.completed_at) return false
+          if (new Date(task.completed_at).getTime() <= moment) return false
+        }
+        const due = parseDate(task.due_date)
+        if (!due) return false
+        return due.getTime() < moment
+      }).length,
+    }
+  })
+}
+
+export type CustomerInsightsSummary = {
+  active: number
+  newInPeriod: number
+  churnRisk: number
+  topCustomers: Array<{ contactId: string; revenue: number; orders: number; lastOrderAt: string | null }>
+  trend: { label: string; active: number; churnRisk: number }[]
+}
+
+export function buildCustomerInsights(
+  range: RangeOption,
+  locale: Locale,
+  customerIds: string[] | null,
+  contacts: ContactRow[],
+  orders: OrderRow[],
+  bounds: Bounds,
+  end: Date,
+): CustomerInsightsSummary {
+  const customerSet = customerIds && customerIds.length > 0 ? new Set(customerIds) : null
+  const isCustomerContact = (contactId: string, contact?: ContactRow) => {
+    if (customerSet) return customerSet.has(contactId)
+    return contact?.pipeline_stage === 'became_customer'
+  }
+
+  const activeContacts = contacts.filter((contact) => isCustomerContact(contact.id, contact))
+  const active = activeContacts.length
+
+  const newInPeriod = activeContacts.filter((contact) => {
+    const reference = parseDate(contact.updated_at) ?? parseDate(contact.created_at)
+    if (!reference) return false
+    return inDateRange(reference.toISOString(), bounds)
+  }).length
+
+  const churnCutoff = addDays(end, -90)
+  const lastOrderByContact = new Map<string, Date>()
+  const revenueByContact = new Map<string, { revenue: number; orders: number }>()
+
+  for (const order of orders) {
+    if (order.status === 'cancelled') continue
+    const contactId = order.contact_id
+    if (!contactId) continue
+    const orderDate = parseDate(order.order_date)
+    if (orderDate) {
+      const existing = lastOrderByContact.get(contactId)
+      if (!existing || orderDate > existing) {
+        lastOrderByContact.set(contactId, orderDate)
+      }
+    }
+    if (inDateRange(order.order_date, bounds)) {
+      const summary = revenueByContact.get(contactId) ?? { revenue: 0, orders: 0 }
+      summary.revenue += order.total_try ?? 0
+      summary.orders += 1
+      revenueByContact.set(contactId, summary)
+    }
+  }
+
+  const churnRisk = activeContacts.filter((contact) => {
+    const lastOrder = lastOrderByContact.get(contact.id)
+    if (!lastOrder) return true
+    return lastOrder < churnCutoff
+  }).length
+
+  const topCustomers = Array.from(revenueByContact.entries())
+    .filter(([contactId]) => isCustomerContact(contactId))
+    .map(([contactId, summary]) => ({
+      contactId,
+      revenue: summary.revenue,
+      orders: summary.orders,
+      lastOrderAt: lastOrderByContact.get(contactId)?.toISOString() ?? null,
+    }))
+    .sort((left, right) => right.revenue - left.revenue)
+    .slice(0, 5)
+
+  const buckets = bucketsForRange(range, end)
+  const trend = buckets.map((bucket) => {
+    const activeAt = activeContacts.filter((contact) => {
+      const reference = parseDate(contact.created_at)
+      if (!reference) return false
+      return reference <= bucket.end
+    }).length
+    const cutoff = addDays(bucket.end, -90)
+    const risk = activeContacts.filter((contact) => {
+      const reference = parseDate(contact.created_at)
+      if (!reference || reference > bucket.end) return false
+      const lastOrder = lastOrderByContact.get(contact.id)
+      if (!lastOrder) return true
+      return lastOrder < cutoff
+    }).length
+    return {
+      label: formatBucketLabel(bucket.start, bucket.end, range, locale),
+      active: activeAt,
+      churnRisk: risk,
+    }
+  })
+
+  return { active, newInPeriod, churnRisk, topCustomers, trend }
+}
+
+export type ProductPerformanceRow = {
+  productId: string
+  name: string
+  units: number
+  revenue: number
+  orderCount: number
+  reorderCycleDays: number | null
+  avgDaysBetween: number | null
+  reorderHealth: 'on_track' | 'slow' | 'unknown'
+}
+
+interface OrderItemSummary {
+  product_id?: string | null
+  product_name?: string | null
+  name?: string | null
+  quantity?: number | null
+  unit_price_try?: number | null
+  total_try?: number | null
+}
+
+export function buildProductPerformance(
+  orders: OrderRow[],
+  bounds: Bounds,
+  productMeta: Map<string, { name: string; reorder_cycle_days: number | null }>,
+  limit = 8,
+): ProductPerformanceRow[] {
+  const aggregate = new Map<string, ProductPerformanceRow & { dates: Date[] }>()
+  const scoped = orders.filter((order) => order.status !== 'cancelled' && inDateRange(order.order_date, bounds))
+
+  for (const order of scoped) {
+    const items = Array.isArray(order.items) ? (order.items as OrderItemSummary[]) : []
+    const orderDate = parseDate(order.order_date)
+    for (const raw of items) {
+      const productId = raw.product_id ?? null
+      const meta = productId ? productMeta.get(productId) : null
+      const key = productId ?? `name:${(raw.product_name ?? raw.name ?? 'unknown').toLowerCase()}`
+      const name = meta?.name ?? raw.product_name ?? raw.name ?? 'Unknown product'
+      const quantity = Number(raw.quantity ?? 0) || 0
+      const unitPrice = Number(raw.unit_price_try ?? 0) || 0
+      const lineRevenue = Number(raw.total_try ?? quantity * unitPrice) || 0
+      const existing = aggregate.get(key)
+      if (existing) {
+        existing.units += quantity
+        existing.revenue += lineRevenue
+        existing.orderCount += 1
+        if (orderDate) existing.dates.push(orderDate)
+      } else {
+        aggregate.set(key, {
+          productId: key,
+          name,
+          units: quantity,
+          revenue: lineRevenue,
+          orderCount: 1,
+          reorderCycleDays: meta?.reorder_cycle_days ?? null,
+          avgDaysBetween: null,
+          reorderHealth: 'unknown',
+          dates: orderDate ? [orderDate] : [],
+        })
+      }
+    }
+  }
+
+  return Array.from(aggregate.values())
+    .map((row) => {
+      let avgDaysBetween: number | null = null
+      if (row.dates.length >= 2) {
+        const sorted = row.dates.slice().sort((a, b) => a.getTime() - b.getTime())
+        const gaps: number[] = []
+        for (let i = 1; i < sorted.length; i += 1) {
+          gaps.push((sorted[i].getTime() - sorted[i - 1].getTime()) / 86400000)
+        }
+        avgDaysBetween = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length
+      }
+      let reorderHealth: ProductPerformanceRow['reorderHealth'] = 'unknown'
+      if (row.reorderCycleDays && avgDaysBetween) {
+        reorderHealth = avgDaysBetween <= row.reorderCycleDays * 1.25 ? 'on_track' : 'slow'
+      }
+      return {
+        productId: row.productId,
+        name: row.name,
+        units: row.units,
+        revenue: row.revenue,
+        orderCount: row.orderCount,
+        reorderCycleDays: row.reorderCycleDays,
+        avgDaysBetween,
+        reorderHealth,
+      }
+    })
+    .sort((left, right) => right.revenue - left.revenue)
+    .slice(0, limit)
+}
+
+export type AiUsagePoint = { date: string; count: number }
+
+export type EngagementSummary = {
+  series: { label: string; value: number }[]
+  todayUsage: number
+  windowUsage: number
+  windowLimit: number
+}
+
+export function buildEngagementMetrics(
+  range: RangeOption,
+  locale: Locale,
+  aiUsage: AiUsagePoint[],
+  end: Date,
+): EngagementSummary {
+  const buckets = bucketsForRange(range, end)
+  const usageMap = new Map<string, number>()
+  for (const point of aiUsage) {
+    usageMap.set(point.date, (usageMap.get(point.date) ?? 0) + point.count)
+  }
+  const series = buckets.map((bucket) => {
+    let value = 0
+    for (const [dateKey, count] of usageMap.entries()) {
+      const parsed = new Date(`${dateKey}T00:00:00.000Z`)
+      if (parsed >= bucket.start && parsed <= bucket.end) {
+        value += count
+      }
+    }
+    return { label: formatBucketLabel(bucket.start, bucket.end, range, locale), value }
+  })
+  const todayKey = end.toISOString().slice(0, 10)
+  const todayUsage = usageMap.get(todayKey) ?? 0
+  const windowUsage = series.reduce((sum, point) => sum + point.value, 0)
+  return { series, todayUsage, windowUsage, windowLimit: buckets.length * 50 }
+}
