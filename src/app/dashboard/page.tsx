@@ -7,11 +7,13 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
+  Award,
   Calendar,
   CheckCircle2,
   ChevronRight,
   Flame,
   Package,
+  Sparkles,
   TrendingUp,
   Users,
   UserRoundCheck,
@@ -26,6 +28,8 @@ import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { useAppStore } from '@/store/appStore'
 import {
   completeTask,
+  fetchAiRateLimitsToday,
+  fetchActiveCustomers,
   fetchAllOrders,
   fetchContacts,
   fetchCustomerContactIds,
@@ -42,11 +46,11 @@ import {
   buildReorderDue,
   buildRevenueSnapshot,
   buildUpcomingEvents,
-  calcDelta,
   computeActivityStreak,
   endOfDay,
   formatDelta,
   formatTRY,
+  previousPeriodKpis,
   startOfDay,
 } from '@/components/dashboard/dashboardMetrics'
 import { RevenueStrip } from '@/components/dashboard/RevenueStrip'
@@ -54,6 +58,10 @@ import { ActivityHeatmap } from '@/components/dashboard/ActivityHeatmap'
 import { PipelineSegmentDonut } from '@/components/dashboard/PipelineSegmentDonut'
 import { ReorderDueCard } from '@/components/dashboard/ReorderDueCard'
 import { DeltaPill } from '@/components/dashboard/DeltaPill'
+import { MotivationPulse } from '@/components/dashboard/MotivationPulse'
+import { EngagementCard } from '@/components/dashboard/EngagementCard'
+import { CustomerSnapshot } from '@/components/dashboard/CustomerSnapshot'
+import { AiStudioShortcut } from '@/components/dashboard/AiStudioShortcut'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }
 const item = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
@@ -176,6 +184,18 @@ export default function DashboardPage() {
   })
   const customerContactIds = customerContactIdsQuery.data ?? null
 
+  const activeCustomersQuery = useQuery({
+    queryKey: ['active-customers-summary'],
+    queryFn: fetchActiveCustomers,
+    staleTime: 60_000,
+  })
+
+  const aiUsageQuery = useQuery({
+    queryKey: ['ai-rate-limits-today'],
+    queryFn: fetchAiRateLimitsToday,
+    staleTime: 30_000,
+  })
+
   const isInitialLoading =
     (contactsQuery.isPending && !contactsQuery.data) ||
     (tasksQuery.isPending && !tasksQuery.data) ||
@@ -238,11 +258,7 @@ export default function DashboardPage() {
     })
     .sort((left, right) => new Date(left.due_date).getTime() - new Date(right.due_date).getTime())
 
-  const activeEvents = events.filter((event) => event.status !== 'cancelled')
-  const overdueEvents = activeEvents.filter((event) => {
-    if (event.status === 'completed') return false
-    return new Date(event.endDate).getTime() < now.getTime()
-  })
+  const periodKpis = previousPeriodKpis(contacts, tasks, orders, now, 30)
 
   const riskItems: RiskItem[] = [
     ...overdueTasks.slice(0, 3).map((task) => ({
@@ -316,52 +332,52 @@ export default function DashboardPage() {
 
   const kpis = [
     {
-      label: locale === 'tr' ? 'Tüm Aksiyonlar' : 'All Actions',
-      value: openTasks.length + activeEvents.length,
+      label: locale === 'tr' ? 'Yeni Kontaklar (30g)' : 'New Contacts (30d)',
+      value: periodKpis.newContacts.current,
       hint: locale === 'tr'
-        ? `${openTasks.length} görev & takip, ${activeEvents.length} etkinlik`
-        : `${openTasks.length} tasks & follow-ups, ${activeEvents.length} events`,
-      icon: Zap,
-      route: '/calendar',
+        ? `Önceki dönem: ${periodKpis.newContacts.previous}`
+        : `Previous period: ${periodKpis.newContacts.previous}`,
+      icon: Users,
+      route: '/contacts',
       accent: 'primary',
-      delta: calcDelta(openTasks.length + activeEvents.length, openTasks.length + activeEvents.length),
+      delta: periodKpis.newContacts.delta,
       deltaTone: 'auto' as const,
     },
     {
-      label: locale === 'tr' ? 'Tüm Görev & Takipler' : 'All Tasks & Follow-ups',
-      value: openTasks.length,
+      label: locale === 'tr' ? 'Tamamlanan Görev (30g)' : 'Completed Tasks (30d)',
+      value: periodKpis.completedTasks.current,
       hint: locale === 'tr'
-        ? `${focusTasks.length} tanesi bugün odakta`
-        : `${focusTasks.length} are in today's focus`,
+        ? `Önceki dönem: ${periodKpis.completedTasks.previous}`
+        : `Previous period: ${periodKpis.completedTasks.previous}`,
       icon: CheckCircle2,
       route: '/tasks',
       accent: 'error',
-      delta: calcDelta(openTasks.length, openTasks.length),
+      delta: periodKpis.completedTasks.delta,
       deltaTone: 'auto' as const,
     },
     {
-      label: locale === 'tr' ? 'Geciken Etkinlikler' : 'Overdue Events',
-      value: overdueEvents.length,
+      label: locale === 'tr' ? 'Sipariş Adedi (30g)' : 'Orders (30d)',
+      value: periodKpis.orderCount.current,
       hint: locale === 'tr'
-        ? `${activeEvents.length} etkinliğin ${overdueEvents.length} tanesi geride kaldı`
-        : `${overdueEvents.length} of ${activeEvents.length} events are in the past`,
-      icon: Calendar,
-      route: '/events',
+        ? `Önceki dönem: ${periodKpis.orderCount.previous}`
+        : `Previous period: ${periodKpis.orderCount.previous}`,
+      icon: Zap,
+      route: '/customers',
       accent: 'warning',
-      delta: calcDelta(overdueEvents.length, overdueEvents.length),
+      delta: periodKpis.orderCount.delta,
       deltaTone: 'auto' as const,
     },
     {
       label: locale === 'tr' ? 'Geciken Görev & Takipler' : 'Overdue Tasks & Follow-ups',
-      value: overdueTasks.length,
+      value: periodKpis.overdueAt.current,
       hint: locale === 'tr'
         ? `${riskItems.length} kritik kayıt listede öne çıkıyor`
         : `${riskItems.length} critical records rise to the top`,
       icon: AlertTriangle,
       route: '/tasks',
       accent: 'secondary',
-      delta: calcDelta(overdueTasks.length, overdueTasks.length),
-      deltaTone: 'auto' as const,
+      delta: periodKpis.overdueAt.delta,
+      deltaTone: 'inverse' as const,
     },
   ] as const
 
@@ -382,6 +398,20 @@ export default function DashboardPage() {
                 {fullName ? `, ${fullName}` : ''}
               </h1>
               <p className="mt-3 text-sm font-medium text-text-tertiary sm:text-base">{heroDateLabel}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-warning/25 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning">
+                <Flame className="h-3.5 w-3.5" />
+                {currentUser?.streak ?? 0} {locale === 'tr' ? 'gün serisi' : 'day streak'}
+              </div>
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
+                <Award className="h-3.5 w-3.5" />
+                {t.dashboard.level} {currentUser?.level ?? 1}
+              </div>
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-secondary/25 bg-secondary/10 px-3 py-1.5 text-xs font-semibold text-secondary">
+                <Sparkles className="h-3.5 w-3.5" />
+                {currentUser?.xp ?? 0} {t.dashboard.xp}
+              </div>
             </div>
           </div>
         </Card>
@@ -561,7 +591,21 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div variants={item} className="h-full xl:col-start-1 xl:row-start-4">
+          <MotivationPulse streak={streak.current} />
+        </motion.div>
+
+        <motion.div variants={item} className="h-full xl:col-start-1 xl:row-start-5">
           <ReorderDueCard entries={reorderDue} />
+        </motion.div>
+
+        <motion.div variants={item} className="h-full xl:col-start-1 xl:row-start-6">
+          <CustomerSnapshot
+            totalActive={activeCustomersQuery.data?.total ?? totalCustomers}
+            newLast30={activeCustomersQuery.data?.newLast30 ?? 0}
+            customerIds={activeCustomersQuery.data?.customerIds ?? customerContactIds}
+            orders={orders}
+            isLoading={activeCustomersQuery.isPending && !activeCustomersQuery.data}
+          />
         </motion.div>
 
         <motion.div variants={item} className="h-full xl:col-start-2 xl:row-start-1">
@@ -740,17 +784,29 @@ export default function DashboardPage() {
           </motion.div>
 
         <motion.div variants={item} className="h-full xl:col-start-2 xl:row-start-4">
+          <AiStudioShortcut
+            used={aiUsageQuery.data?.used ?? 0}
+            limit={aiUsageQuery.data?.limit ?? 50}
+            remaining={aiUsageQuery.data?.remaining ?? 50}
+            lastUsedAt={aiUsageQuery.data?.lastUsedAt ?? null}
+            isLoading={aiUsageQuery.isPending && !aiUsageQuery.data}
+          />
+        </motion.div>
+
+        <motion.div variants={item} className="h-full xl:col-start-2 xl:row-start-5">
+          <EngagementCard />
+        </motion.div>
+
+        <motion.div variants={item} className="h-full xl:col-start-2 xl:row-start-6">
           <Card className="h-full" padding="lg">
             <CardHeader className="mb-5 items-start gap-3 sm:flex-row sm:items-center">
               <div>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <TrendingUp className="h-4 w-4 text-success" />
-                  {locale === 'tr' ? 'Bu Ay' : 'This Month'}
+                  {t.dashboard.last30Days}
                 </CardTitle>
                   <CardDescription className="mt-1">
-                    {locale === 'tr'
-                      ? 'Son 30 günün hızlı özeti.'
-                      : 'Quick pulse of the last 30 days.'}
+                    {t.dashboard.last30DaysHint}
                   </CardDescription>
                 </div>
               </CardHeader>

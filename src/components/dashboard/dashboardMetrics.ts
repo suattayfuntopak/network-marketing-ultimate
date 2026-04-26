@@ -404,6 +404,84 @@ export type UpcomingEventEntry = {
   capacity: number | null
 }
 
+export type PeriodKpiPair = { current: number; previous: number; delta: DeltaInfo }
+
+export type PeriodKpis = {
+  newContacts: PeriodKpiPair
+  completedTasks: PeriodKpiPair
+  orderCount: PeriodKpiPair
+  overdueAt: PeriodKpiPair
+}
+
+export function previousPeriodKpis(
+  contacts: ContactRow[],
+  tasks: TaskRow[],
+  orders: OrderRow[],
+  reference: Date,
+  windowDays = 30,
+): PeriodKpis {
+  const safeWindow = Math.max(1, Math.floor(windowDays))
+  const todayEnd = endOfDay(reference)
+  const currentStart = startOfDay(addDays(reference, -(safeWindow - 1)))
+  const previousEnd = endOfDay(addDays(currentStart, -1))
+  const previousStart = startOfDay(addDays(previousEnd, -(safeWindow - 1)))
+  const current: WindowBounds = { start: currentStart, end: todayEnd }
+  const previous: WindowBounds = { start: previousStart, end: previousEnd }
+
+  const newContactsCurrent = contacts.filter((contact) => inWindow(contact.created_at, current)).length
+  const newContactsPrevious = contacts.filter((contact) => inWindow(contact.created_at, previous)).length
+
+  const completedCurrent = tasks.filter(
+    (task) => task.status === 'completed' && inWindow(task.completed_at, current),
+  ).length
+  const completedPrevious = tasks.filter(
+    (task) => task.status === 'completed' && inWindow(task.completed_at, previous),
+  ).length
+
+  const orderCurrent = countOrders(orders, current)
+  const orderPrevious = countOrders(orders, previous)
+
+  const overdueAtReference = countOverdueAt(tasks, reference)
+  const overdueAtPrevious = countOverdueAt(tasks, addDays(reference, -safeWindow))
+
+  return {
+    newContacts: {
+      current: newContactsCurrent,
+      previous: newContactsPrevious,
+      delta: calcDelta(newContactsCurrent, newContactsPrevious),
+    },
+    completedTasks: {
+      current: completedCurrent,
+      previous: completedPrevious,
+      delta: calcDelta(completedCurrent, completedPrevious),
+    },
+    orderCount: {
+      current: orderCurrent,
+      previous: orderPrevious,
+      delta: calcDelta(orderCurrent, orderPrevious),
+    },
+    overdueAt: {
+      current: overdueAtReference,
+      previous: overdueAtPrevious,
+      delta: calcDelta(overdueAtReference, overdueAtPrevious),
+    },
+  }
+}
+
+function countOverdueAt(tasks: TaskRow[], reference: Date) {
+  const moment = reference.getTime()
+  return tasks.filter((task) => {
+    if (task.status === 'skipped') return false
+    if (task.status === 'completed') {
+      if (!task.completed_at) return false
+      if (new Date(task.completed_at).getTime() <= moment) return false
+    }
+    const due = parseDate(task.due_date)
+    if (!due) return false
+    return due.getTime() < moment
+  }).length
+}
+
 export function buildUpcomingEvents(events: Event[], reference: Date, horizonDays = 14): UpcomingEventEntry[] {
   const today = startOfDay(reference)
   const horizon = addDays(today, horizonDays)
