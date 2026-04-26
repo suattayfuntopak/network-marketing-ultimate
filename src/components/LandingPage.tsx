@@ -1,835 +1,906 @@
-import Image from "next/image";
-import { useState, useEffect, useRef } from "react";
+'use client'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type Lang = "tr" | "en";
-type Theme = "dark" | "light";
+import Image from 'next/image'
+import Link from 'next/link'
+import { useState, type ReactNode } from 'react'
+import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion'
+import {
+  Bot,
+  Brain,
+  Calendar,
+  ChevronDown,
+  GraduationCap,
+  Heart,
+  KanbanSquare,
+  LineChart,
+  ListChecks,
+  Mail,
+  Moon,
+  MoveRight,
+  Package,
+  ScrollText,
+  ShieldCheck,
+  Sparkles,
+  Sun,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react'
 
-// ─── Translations ─────────────────────────────────────────────────────────────
-const t = {
-  tr: {
-    nav: {
-      features: "Özellikler",
-      howItWorks: "Nasıl Çalışır",
-      pricing: "Fiyatlar",
-      login: "Giriş Yap",
-      start: "Ücretsiz Başla",
-    },
-    hero: {
-      badge: "YZ Destekli Network Marketing Sistemi",
-      title1: "Network Marketing'i",
-      title2: "Profesyonelce",
-      title3: "Yönet",
-      sub: "Ekibini büyüt, potansiyellerini takip et, YZ koçunla karar al. Tüm işini tek akıllı sistemden yönet.",
-      cta: "Hemen Başla — Ücretsiz",
-      stat1: "Aktif Distribütör",
-      stat2: "Ortalama Ekip Büyümesi",
-      stat3: "Zaman Tasarrufu",
-    },
-    features: {
-      title: "Başarı İçin Gereken Her Şey",
-      sub: "Kontaktan dönüşüme, ekip yönetiminden analitiğe — her adım sistemde.",
-      items: [
-        {
-          icon: "👥",
-          title: "Akıllı Kontak Yönetimi",
-          desc: "Potansiyelleri sıcaklık skoruyla takip et. Kim nerede, ne zaman iletişime geçilmeli — hepsini bil.",
-        },
-        {
-          icon: "📊",
-          title: "Süreç Takibi & Kanban",
-          desc: "Potansiyelden müşteriye, müşteriden ekip üyesine — süreci görsel olarak yönet.",
-        },
-        {
-          icon: "🤖",
-          title: "YZ Koç & Mesaj Üreteci",
-          desc: "Yapay zeka koçun sana günlük öneriler sunar. Kişiselleştirilmiş mesajları saniyeler içinde üret.",
-        },
-        {
-          icon: "📚",
-          title: "İtiraz Bankası & Akademi",
-          desc: "Sık karşılaşılan itirazlara hazır yanıtlar. Ekibini eğit, kendini geliştir.",
-        },
-        {
-          icon: "📅",
-          title: "Takvim & Hatırlatıcılar",
-          desc: "Takip zamanlarını kaçırma. Otomatik hatırlatıcılarla her zaman doğru anda ol.",
-        },
-        {
-          icon: "📈",
-          title: "Gelişmiş Analitik",
-          desc: "Ekip performansını, dönüşüm oranlarını ve büyüme trendlerini gerçek zamanlı izle.",
-        },
-      ],
-    },
-    how: {
-      title: "3 Adımda Başla",
-      steps: [
-        {
-          n: "01",
-          title: "Hesap Oluştur",
-          desc: "E-posta adresinle ücretsiz kayıt ol. Kurulum yok, kredi kartı yok.",
-        },
-        {
-          n: "02",
-          title: "Ekibini & Kontaklarını Ekle",
-          desc: "Mevcut kontaklarını içe aktar veya sıfırdan başla. Sistem sana yol gösterir.",
-        },
-        {
-          n: "03",
-          title: "YZ ile Büyü",
-          desc: "YZ koçun her gün sana öneriler sunar. Daha az zaman harca, daha fazla kazan.",
-        },
-      ],
-    },
-    pricing: {
-      title: "Şeffaf Fiyatlandırma",
-      sub: "Gizli ücret yok. İstediğin zaman iptal et.",
-      badge: "Yakında",
-      free: {
-        name: "Başlangıç",
-        price: "Ücretsiz",
-        desc: "Yeni başlayanlar için",
-        features: ["50 kontak", "Temel takip", "YZ mesaj üreteci (5/gün)", "Mobil erişim"],
-        cta: "Ücretsiz Başla",
-      },
-      pro: {
-        name: "Profesyonel",
-        price: "₺299",
-        period: "/ay",
-        desc: "Büyüyen distribütörler için",
-        features: [
-          "Sınırsız kontak",
-          "Gelişmiş analitik",
-          "Sınırsız YZ mesajı",
-          "İtiraz bankası",
-          "Öncelikli destek",
-        ],
-        cta: "14 Gün Ücretsiz Dene",
-        popular: "En Popüler",
-      },
-      team: {
-        name: "Ekip",
-        price: "₺799",
-        period: "/ay",
-        desc: "Büyük ekipler için",
-        features: ["Her şey dahil", "5 ekip üyesi", "Ekip analitiği", "Özel entegrasyonlar", "Özel destek"],
-        cta: "Ekibinle Başla",
-      },
-    },
-    cta: {
-      title: "Network Marketing'de Fark Yarat",
-      sub: "Binlerce distribütör işlerini NMU ile büyütüyor. Sen de başla.",
-      btn: "Ücretsiz Hesap Oluştur",
-      login: "Zaten hesabın var mı?",
-      loginLink: "Giriş yap →",
-    },
-    footer: {
-      copy: "© 2026 Network Marketing Ultimate. Tüm hakları saklıdır.",
-    },
-  },
-  en: {
-    nav: {
-      features: "Features",
-      howItWorks: "How It Works",
-      pricing: "Pricing",
-      login: "Login",
-      start: "Start Free",
-    },
-    hero: {
-      badge: "AI-Powered Network Marketing System",
-      title1: "Manage Network",
-      title2: "Marketing",
-      title3: "Professionally",
-      sub: "Grow your team, track prospects, make decisions with your AI coach. Manage your entire business from one intelligent system.",
-      cta: "Get Started — Free",
-      stat1: "Active Distributors",
-      stat2: "Avg. Team Growth",
-      stat3: "Time Saved",
-    },
-    features: {
-      title: "Everything You Need to Succeed",
-      sub: "From contact to conversion, team management to analytics — every step is in the system.",
-      items: [
-        {
-          icon: "👥",
-          title: "Smart Contact Management",
-          desc: "Track prospects with warmth scores. Know who's where and when to reach out — always.",
-        },
-        {
-          icon: "📊",
-          title: "Pipeline & Kanban Tracking",
-          desc: "From prospect to customer, customer to team member — manage visually.",
-        },
-        {
-          icon: "🤖",
-          title: "AI Coach & Message Generator",
-          desc: "Your AI coach gives daily recommendations. Generate personalized messages in seconds.",
-        },
-        {
-          icon: "📚",
-          title: "Objection Bank & Academy",
-          desc: "Ready answers for common objections. Train your team, develop yourself.",
-        },
-        {
-          icon: "📅",
-          title: "Calendar & Reminders",
-          desc: "Never miss a follow-up. Automated reminders keep you at the right moment.",
-        },
-        {
-          icon: "📈",
-          title: "Advanced Analytics",
-          desc: "Monitor team performance, conversion rates, and growth trends in real time.",
-        },
-      ],
-    },
-    how: {
-      title: "Start in 3 Steps",
-      steps: [
-        {
-          n: "01",
-          title: "Create Account",
-          desc: "Sign up free with your email. No setup, no credit card.",
-        },
-        {
-          n: "02",
-          title: "Add Your Team & Contacts",
-          desc: "Import existing contacts or start fresh. The system guides you.",
-        },
-        {
-          n: "03",
-          title: "Grow with AI",
-          desc: "Your AI coach gives you daily suggestions. Work less, earn more.",
-        },
-      ],
-    },
-    pricing: {
-      title: "Transparent Pricing",
-      sub: "No hidden fees. Cancel anytime.",
-      badge: "Coming Soon",
-      free: {
-        name: "Starter",
-        price: "Free",
-        desc: "For those just getting started",
-        features: ["50 contacts", "Basic tracking", "AI message generator (5/day)", "Mobile access"],
-        cta: "Start Free",
-      },
-      pro: {
-        name: "Professional",
-        price: "$9",
-        period: "/mo",
-        desc: "For growing distributors",
-        features: [
-          "Unlimited contacts",
-          "Advanced analytics",
-          "Unlimited AI messages",
-          "Objection bank",
-          "Priority support",
-        ],
-        cta: "Try 14 Days Free",
-        popular: "Most Popular",
-      },
-      team: {
-        name: "Team",
-        price: "$24",
-        period: "/mo",
-        desc: "For large teams",
-        features: ["Everything included", "5 team members", "Team analytics", "Custom integrations", "Dedicated support"],
-        cta: "Start with Your Team",
-      },
-    },
-    cta: {
-      title: "Make a Difference in Network Marketing",
-      sub: "Thousands of distributors are growing their businesses with NMU. Join them.",
-      btn: "Create Free Account",
-      login: "Already have an account?",
-      loginLink: "Log in →",
-    },
-    footer: {
-      copy: "© 2026 Network Marketing Ultimate. All rights reserved.",
-    },
-  },
-};
+import { useLanguage } from '@/components/common/LanguageProvider'
+import { useTheme } from '@/components/common/ThemeProvider'
+import { LanguageSwitcher } from '@/components/common/LanguageSwitcher'
 
-// ─── Animated Counter ─────────────────────────────────────────────────────────
-function useCounter(target: number, duration = 2000, start = false) {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    if (!start) return;
-    let startTime: number | null = null;
-    const step = (timestamp: number) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      setCount(Math.floor(progress * target));
-      if (progress < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, [target, duration, start]);
-  return count;
+interface LandingPageProps {
+  onNavigateToRegister: () => void
+  onNavigateToLogin: () => void
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-export default function LandingPage({
-  onNavigateToRegister,
-  onNavigateToLogin,
-}: {
-  onNavigateToRegister: () => void;
-  onNavigateToLogin: () => void;
-}) {
-  const [lang, setLang] = useState<Lang>("tr");
-  const [theme, setTheme] = useState<Theme>("dark");
-  const [scrolled, setScrolled] = useState(false);
-  const [statsVisible, setStatsVisible] = useState(false);
-  const [viewportWidth, setViewportWidth] = useState(1280);
-  const statsRef = useRef<HTMLDivElement>(null);
-  const text = t[lang];
+interface ModuleEntry {
+  key: keyof typeof MODULE_ICON
+  href: string
+}
 
-  const stat1 = useCounter(1240, 2000, statsVisible);
-  const stat2 = useCounter(47, 2000, statsVisible);
-  const stat3 = useCounter(68, 2000, statsVisible);
+const MODULE_ICON: Record<string, LucideIcon> = {
+  contacts: Users,
+  pipeline: KanbanSquare,
+  customers: Wallet,
+  products: Package,
+  tasks: ListChecks,
+  calendar: Calendar,
+  events: Sparkles,
+  academy: GraduationCap,
+  scripts: ScrollText,
+  ai: Bot,
+  motivation: Heart,
+  analytics: LineChart,
+}
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+const MODULE_GRID: ModuleEntry[] = [
+  { key: 'contacts', href: '/contacts' },
+  { key: 'pipeline', href: '/pipeline' },
+  { key: 'customers', href: '/customers' },
+  { key: 'products', href: '/products' },
+  { key: 'tasks', href: '/tasks' },
+  { key: 'calendar', href: '/calendar' },
+  { key: 'events', href: '/events' },
+  { key: 'academy', href: '/academy' },
+  { key: 'scripts', href: '/scripts' },
+  { key: 'ai', href: '/ai' },
+  { key: 'motivation', href: '/motivation' },
+  { key: 'analytics', href: '/analytics' },
+]
 
-  useEffect(() => {
-    const syncViewport = () => setViewportWidth(window.innerWidth);
-    syncViewport();
-    window.addEventListener("resize", syncViewport);
-    return () => window.removeEventListener("resize", syncViewport);
-  }, []);
+const FAQ_KEYS = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'] as const
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setStatsVisible(true); },
-      { threshold: 0.3 }
-    );
-    if (statsRef.current) observer.observe(statsRef.current);
-    return () => observer.disconnect();
-  }, []);
+export default function LandingPage({ onNavigateToRegister, onNavigateToLogin }: LandingPageProps) {
+  const { t } = useLanguage()
+  const { theme, setTheme } = useTheme()
+  const [scrolled, setScrolled] = useState(false)
+  const [openFaq, setOpenFaq] = useState<number | null>(0)
+  const { scrollY } = useScroll()
 
-  const isDark = theme === "dark";
-  const isMobile = viewportWidth < 768;
-  const isTablet = viewportWidth >= 768 && viewportWidth < 1100;
+  useMotionValueEvent(scrollY, 'change', (value) => {
+    setScrolled(value > 16)
+  })
 
-  // ── CSS variables injected via style tag ──
-  const cssVars = isDark
-    ? {
-        "--bg": "#0a0b0f",
-        "--bg2": "#111218",
-        "--bg3": "#1a1b24",
-        "--border": "rgba(255,255,255,0.07)",
-        "--text": "#f0f0f5",
-        "--text2": "#9da5b4",
-        "--accent": "#7c6af7",
-        "--accent2": "#22d3ee",
-        "--card": "rgba(255,255,255,0.03)",
-      }
-    : {
-        "--bg": "#f4f5fa",
-        "--bg2": "#ffffff",
-        "--bg3": "#edf0f7",
-        "--border": "rgba(0,0,0,0.08)",
-        "--text": "#0f1117",
-        "--text2": "#5a6478",
-        "--accent": "#6c5ce7",
-        "--accent2": "#0891b2",
-        "--card": "rgba(0,0,0,0.02)",
-      };
+  const isDark = theme === 'dark'
 
   return (
-    <div
-      style={{ ...(cssVars as React.CSSProperties), background: "var(--bg)", color: "var(--text)", minHeight: "100vh", fontFamily: "'Sora', 'DM Sans', system-ui, sans-serif", overflowX: "hidden" }}
-    >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Sans:wght@400;500;600&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html { scroll-behavior: smooth; }
-        .grad-text {
-          background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-        .btn-primary {
-          background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-          color: #fff;
-          border: none;
-          border-radius: 12px;
-          padding: 14px 28px;
-          font-size: 15px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          font-family: inherit;
-          white-space: nowrap;
-        }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(124,106,247,0.35); }
-        .btn-ghost {
-          background: transparent;
-          color: var(--text2);
-          border: 1px solid var(--border);
-          border-radius: 12px;
-          padding: 14px 28px;
-          font-size: 15px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: border-color 0.2s, color 0.2s;
-          font-family: inherit;
-        }
-        .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-        .feature-card {
-          background: var(--card);
-          border: 1px solid var(--border);
-          border-radius: 20px;
-          padding: 32px;
-          transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
-        }
-        .feature-card:hover {
-          transform: translateY(-6px);
-          border-color: var(--accent);
-          box-shadow: 0 20px 60px rgba(124,106,247,0.12);
-        }
-        .pricing-card {
-          background: var(--bg2);
-          border: 1px solid var(--border);
-          border-radius: 24px;
-          padding: 36px;
-          transition: transform 0.25s;
-          position: relative;
-        }
-        .pricing-card:hover { transform: translateY(-4px); }
-        .pricing-card.popular {
-          border-color: var(--accent);
-          box-shadow: 0 0 0 1px var(--accent), 0 24px 64px rgba(124,106,247,0.18);
-        }
-        .step-num {
-          font-size: 72px;
-          font-weight: 800;
-          line-height: 1;
-          background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          opacity: 0.3;
-        }
-        .mesh-bg {
-          position: absolute;
-          inset: 0;
-          overflow: hidden;
-          pointer-events: none;
-          z-index: 0;
-        }
-        .mesh-bg::before {
-          content: '';
-          position: absolute;
-          width: 600px;
-          height: 600px;
-          background: radial-gradient(circle, rgba(124,106,247,0.15) 0%, transparent 70%);
-          top: -200px;
-          right: -100px;
-          border-radius: 50%;
-        }
-        .mesh-bg::after {
-          content: '';
-          position: absolute;
-          width: 400px;
-          height: 400px;
-          background: radial-gradient(circle, rgba(34,211,238,0.1) 0%, transparent 70%);
-          bottom: -100px;
-          left: -50px;
-          border-radius: 50%;
-        }
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-12px); }
-        }
-        .float { animation: float 5s ease-in-out infinite; }
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(24px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .fade-up { animation: fadeUp 0.7s ease both; }
-        .fade-up-1 { animation-delay: 0.1s; }
-        .fade-up-2 { animation-delay: 0.2s; }
-        .fade-up-3 { animation-delay: 0.3s; }
-        .fade-up-4 { animation-delay: 0.4s; }
-        .dash-preview {
-          background: var(--bg3);
-          border: 1px solid var(--border);
-          border-radius: 16px;
-          overflow: hidden;
-        }
-        .dash-bar {
-          height: 32px;
-          background: var(--bg2);
-          border-bottom: 1px solid var(--border);
-          display: flex;
-          align-items: center;
-          padding: 0 14px;
-          gap: 6px;
-        }
-        .dot { width: 10px; height: 10px; border-radius: 50%; }
-        .landing-shell { max-width: 1200px; margin: 0 auto; width: 100%; }
-        @media (max-width: 767px) {
-          .btn-primary, .btn-ghost { width: 100%; justify-content: center; }
-          .feature-card { padding: 24px; border-radius: 18px; }
-          .pricing-card { padding: 28px 22px; border-radius: 20px; }
-          .step-num { font-size: 56px; }
-        }
-      `}</style>
+    <div className="min-h-screen bg-obsidian text-text-primary antialiased overflow-x-clip">
+      <Navbar
+        scrolled={scrolled}
+        isDark={isDark}
+        onToggleTheme={() => setTheme(isDark ? 'light' : 'dark')}
+        onLogin={onNavigateToLogin}
+        onRegister={onNavigateToRegister}
+        labels={t.landing.nav}
+      />
 
-      {/* ── Navbar ── */}
-      <nav style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-        background: scrolled ? (isDark ? "rgba(10,11,15,0.92)" : "rgba(244,245,250,0.92)") : "transparent",
-        backdropFilter: scrolled ? "blur(20px)" : "none",
-        borderBottom: scrolled ? `1px solid var(--border)` : "1px solid transparent",
-        transition: "all 0.3s",
-        padding: isMobile ? "10px 16px 12px" : "0 24px",
-      }}>
-        <div className="landing-shell" style={{
-          minHeight: isMobile ? "auto" : 64,
-          display: "flex",
-          flexDirection: isMobile ? "column" : "row",
-          alignItems: isMobile ? "stretch" : "center",
-          justifyContent: "space-between",
-          gap: isMobile ? 12 : 24,
-        }}>
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: isMobile ? "space-between" : "flex-start", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <div style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                overflow: "hidden",
-                boxShadow: "0 10px 24px rgba(34,211,238,0.18)",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid var(--border)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}>
-                <Image
-                  src="/favicon.png"
-                  alt="Network Marketing Ultimate logo"
-                  width={40}
-                  height={40}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </div>
-              <span style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16, letterSpacing: "-0.3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                Network Marketing <span className="grad-text">Ultimate</span>
-              </span>
+      <main>
+        <Hero
+          labels={t.landing.hero}
+          mockGreeting={t.landing.hero.mockGreeting}
+          mockKpis={[
+            { label: t.landing.hero.mockKpiContacts, value: '142', accent: 'text-primary' },
+            { label: t.landing.hero.mockKpiPipeline, value: '36', accent: 'text-secondary' },
+            { label: t.landing.hero.mockKpiRevenue, value: '₺18.4k', accent: 'text-success' },
+          ]}
+          mockAi={{ title: t.landing.hero.mockAiTitle, body: t.landing.hero.mockAiBody }}
+          mockMotivation={{ title: t.landing.hero.mockMotivationTitle, body: t.landing.hero.mockMotivationBody }}
+          onPrimary={onNavigateToRegister}
+          onSecondary={() => scrollToId('modules')}
+        />
+
+        <TrustStrip
+          badges={[
+            t.landing.trust.badge1,
+            t.landing.trust.badge2,
+            t.landing.trust.badge3,
+            t.landing.trust.badge4,
+          ]}
+        />
+
+        <section id="modules" className="relative px-4 py-24 sm:px-6 lg:py-32">
+          <div className="mx-auto max-w-6xl">
+            <SectionHeader title={t.landing.modules.title} subtitle={t.landing.modules.sub} />
+            <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {MODULE_GRID.map((module, index) => {
+                const Icon = MODULE_ICON[module.key]
+                const item = (t.landing.modules.items as Record<string, { title: string; desc: string }>)[module.key]
+                if (!item) return null
+                return (
+                  <motion.a
+                    key={module.key}
+                    href={module.href}
+                    initial={{ opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '-80px' }}
+                    transition={{ duration: 0.4, delay: Math.min(index * 0.04, 0.32) }}
+                    whileHover={{ y: -4 }}
+                    className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-[0_20px_60px_rgba(0,212,255,0.08)]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <Icon size={20} />
+                      </span>
+                      <h3 className="text-base font-semibold tracking-tight">{item.title}</h3>
+                    </div>
+                    <p className="mt-3 text-sm leading-relaxed text-text-secondary">{item.desc}</p>
+                  </motion.a>
+                )
+              })}
             </div>
-            {isMobile && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button onClick={() => setLang("tr")} style={{ background: "none", border: `2px solid ${lang === "tr" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇹🇷</button>
-                <button onClick={() => setLang("en")} style={{ background: "none", border: `2px solid ${lang === "en" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇺🇸</button>
-                <button onClick={() => setTheme(isDark ? "light" : "dark")} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, width: 38, height: 38, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
-                  {isDark ? "☀️" : "🌙"}
-                </button>
-              </div>
-            )}
           </div>
+        </section>
 
-          {/* Nav links — desktop */}
-          {!isMobile && (
-            <div style={{ display: "flex", alignItems: "center", gap: isTablet ? 20 : 32 }} className="nav-links">
-              {[
-                ["#features", text.nav.features],
-                ["#how", text.nav.howItWorks],
-                ["#pricing", text.nav.pricing],
-              ].map(([href, label]) => (
-                <a key={href} href={href} style={{ color: "var(--text2)", fontSize: 14, fontWeight: 500, textDecoration: "none", transition: "color 0.2s" }}
-                  onMouseEnter={e => (e.currentTarget.style.color = "var(--accent)")}
-                  onMouseLeave={e => (e.currentTarget.style.color = "var(--text2)")}>
-                  {label}
-                </a>
+        <DeepDiveStrip
+          eyebrow={t.landing.deepDive.ai.eyebrow}
+          title={t.landing.deepDive.ai.title}
+          body={t.landing.deepDive.ai.body}
+          highlights={[
+            t.landing.deepDive.ai.highlight1,
+            t.landing.deepDive.ai.highlight2,
+            t.landing.deepDive.ai.highlight3,
+          ]}
+          mock={<AiStudioMock body={t.landing.hero.mockAiBody} />}
+          orientation="left"
+        />
+
+        <DeepDiveStrip
+          eyebrow={t.landing.deepDive.pipeline.eyebrow}
+          title={t.landing.deepDive.pipeline.title}
+          body={t.landing.deepDive.pipeline.body}
+          highlights={[
+            t.landing.deepDive.pipeline.highlight1,
+            t.landing.deepDive.pipeline.highlight2,
+            t.landing.deepDive.pipeline.highlight3,
+          ]}
+          mock={<PipelineMock />}
+          orientation="right"
+        />
+
+        <DeepDiveStrip
+          eyebrow={t.landing.deepDive.motivation.eyebrow}
+          title={t.landing.deepDive.motivation.title}
+          body={t.landing.deepDive.motivation.body}
+          highlights={[
+            t.landing.deepDive.motivation.highlight1,
+            t.landing.deepDive.motivation.highlight2,
+            t.landing.deepDive.motivation.highlight3,
+          ]}
+          mock={<MotivationMock title={t.landing.hero.mockMotivationTitle} body={t.landing.hero.mockMotivationBody} />}
+          orientation="left"
+        />
+
+        <section id="how" className="relative px-4 py-24 sm:px-6 lg:py-32 border-t border-border-subtle">
+          <div className="mx-auto max-w-5xl">
+            <SectionHeader title={t.landing.how.title} centered />
+            <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+              {(['one', 'two', 'three'] as const).map((step, index) => {
+                const data = t.landing.how.steps[step]
+                return (
+                  <motion.div
+                    key={step}
+                    initial={{ opacity: 0, y: 16 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '-60px' }}
+                    transition={{ duration: 0.45, delay: index * 0.08 }}
+                    className="relative rounded-2xl border border-border bg-card p-6"
+                  >
+                    <span className="text-5xl font-extrabold tracking-tight bg-gradient-to-br from-primary to-secondary bg-clip-text text-transparent opacity-70">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <h3 className="mt-4 text-lg font-semibold tracking-tight">{data.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-text-secondary">{data.desc}</p>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section className="relative px-4 py-24 sm:px-6 lg:py-32 border-t border-border-subtle">
+          <div className="mx-auto max-w-5xl">
+            <SectionHeader title={t.landing.testimonials.title} subtitle={t.landing.testimonials.sub} centered />
+            <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
+              {[0, 1, 2].map((index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-60px' }}
+                  transition={{ duration: 0.4, delay: index * 0.08 }}
+                  className="rounded-2xl border border-dashed border-border-strong bg-card/40 p-6"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-full bg-surface ring-1 ring-border" />
+                    <div className="flex-1">
+                      <div className="h-3 w-24 rounded bg-surface" />
+                      <div className="mt-1 h-2.5 w-16 rounded bg-surface/70" />
+                    </div>
+                  </div>
+                  <p className="mt-4 text-sm italic text-text-tertiary">&ldquo; {t.landing.testimonials.slot} &rdquo;</p>
+                </motion.div>
               ))}
             </div>
-          )}
+          </div>
+        </section>
 
-          {/* Right controls */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: isMobile ? "stretch" : "flex-end", gap: 10, width: isMobile ? "100%" : "auto" }}>
-            {!isMobile && (
-              <>
-                <button onClick={() => setLang("tr")} style={{ background: "none", border: `2px solid ${lang === "tr" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇹🇷</button>
-                <button onClick={() => setLang("en")} style={{ background: "none", border: `2px solid ${lang === "en" ? "var(--accent)" : "transparent"}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", fontSize: 18, lineHeight: 1, transition: "border-color 0.2s" }}>🇺🇸</button>
-                <button onClick={() => setTheme(isDark ? "light" : "dark")} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, width: 38, height: 38, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
-                  {isDark ? "☀️" : "🌙"}
-                </button>
-              </>
-            )}
-
-            <div style={{ display: "flex", alignItems: "center", gap: 10, width: isMobile ? "100%" : "auto" }}>
-              <button className="btn-ghost" style={{ padding: isMobile ? "10px 16px" : "8px 18px", fontSize: 14, flex: isMobile ? 1 : undefined }} onClick={onNavigateToLogin}>{text.nav.login}</button>
-              <button className="btn-primary" style={{ padding: isMobile ? "10px 16px" : "8px 18px", fontSize: 14, flex: isMobile ? 1 : undefined }} onClick={onNavigateToRegister}>{text.nav.start}</button>
+        <section id="faq" className="relative px-4 py-24 sm:px-6 lg:py-32 border-t border-border-subtle">
+          <div className="mx-auto max-w-3xl">
+            <SectionHeader title={t.landing.faq.title} centered />
+            <div className="mt-10 divide-y divide-border-subtle rounded-2xl border border-border bg-card">
+              {FAQ_KEYS.map((key, index) => {
+                const item = t.landing.faq.items[key]
+                const isOpen = openFaq === index
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-expanded={isOpen}
+                    onClick={() => setOpenFaq(isOpen ? null : index)}
+                    className="block w-full px-5 py-5 text-left transition hover:bg-surface/30"
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-base font-medium tracking-tight">{item.q}</span>
+                      <ChevronDown
+                        size={18}
+                        className={`shrink-0 text-text-tertiary transition-transform ${
+                          isOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </div>
+                    <AnimatePresence initial={false}>
+                      {isOpen ? (
+                        <motion.p
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="mt-3 text-sm leading-relaxed text-text-secondary"
+                        >
+                          {item.a}
+                        </motion.p>
+                      ) : null}
+                    </AnimatePresence>
+                  </button>
+                )
+              })}
             </div>
           </div>
-        </div>
-      </nav>
+        </section>
 
-      {/* ── Hero ── */}
-      <section style={{ position: "relative", minHeight: isMobile ? "auto" : "100vh", display: "flex", alignItems: "center", paddingTop: isMobile ? 132 : 80 }}>
-        <div className="mesh-bg" />
-        <div className="landing-shell" style={{ padding: isMobile ? "36px 20px 56px" : "80px 24px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 36 : isTablet ? 40 : 64, alignItems: "center", position: "relative", zIndex: 1 }}>
-          {/* Left */}
-          <div style={{ order: isMobile ? 1 : 0 }}>
-            <div className="fade-up fade-up-1" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(124,106,247,0.12)", border: "1px solid rgba(124,106,247,0.25)", borderRadius: 100, padding: "6px 16px", marginBottom: 24 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />
-              <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}>{text.hero.badge}</span>
-            </div>
+        <PricingSection
+          labels={t.landing.pricing}
+          onPrimary={onNavigateToRegister}
+        />
 
-            <h1 className="fade-up fade-up-2" style={{ fontSize: "clamp(40px, 5vw, 62px)", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-1.5px", marginBottom: 24 }}>
-              {text.hero.title1}{" "}
-              <span className="grad-text">{text.hero.title2}</span>
-              <br />{text.hero.title3}
-            </h1>
-
-            <p className="fade-up fade-up-3" style={{ fontSize: isMobile ? 16 : 18, color: "var(--text2)", lineHeight: 1.7, marginBottom: isMobile ? 28 : 40, maxWidth: 500 }}>
-              {text.hero.sub}
-            </p>
-
-            <div className="fade-up fade-up-4" style={{ display: "flex", alignItems: "center", marginTop: 4 }}>
-              <button className="btn-primary" style={{ fontSize: 16, padding: isMobile ? "15px 24px" : "16px 32px", maxWidth: isMobile ? "100%" : "fit-content" }} onClick={onNavigateToRegister}>
-                {text.hero.cta}
+        <section className="relative overflow-hidden px-4 py-24 sm:px-6 lg:py-32 border-t border-border-subtle">
+          <div className="absolute inset-0 -z-10 gradient-mesh opacity-40" />
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{t.landing.cta.title}</h2>
+            <p className="mt-4 text-base leading-relaxed text-text-secondary sm:text-lg">{t.landing.cta.sub}</p>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <PrimaryButton onClick={onNavigateToRegister} size="lg">
+                {t.landing.cta.primary}
+                <MoveRight size={16} />
+              </PrimaryButton>
+              <button
+                type="button"
+                onClick={onNavigateToLogin}
+                className="rounded-xl border border-border bg-card/50 px-6 py-3 text-sm font-semibold text-text-primary transition hover:border-primary/50 hover:text-primary"
+              >
+                {t.landing.cta.secondary}
               </button>
             </div>
           </div>
+        </section>
+      </main>
 
-          {/* Right — Dashboard preview */}
-          <div className="float" style={{ position: "relative", order: isMobile ? 2 : 0, maxWidth: isMobile ? 440 : "none", width: "100%", margin: isMobile ? "0 auto" : "0" }}>
-            <div style={{ position: "absolute", inset: -20, background: "radial-gradient(circle, rgba(124,106,247,0.15) 0%, transparent 70%)", borderRadius: "50%", pointerEvents: "none" }} />
-            <div className="dash-preview" style={{ boxShadow: "0 40px 100px rgba(0,0,0,0.4)" }}>
-              <div className="dash-bar">
-                <div className="dot" style={{ background: "#ff5f57" }} />
-                <div className="dot" style={{ background: "#febc2e" }} />
-                <div className="dot" style={{ background: "#28c840" }} />
-                <div style={{ flex: 1, textAlign: "center", fontSize: 11, color: "var(--text2)" }}>networkmarketing.suattayfuntopak.com</div>
-              </div>
-              <div style={{ padding: 20 }}>
-                {/* Mini dashboard mockup */}
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "var(--text2)" }}>Pano</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                  {[
-                    { label: "Yeni Potansiyel", val: "24", color: "var(--accent)" },
-                    { label: "Takipler", val: "12", color: "var(--accent2)" },
-                    { label: "Dönüşümler", val: "8", color: "#22c55e" },
-                    { label: "Ekip", val: "5", color: "#f59e0b" },
-                  ].map(({ label, val, color }) => (
-                    <div key={label} style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", borderRadius: 12, padding: "14px 16px", border: "1px solid var(--border)" }}>
-                      <div style={{ fontSize: 11, color: "var(--text2)", marginBottom: 4 }}>{label}</div>
-                      <div style={{ fontSize: 24, fontWeight: 700, color }}>{val}</div>
-                    </div>
-                  ))}
-                </div>
-                {/* Progress bars */}
-                {[
-                  { label: "Haftalık Hedef", pct: 72, color: "var(--accent)" },
-                  { label: "Ekip Aktivitesi", pct: 55, color: "var(--accent2)" },
-                ].map(({ label, pct, color }) => (
-                  <div key={label} style={{ marginBottom: 10 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text2)", marginBottom: 5 }}>
-                      <span>{label}</span><span>{pct}%</span>
-                    </div>
-                    <div style={{ height: 6, background: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)", borderRadius: 99 }}>
-                      <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99, transition: "width 1s" }} />
-                    </div>
-                  </div>
-                ))}
-                {/* AI suggestion chip */}
-                <div style={{ marginTop: 14, background: "rgba(124,106,247,0.1)", border: "1px solid rgba(124,106,247,0.2)", borderRadius: 10, padding: "10px 14px", display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 16 }}>🤖</span>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--accent)" }}>YZ Koç Önerisi</div>
-                    <div style={{ fontSize: 11, color: "var(--text2)" }}>Ahmet ile bugün iletişime geç — sıcak potansiyel!</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Stats ── */}
-      <section ref={statsRef} style={{ background: "var(--bg2)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", padding: isMobile ? "40px 20px" : "60px 24px" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: isMobile ? 24 : 40, textAlign: "center" }}>
-          {[
-            { val: stat1, suffix: "+", label: text.hero.stat1 },
-            { val: stat2, suffix: "%", label: text.hero.stat2 },
-            { val: stat3, suffix: "%", label: text.hero.stat3 },
-          ].map(({ val, suffix, label }) => (
-            <div key={label}>
-              <div style={{ fontSize: "clamp(36px, 5vw, 52px)", fontWeight: 800, letterSpacing: "-1px" }}>
-                <span className="grad-text">{val}{suffix}</span>
-              </div>
-              <div style={{ fontSize: 15, color: "var(--text2)", marginTop: 4 }}>{label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Features ── */}
-      <section id="features" style={{ padding: isMobile ? "72px 20px" : "100px 24px" }}>
-        <div className="landing-shell">
-          <div style={{ textAlign: "center", marginBottom: isMobile ? 40 : 64 }}>
-            <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, letterSpacing: "-1px", marginBottom: 16 }}>
-              {text.features.title}
-            </h2>
-            <p style={{ fontSize: isMobile ? 16 : 18, color: "var(--text2)", maxWidth: 520, margin: "0 auto" }}>{text.features.sub}</p>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
-            {text.features.items.map((f) => (
-              <div key={f.title} className="feature-card">
-                <div style={{ fontSize: 36, marginBottom: 16 }}>{f.icon}</div>
-                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 10 }}>{f.title}</h3>
-                <p style={{ fontSize: 15, color: "var(--text2)", lineHeight: 1.65 }}>{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── How It Works ── */}
-      <section id="how" style={{ background: "var(--bg2)", padding: isMobile ? "72px 20px" : "100px 24px", borderTop: "1px solid var(--border)" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, letterSpacing: "-1px", textAlign: "center", marginBottom: isMobile ? 40 : 72 }}>
-            {text.how.title}
-          </h2>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 32 : 48 }}>
-            {text.how.steps.map((s) => (
-              <div key={s.n} style={{ position: "relative" }}>
-                <div className="step-num">{s.n}</div>
-                <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 10, marginTop: 8 }}>{s.title}</h3>
-                <p style={{ fontSize: 15, color: "var(--text2)", lineHeight: 1.65 }}>{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Pricing ── */}
-      <section id="pricing" style={{ padding: isMobile ? "72px 20px" : "100px 24px", position: "relative" }}>
-        <div className="mesh-bg" />
-        <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative", zIndex: 1 }}>
-          <div style={{ textAlign: "center", marginBottom: isMobile ? 40 : 64 }}>
-            <div style={{ display: "inline-block", background: "rgba(124,106,247,0.12)", border: "1px solid rgba(124,106,247,0.25)", borderRadius: 100, padding: "4px 14px", marginBottom: 16 }}>
-              <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600 }}>{text.pricing.badge}</span>
-            </div>
-            <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, letterSpacing: "-1px", marginBottom: 14 }}>
-              {text.pricing.title}
-            </h2>
-            <p style={{ fontSize: isMobile ? 16 : 17, color: "var(--text2)" }}>{text.pricing.sub}</p>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "1fr" : "repeat(3, 1fr)", gap: 24, alignItems: "start" }}>
-            {/* Free */}
-            <div className="pricing-card">
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text2)", marginBottom: 8 }}>{text.pricing.free.name}</div>
-              <div style={{ fontSize: 40, fontWeight: 800, marginBottom: 4 }}>{text.pricing.free.price}</div>
-              <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 28 }}>{text.pricing.free.desc}</div>
-              <button className="btn-ghost" style={{ width: "100%", marginBottom: 28 }} onClick={onNavigateToRegister}>{text.pricing.free.cta}</button>
-              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
-                {text.pricing.free.features.map((f) => (
-                  <li key={f} style={{ fontSize: 14, color: "var(--text2)", display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ color: "#22c55e", fontWeight: 700 }}>✓</span> {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Pro */}
-            <div className="pricing-card popular" style={{ marginTop: isMobile || isTablet ? 0 : -12 }}>
-              <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: "linear-gradient(135deg, var(--accent), var(--accent2))", color: "#fff", borderRadius: 100, padding: "4px 16px", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
-                {text.pricing.pro.popular}
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text2)", marginBottom: 8 }}>{text.pricing.pro.name}</div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 4 }}>
-                <span style={{ fontSize: 40, fontWeight: 800 }}>{text.pricing.pro.price}</span>
-                <span style={{ fontSize: 16, color: "var(--text2)" }}>{text.pricing.pro.period}</span>
-              </div>
-              <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 28 }}>{text.pricing.pro.desc}</div>
-              <button className="btn-primary" style={{ width: "100%", marginBottom: 28 }} onClick={onNavigateToRegister}>{text.pricing.pro.cta}</button>
-              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
-                {text.pricing.pro.features.map((f) => (
-                  <li key={f} style={{ fontSize: 14, color: "var(--text2)", display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ color: "var(--accent)", fontWeight: 700 }}>✓</span> {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Team */}
-            <div className="pricing-card">
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text2)", marginBottom: 8 }}>{text.pricing.team.name}</div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 4 }}>
-                <span style={{ fontSize: 40, fontWeight: 800 }}>{text.pricing.team.price}</span>
-                <span style={{ fontSize: 16, color: "var(--text2)" }}>{text.pricing.team.period}</span>
-              </div>
-              <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 28 }}>{text.pricing.team.desc}</div>
-              <button className="btn-ghost" style={{ width: "100%", marginBottom: 28 }} onClick={onNavigateToRegister}>{text.pricing.team.cta}</button>
-              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
-                {text.pricing.team.features.map((f) => (
-                  <li key={f} style={{ fontSize: 14, color: "var(--text2)", display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ color: "#22c55e", fontWeight: 700 }}>✓</span> {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Final CTA ── */}
-      <section style={{ background: "var(--bg2)", borderTop: "1px solid var(--border)", padding: isMobile ? "72px 20px" : "100px 24px", textAlign: "center" }}>
-        <div style={{ maxWidth: 600, margin: "0 auto" }}>
-          <h2 style={{ fontSize: "clamp(28px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-1px", marginBottom: 16 }}>
-            {text.cta.title}
-          </h2>
-          <p style={{ fontSize: isMobile ? 16 : 18, color: "var(--text2)", marginBottom: 40, lineHeight: 1.65 }}>{text.cta.sub}</p>
-          <button className="btn-primary" style={{ fontSize: 17, padding: isMobile ? "16px 24px" : "18px 40px", maxWidth: isMobile ? "100%" : "fit-content" }} onClick={onNavigateToRegister}>
-            {text.cta.btn}
-          </button>
-          <div style={{ marginTop: 20, fontSize: 14, color: "var(--text2)" }}>
-            {text.cta.login}{" "}
-            <button style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }} onClick={onNavigateToLogin}>
-              {text.cta.loginLink}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Footer ── */}
-      <footer style={{ borderTop: "1px solid var(--border)", padding: isMobile ? "24px 20px" : "28px 24px", textAlign: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
-          <div style={{
-            width: 24,
-            height: 24,
-            borderRadius: 7,
-            overflow: "hidden",
-            border: "1px solid var(--border)",
-            background: "rgba(255,255,255,0.04)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}>
-            <Image
-              src="/favicon.png"
-              alt="Network Marketing Ultimate logo"
-              width={24}
-              height={24}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          </div>
-          <span style={{ fontSize: 13, color: "var(--text2)" }}>{text.footer.copy}</span>
-        </div>
-      </footer>
+      <Footer footer={t.landing.footer} />
     </div>
-  );
+  )
+}
+
+interface NavbarProps {
+  scrolled: boolean
+  isDark: boolean
+  onToggleTheme: () => void
+  onLogin: () => void
+  onRegister: () => void
+  labels: ReturnType<typeof useLanguage>['t']['landing']['nav']
+}
+
+function Navbar({ scrolled, isDark, onToggleTheme, onLogin, onRegister, labels }: NavbarProps) {
+  return (
+    <header
+      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
+        scrolled ? 'border-b border-border-subtle bg-obsidian/85 backdrop-blur-xl' : 'border-b border-transparent'
+      }`}
+    >
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <span className="relative inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-border bg-surface">
+            <Image src="/favicon.png" alt="NMU" width={36} height={36} className="h-full w-full object-cover" />
+          </span>
+          <span className="text-sm font-semibold tracking-tight sm:text-base">
+            Network Marketing{' '}
+            <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Ultimate</span>
+          </span>
+        </Link>
+
+        <nav className="hidden items-center gap-7 lg:flex">
+          {[
+            ['#modules', labels.modules],
+            ['#how', labels.howItWorks],
+            ['#faq', labels.faq],
+            ['#pricing', labels.pricing],
+          ].map(([href, label]) => (
+            <a
+              key={href}
+              href={href}
+              className="text-sm font-medium text-text-secondary transition hover:text-primary"
+            >
+              {label}
+            </a>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:block">
+            <LanguageSwitcher />
+          </div>
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            aria-label="Toggle theme"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border-subtle bg-card text-text-secondary transition hover:border-primary/40 hover:text-primary"
+          >
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <button
+            type="button"
+            onClick={onLogin}
+            className="hidden rounded-xl border border-border-subtle bg-card px-3.5 py-2 text-sm font-medium text-text-secondary transition hover:border-primary/40 hover:text-text-primary md:inline-flex"
+          >
+            {labels.login}
+          </button>
+          <PrimaryButton onClick={onRegister} size="sm">
+            {labels.start}
+          </PrimaryButton>
+        </div>
+      </div>
+    </header>
+  )
+}
+
+interface HeroProps {
+  labels: ReturnType<typeof useLanguage>['t']['landing']['hero']
+  mockGreeting: string
+  mockKpis: { label: string; value: string; accent: string }[]
+  mockAi: { title: string; body: string }
+  mockMotivation: { title: string; body: string }
+  onPrimary: () => void
+  onSecondary: () => void
+}
+
+function Hero({ labels, mockGreeting, mockKpis, mockAi, mockMotivation, onPrimary, onSecondary }: HeroProps) {
+  return (
+    <section className="relative overflow-hidden pt-28 pb-20 sm:pt-32 lg:pt-40 lg:pb-28">
+      <div className="absolute inset-0 -z-10 gradient-mesh opacity-90" />
+      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[1.1fr,1fr]">
+        <div>
+          <motion.span
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+          >
+            <Sparkles size={12} /> {labels.badge}
+          </motion.span>
+          <motion.h1
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.05 }}
+            className="mt-5 text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl"
+          >
+            {labels.title1}{' '}
+            <span className="bg-gradient-to-br from-primary via-secondary to-accent bg-clip-text text-transparent">
+              {labels.title2}
+            </span>{' '}
+            {labels.title3}
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.12 }}
+            className="mt-5 max-w-xl text-base leading-relaxed text-text-secondary sm:text-lg"
+          >
+            {labels.sub}
+          </motion.p>
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.18 }}
+            className="mt-8 flex flex-col gap-3 sm:flex-row"
+          >
+            <PrimaryButton onClick={onPrimary} size="lg">
+              {labels.ctaPrimary}
+              <MoveRight size={16} />
+            </PrimaryButton>
+            <button
+              type="button"
+              onClick={onSecondary}
+              className="rounded-xl border border-border bg-card/60 px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-primary/40 hover:text-primary"
+            >
+              {labels.ctaSecondary}
+            </button>
+          </motion.div>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.18 }}
+          className="relative"
+        >
+          <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-gradient-to-br from-primary/15 via-secondary/10 to-transparent blur-2xl" />
+          <div className="rounded-2xl border border-border bg-card/90 shadow-elevated">
+            <div className="flex items-center gap-1.5 border-b border-border-subtle px-4 py-2.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-error/70" />
+              <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
+              <span className="h-2.5 w-2.5 rounded-full bg-success/70" />
+              <span className="ml-3 text-[11px] text-text-tertiary">app.suattayfuntopak.com</span>
+            </div>
+            <div className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-text-tertiary">{mockGreeting}</p>
+                  <p className="mt-0.5 text-sm font-semibold tracking-tight">Suat Tayfun</p>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-[11px] font-semibold text-warning">
+                  <Sparkles size={12} /> 7 day streak
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2.5">
+                {mockKpis.map((kpi) => (
+                  <div key={kpi.label} className="rounded-xl border border-border-subtle bg-surface/60 p-3">
+                    <p className="text-[10px] uppercase tracking-wider text-text-tertiary">{kpi.label}</p>
+                    <p className={`mt-1 text-lg font-bold ${kpi.accent}`}>{kpi.value}</p>
+                  </div>
+                ))}
+              </div>
+              <Sparkline className="mt-4" />
+              <div className="mt-4 grid grid-cols-1 gap-2.5">
+                <div className="flex items-start gap-2.5 rounded-xl border border-primary/25 bg-primary/8 p-3">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                    <Bot size={14} />
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-primary">{mockAi.title}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">{mockAi.body}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5 rounded-xl border border-secondary/25 bg-secondary/8 p-3">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
+                    <Heart size={14} />
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-secondary">{mockMotivation.title}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">{mockMotivation.body}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  )
+}
+
+function Sparkline({ className }: { className?: string }) {
+  const points = [12, 18, 14, 22, 20, 28, 26, 36, 32, 42]
+  const max = Math.max(...points)
+  const path = points
+    .map((p, i) => {
+      const x = (i / (points.length - 1)) * 100
+      const y = 100 - (p / max) * 100
+      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`
+    })
+    .join(' ')
+  return (
+    <div className={`relative h-12 w-full overflow-hidden rounded-xl border border-border-subtle bg-surface/40 ${className ?? ''}`}>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+        <defs>
+          <linearGradient id="spark" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgb(0,212,255)" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="rgb(0,212,255)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={`${path} L 100 100 L 0 100 Z`} fill="url(#spark)" />
+        <path d={path} fill="none" stroke="rgb(0,212,255)" strokeWidth="1.5" />
+      </svg>
+    </div>
+  )
+}
+
+function TrustStrip({ badges }: { badges: string[] }) {
+  return (
+    <div className="border-y border-border-subtle bg-surface/40">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-8 gap-y-3 px-4 py-5 text-sm font-medium text-text-secondary sm:px-6">
+        {badges.map((badge, index) => (
+          <span key={badge} className="flex items-center gap-2">
+            <ShieldCheck size={14} className="text-primary/70" />
+            {badge}
+            {index < badges.length - 1 ? <span className="hidden text-border-strong sm:inline">·</span> : null}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+interface DeepDiveProps {
+  eyebrow: string
+  title: string
+  body: string
+  highlights: string[]
+  mock: ReactNode
+  orientation: 'left' | 'right'
+}
+
+function DeepDiveStrip({ eyebrow, title, body, highlights, mock, orientation }: DeepDiveProps) {
+  const reversed = orientation === 'right'
+  return (
+    <section className="relative px-4 py-20 sm:px-6 lg:py-28 border-t border-border-subtle">
+      <div className={`mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-2 ${reversed ? 'lg:[direction:rtl]' : ''}`}>
+        <motion.div
+          initial={{ opacity: 0, x: reversed ? 20 : -20 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ duration: 0.5 }}
+          className="lg:[direction:ltr]"
+        >
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-secondary/30 bg-secondary/10 px-3 py-1 text-xs font-medium text-secondary">
+            <Brain size={12} />
+            {eyebrow}
+          </span>
+          <h2 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h2>
+          <p className="mt-4 text-base leading-relaxed text-text-secondary">{body}</p>
+          <ul className="mt-6 space-y-2.5">
+            {highlights.map((h) => (
+              <li key={h} className="flex items-start gap-2.5 text-sm text-text-primary">
+                <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  <Sparkles size={12} />
+                </span>
+                {h}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, x: reversed ? -20 : 20 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="lg:[direction:ltr]"
+        >
+          {mock}
+        </motion.div>
+      </div>
+    </section>
+  )
+}
+
+function AiStudioMock({ body }: { body: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card/90 shadow-card">
+      <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <Bot size={14} className="text-primary" /> AI Studio
+        </div>
+        <span className="text-[11px] text-text-tertiary">12 / 50 today</span>
+      </div>
+      <div className="space-y-3 p-4">
+        <div className="rounded-xl border border-border-subtle bg-surface/60 p-3">
+          <p className="text-[11px] uppercase tracking-wider text-text-tertiary">Audience</p>
+          <p className="mt-1 text-sm font-medium">Hot prospect · WhatsApp</p>
+        </div>
+        <div className="rounded-xl border border-primary/30 bg-primary/8 p-3">
+          <p className="text-[11px] uppercase tracking-wider text-primary">Draft</p>
+          <p className="mt-1 text-sm leading-relaxed text-text-secondary">{body}</p>
+        </div>
+        <div className="flex justify-end">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary">
+            Send <MoveRight size={12} />
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PipelineMock() {
+  const stages = [
+    { name: 'Cold', color: 'bg-cold', count: 12 },
+    { name: 'Warm', color: 'bg-warm', count: 8 },
+    { name: 'Hot', color: 'bg-hot', count: 4 },
+  ]
+  return (
+    <div className="rounded-2xl border border-border bg-card/90 p-4 shadow-card">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <KanbanSquare size={14} className="text-primary" /> Pipeline
+        </div>
+        <span className="text-[11px] text-text-tertiary">15 stages</span>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        {stages.map((stage) => (
+          <div key={stage.name} className="rounded-xl border border-border-subtle bg-surface/40 p-3">
+            <p className="text-[11px] uppercase tracking-wider text-text-tertiary">{stage.name}</p>
+            <p className="mt-1 text-2xl font-bold">{stage.count}</p>
+            <div className={`mt-2 h-1.5 w-full rounded-full ${stage.color}/40`}>
+              <div className={`h-full w-2/3 rounded-full ${stage.color}`} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 rounded-xl border border-border-subtle bg-surface/40 p-3">
+        <div className="flex items-center justify-between text-xs text-text-secondary">
+          <span>Warmth · Ahmet K.</span>
+          <span className="font-semibold text-primary">82</span>
+        </div>
+        <div className="mt-2 h-2 w-full rounded-full bg-surface">
+          <div className="h-full w-[82%] rounded-full bg-gradient-to-r from-primary via-secondary to-warning" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MotivationMock({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card/90 p-4 shadow-card">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <Heart size={14} className="text-secondary" /> {title}
+      </div>
+      <p className="mt-3 text-sm leading-relaxed text-text-secondary">{body}</p>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="rounded-xl border border-border-subtle bg-surface/50 p-3">
+          <p className="text-[11px] uppercase tracking-wider text-text-tertiary">Streak</p>
+          <p className="mt-1 text-2xl font-bold text-warning">7</p>
+        </div>
+        <div className="rounded-xl border border-border-subtle bg-surface/50 p-3">
+          <p className="text-[11px] uppercase tracking-wider text-text-tertiary">Sent today</p>
+          <p className="mt-1 text-2xl font-bold text-primary">14</p>
+        </div>
+      </div>
+      <div className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-secondary/15 px-3 py-1.5 text-xs font-semibold text-secondary">
+        <Sparkles size={12} /> +120 XP
+      </div>
+    </div>
+  )
+}
+
+function PricingSection({
+  labels,
+  onPrimary,
+}: {
+  labels: ReturnType<typeof useLanguage>['t']['landing']['pricing']
+  onPrimary: () => void
+}) {
+  const [email, setEmail] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+  return (
+    <section id="pricing" className="relative px-4 py-24 sm:px-6 lg:py-32 border-t border-border-subtle">
+      <div className="mx-auto max-w-4xl">
+        <div className="text-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-semibold text-success">
+            <Sparkles size={12} /> {labels.badge}
+          </span>
+          <h2 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">{labels.title}</h2>
+          <p className="mt-3 text-base text-text-secondary">{labels.sub}</p>
+        </div>
+
+        <div className="mt-12 rounded-2xl border border-primary/30 bg-gradient-to-br from-card to-surface/40 p-6 shadow-elevated sm:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wider text-primary">{labels.cardTitle}</p>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-5xl font-extrabold tracking-tight">{labels.cardPrice}</span>
+                <span className="text-sm text-text-tertiary">{labels.cardPeriod}</span>
+              </div>
+              <ul className="mt-5 grid grid-cols-1 gap-2 text-sm text-text-secondary sm:grid-cols-2">
+                {labels.bullets.map((bullet) => (
+                  <li key={bullet} className="flex items-center gap-2">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-success/15 text-success">
+                      <Sparkles size={12} />
+                    </span>
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex flex-col gap-3">
+              <PrimaryButton onClick={onPrimary} size="lg">
+                {labels.ctaPrimary}
+                <MoveRight size={16} />
+              </PrimaryButton>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  if (!email) return
+                  setSubmitted(true)
+                }}
+                className="flex flex-col gap-2 sm:flex-row sm:items-stretch"
+              >
+                <label className="relative flex flex-1 items-center">
+                  <Mail size={14} className="absolute left-3 text-text-tertiary" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder={labels.notifyPlaceholder}
+                    className="w-full rounded-xl border border-border-subtle bg-surface/60 py-2.5 pl-9 pr-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-primary/50 hover:text-primary"
+                >
+                  {labels.ctaSecondary}
+                </button>
+              </form>
+              <p className="text-[11px] text-text-tertiary">
+                {submitted ? '✓ ' : ''}
+                {labels.notifyHint}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function Footer({ footer }: { footer: ReturnType<typeof useLanguage>['t']['landing']['footer'] }) {
+  return (
+    <footer className="border-t border-border-subtle bg-card/40">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="lg:col-span-2">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface">
+              <Image src="/favicon.png" alt="NMU" width={32} height={32} className="h-full w-full object-cover" />
+            </span>
+            <span className="text-sm font-semibold tracking-tight">
+              Network Marketing{' '}
+              <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Ultimate</span>
+            </span>
+          </div>
+          <p className="mt-3 max-w-sm text-sm leading-relaxed text-text-secondary">
+            <a href={`mailto:${footer.contactLine}`} className="text-text-secondary hover:text-primary">
+              {footer.contactLine}
+            </a>
+          </p>
+        </div>
+
+        <FooterColumn title={footer.product}>
+          <FooterLink href="/dashboard">{footer.productLinks.dashboard}</FooterLink>
+          <FooterLink href="/pipeline">{footer.productLinks.pipeline}</FooterLink>
+          <FooterLink href="/ai">{footer.productLinks.ai}</FooterLink>
+          <FooterLink href="/motivation">{footer.productLinks.motivation}</FooterLink>
+          <FooterLink href="/analytics">{footer.productLinks.analytics}</FooterLink>
+        </FooterColumn>
+
+        <FooterColumn title={footer.resources}>
+          <FooterLink href="/academy">{footer.resourcesLinks.academy}</FooterLink>
+          <FooterLink href="/scripts">{footer.resourcesLinks.scripts}</FooterLink>
+          <FooterLink href="#">{footer.resourcesLinks.blog}</FooterLink>
+        </FooterColumn>
+
+        <FooterColumn title={footer.legal}>
+          <FooterLink href="#">{footer.legalLinks.privacy}</FooterLink>
+          <FooterLink href="#">{footer.legalLinks.terms}</FooterLink>
+          <FooterLink href="#">{footer.legalLinks.kvkk}</FooterLink>
+        </FooterColumn>
+      </div>
+      <div className="border-t border-border-subtle">
+        <div className="mx-auto max-w-6xl px-4 py-5 text-center text-xs text-text-tertiary sm:px-6">
+          {footer.copy}
+        </div>
+      </div>
+    </footer>
+  )
+}
+
+function FooterColumn({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-primary">{title}</p>
+      <ul className="mt-3 space-y-2 text-sm">{children}</ul>
+    </div>
+  )
+}
+
+function FooterLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <li>
+      <a href={href} className="text-text-secondary transition hover:text-primary">
+        {children}
+      </a>
+    </li>
+  )
+}
+
+function SectionHeader({
+  title,
+  subtitle,
+  centered,
+}: {
+  title: string
+  subtitle?: string
+  centered?: boolean
+}) {
+  return (
+    <div className={centered ? 'text-center' : 'max-w-2xl'}>
+      <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h2>
+      {subtitle ? (
+        <p className={`mt-3 text-base leading-relaxed text-text-secondary sm:text-lg ${centered ? 'mx-auto max-w-2xl' : ''}`}>
+          {subtitle}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+interface PrimaryButtonProps {
+  onClick: () => void
+  children: ReactNode
+  size?: 'sm' | 'md' | 'lg'
+}
+
+function PrimaryButton({ onClick, children, size = 'md' }: PrimaryButtonProps) {
+  const sizeClasses =
+    size === 'lg'
+      ? 'px-6 py-3 text-sm sm:text-base'
+      : size === 'sm'
+        ? 'px-3.5 py-2 text-xs sm:text-sm'
+        : 'px-5 py-2.5 text-sm'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-primary to-secondary font-semibold text-obsidian shadow-[0_12px_32px_rgba(0,212,255,0.18)] transition hover:shadow-[0_16px_44px_rgba(0,212,255,0.25)] active:translate-y-px ${sizeClasses}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function scrollToId(id: string) {
+  if (typeof document === 'undefined') return
+  const el = document.getElementById(id)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
