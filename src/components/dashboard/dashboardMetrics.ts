@@ -285,6 +285,45 @@ export function buildActivityHeatmap(
   return cells
 }
 
+export function buildMomentumSeries(
+  contacts: ContactRow[],
+  tasks: TaskRow[],
+  orders: OrderRow[],
+  reference: Date,
+  days = 14,
+): { value: number }[] {
+  const safeDays = Math.max(2, Math.floor(days))
+  const dailyTouches = new Map<string, number>()
+  const dailyTasks = new Map<string, number>()
+  const dailyOrders = new Map<string, number>()
+
+  for (const contact of contacts) {
+    if (!contact.last_contact_date) continue
+    const key = dayKey(new Date(contact.last_contact_date))
+    dailyTouches.set(key, (dailyTouches.get(key) ?? 0) + 1)
+  }
+  for (const task of tasks) {
+    if (task.status !== 'completed' || !task.completed_at) continue
+    const key = dayKey(new Date(task.completed_at))
+    dailyTasks.set(key, (dailyTasks.get(key) ?? 0) + 1)
+  }
+  for (const order of orders) {
+    if (order.status === 'cancelled') continue
+    const key = dayKey(new Date(order.order_date))
+    dailyOrders.set(key, (dailyOrders.get(key) ?? 0) + 1)
+  }
+
+  const refStart = startOfDay(reference)
+  const series: { value: number }[] = []
+  for (let i = safeDays - 1; i >= 0; i -= 1) {
+    const day = addDays(refStart, -i)
+    const key = dayKey(day)
+    const value = (dailyTouches.get(key) ?? 0) + (dailyTasks.get(key) ?? 0) + (dailyOrders.get(key) ?? 0)
+    series.push({ value })
+  }
+  return series
+}
+
 export type PipelineSegment = {
   id: 'cold' | 'warming' | 'hot' | 'converted' | 'lost'
   labelTr: string

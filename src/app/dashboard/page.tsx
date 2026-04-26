@@ -42,6 +42,7 @@ import type { Event } from '@/types'
 import {
   addDays,
   buildActivityHeatmap,
+  buildMomentumSeries,
   buildPipelineSegments,
   buildReorderDue,
   buildRevenueSnapshot,
@@ -54,6 +55,7 @@ import {
   startOfDay,
 } from '@/components/dashboard/dashboardMetrics'
 import { RevenueStrip } from '@/components/dashboard/RevenueStrip'
+import { Sparkline } from '@/components/dashboard/Sparkline'
 import { ActivityHeatmap } from '@/components/dashboard/ActivityHeatmap'
 import { PipelineSegmentDonut } from '@/components/dashboard/PipelineSegmentDonut'
 import { ReorderDueCard } from '@/components/dashboard/ReorderDueCard'
@@ -222,6 +224,7 @@ export default function DashboardPage() {
   const revenueSnapshot = buildRevenueSnapshot(orders, now)
   const streak = computeActivityStreak(contacts, tasks, now)
   const heatmap = buildActivityHeatmap(contacts, tasks, orders, now, 12)
+  const momentumSeries = buildMomentumSeries(contacts, tasks, orders, now, 14)
   const pipelineSegments = buildPipelineSegments(contacts)
   const reorderDue = buildReorderDue(orders, contacts, now, 14)
   const upcomingEventEntries = buildUpcomingEvents(events, now, 14)
@@ -399,18 +402,32 @@ export default function DashboardPage() {
               </h1>
               <p className="mt-3 text-sm font-medium text-text-tertiary sm:text-base">{heroDateLabel}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-warning/25 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning">
-                <Flame className="h-3.5 w-3.5" />
-                {currentUser?.streak ?? 0} {locale === 'tr' ? 'gün serisi' : 'day streak'}
+            <div className="flex flex-col items-stretch gap-3 lg:items-end">
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-warning/25 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning">
+                  <Flame className="h-3.5 w-3.5" />
+                  {currentUser?.streak ?? 0} {locale === 'tr' ? 'gün serisi' : 'day streak'}
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
+                  <Award className="h-3.5 w-3.5" />
+                  {t.dashboard.level} {currentUser?.level ?? 1}
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-secondary/25 bg-secondary/10 px-3 py-1.5 text-xs font-semibold text-secondary">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {currentUser?.xp ?? 0} {t.dashboard.xp}
+                </div>
               </div>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
-                <Award className="h-3.5 w-3.5" />
-                {t.dashboard.level} {currentUser?.level ?? 1}
-              </div>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-secondary/25 bg-secondary/10 px-3 py-1.5 text-xs font-semibold text-secondary">
-                <Sparkles className="h-3.5 w-3.5" />
-                {currentUser?.xp ?? 0} {t.dashboard.xp}
+              <div className="w-full max-w-[260px] rounded-2xl border border-border-subtle bg-surface/40 p-3">
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-text-tertiary">
+                  <span>{t.dashboard.heroMomentum}</span>
+                  <span className="text-text-secondary">
+                    {momentumSeries.reduce((sum, point) => sum + point.value, 0)}
+                  </span>
+                </div>
+                <div className="mt-1 h-[36px]">
+                  <Sparkline data={momentumSeries} color="#00d4ff" gradientId="hero-momentum" height={36} />
+                </div>
+                <p className="mt-1 text-[10px] text-text-tertiary line-clamp-1">{t.dashboard.heroMomentumHint}</p>
               </div>
             </div>
           </div>

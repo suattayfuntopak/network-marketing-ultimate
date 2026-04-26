@@ -1,13 +1,20 @@
 'use client'
 
-import { Award, Flame, Sparkles, TrendingUp } from 'lucide-react'
+import { Award, BellRing, BookOpenCheck, Flame, MessageSquareQuote, Sparkles, TrendingUp } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useAppStore } from '@/store/appStore'
+import { usePersistentState } from '@/hooks/usePersistentState'
+import { academyLibraryItems } from '@/data/academyLibrary'
 
 export function EngagementCard() {
-  const { t } = useLanguage()
-  const { currentUser } = useAppStore()
+  const { t, locale } = useLanguage()
+  const { currentUser, notifications } = useAppStore()
+
+  const [viewedLibraryIds] = usePersistentState<string[]>('nmu-academy-library-viewed-v1', [])
+  const [viewedObjectionIds] = usePersistentState<string[]>('nmu-academy-objection-viewed-v1', [])
+  const [favoriteLibraryIds] = usePersistentState<string[]>('nmu-academy-library-favorites-v2', [])
+  const [favoriteObjectionIds] = usePersistentState<string[]>('nmu-academy-objection-favorites-v2', [])
 
   const streak = currentUser?.streak ?? 0
   const xp = currentUser?.xp ?? 0
@@ -15,6 +22,12 @@ export function EngagementCard() {
   const momentum = Math.max(0, Math.min(100, currentUser?.momentumScore ?? 0))
   const xpInLevel = xp % 1000
   const xpProgress = (xpInLevel / 1000) * 100
+
+  const totalLibrary = Math.max(academyLibraryItems.length, 1)
+  const viewedLibraryCount = new Set(viewedLibraryIds).size
+  const academyPercent = Math.round((viewedLibraryCount / totalLibrary) * 100)
+  const unread = notifications.filter((notification) => !notification.isRead).length
+  const scriptsOpened = new Set([...viewedLibraryIds, ...viewedObjectionIds, ...favoriteLibraryIds, ...favoriteObjectionIds]).size
 
   return (
     <Card className="h-full" padding="lg">
@@ -75,6 +88,38 @@ export function EngagementCard() {
             />
           </div>
         </div>
+
+        <div className="rounded-2xl border border-border-subtle bg-surface/30 p-4">
+          <div className="grid grid-cols-3 gap-3">
+            <SmallStat
+              label={t.dashboard.academyProgress}
+              value={`%${academyPercent}`}
+              hint={`${viewedLibraryCount}/${totalLibrary}`}
+              icon={<BookOpenCheck className="h-3.5 w-3.5" />}
+              accent="text-primary"
+            />
+            <SmallStat
+              label={t.dashboard.notificationsUnread}
+              value={String(unread)}
+              hint={locale === 'tr' ? 'aktif kayıt' : 'open items'}
+              icon={<BellRing className="h-3.5 w-3.5" />}
+              accent="text-warning"
+            />
+            <SmallStat
+              label={t.dashboard.scriptsOpened}
+              value={String(scriptsOpened)}
+              hint={t.dashboard.academyProgressHint}
+              icon={<MessageSquareQuote className="h-3.5 w-3.5" />}
+              accent="text-secondary"
+            />
+          </div>
+          <div className="mt-3 h-1.5 w-full rounded-full bg-surface">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-primary/80 to-secondary/80"
+              style={{ width: `${Math.min(100, academyPercent)}%` }}
+            />
+          </div>
+        </div>
       </div>
     </Card>
   )
@@ -103,6 +148,31 @@ function Stat({
         {icon}
         {value}
       </p>
+    </div>
+  )
+}
+
+function SmallStat({
+  label,
+  value,
+  hint,
+  icon,
+  accent,
+}: {
+  label: string
+  value: string
+  hint: string
+  icon: React.ReactNode
+  accent: string
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-tertiary">
+        <span className={accent}>{icon}</span>
+        <span className="line-clamp-1">{label}</span>
+      </div>
+      <p className={`mt-1 text-lg font-bold ${accent}`}>{value}</p>
+      <p className="text-[10px] text-text-tertiary line-clamp-1">{hint}</p>
     </div>
   )
 }
