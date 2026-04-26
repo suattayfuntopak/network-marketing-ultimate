@@ -42,8 +42,7 @@ import {
 import type { Event } from '@/types'
 import { Calendar, Clock, MapPin, Plus, Video } from 'lucide-react'
 import type { InviteChannel } from '@/components/events/eventInviteUtils'
-import { templateMessage } from '@/components/events/eventInviteUtils'
-import { openMessageOnChannel } from '@/lib/openChannelSend'
+import { EventBroadcastPreviewModal } from '@/components/events/EventBroadcastPreviewModal'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -66,6 +65,10 @@ export default function EventsPage() {
   const [savingEvent, setSavingEvent] = useState(false)
   const [processedParamsToken, setProcessedParamsToken] = useState<string | null>(null)
   const [detailsInitialStep, setDetailsInitialStep] = useState<1 | 2>(1)
+  const [broadcastDraft, setBroadcastDraft] = useState<{
+    channel: InviteChannel
+    contactIds: string[]
+  } | null>(null)
 
   const { data: eventItems = [] } = useQuery<Event[]>({
     queryKey: ['events'],
@@ -368,52 +371,10 @@ export default function EventsPage() {
     }
   }
 
-  async function sendEventDirect(channel: InviteChannel) {
-    if (!activeEvent) return
-    const selectedContacts = pendingAttendeeIds
-      .map((id) => contacts.find((c) => c.id === id))
-      .filter((c): c is ContactRow => Boolean(c))
-    if (selectedContacts.length === 0) return
-
-    const baseMessage = templateMessage(
-      locale === 'tr'
-        ? 'Merhaba değerli katılımcı, "{eventTitle}" etkinliğine davetlisin. Tarih: {date}, Saat: {time}, Konum: {location}. Toplantı: {meetingUrl}'
-        : 'Hello dear participant, you are invited to "{eventTitle}". Date: {date}, Time: {time}, Location: {location}. Meeting: {meetingUrl}',
-      activeEvent,
-      locale,
-    )
-
-    await syncInvitedContacts(selectedContacts.map((c) => c.id), true)
-
-    if (channel === 'email') {
-      const emails = selectedContacts.map((c) => c.email?.trim()).filter((x): x is string => Boolean(x))
-      if (emails.length === 0) return
-      const first = emails[0]
-      const bcc = emails.slice(1).join(',')
-      const href = `mailto:${first}?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(activeEvent.title)}&body=${encodeURIComponent(baseMessage)}`
-      window.open(href, '_blank', 'noopener,noreferrer')
-      return
-    }
-
-    if (channel === 'whatsapp' || channel === 'sms') {
-      const phones = selectedContacts
-        .map((c) => c.phone?.replace(/\D/g, '') ?? '')
-        .filter((p) => p.length > 0)
-      if (phones.length === 0) return
-      if (phones.length === 1) {
-        openMessageOnChannel(channel, baseMessage, { phone: phones[0], email: null, linkMode: 'strict' })
-        return
-      }
-      openMessageOnChannel(channel, baseMessage, { phone: null, email: null, linkMode: 'loose' })
-      return
-    }
-
-    openMessageOnChannel('telegram', baseMessage, { phone: null, email: null, linkMode: 'loose' })
-  }
-
   async function proceedSendFromDetails(channel: InviteChannel) {
+    if (!activeEvent || pendingAttendeeIds.length === 0) return
     await saveEvent()
-    await sendEventDirect(channel)
+    setBroadcastDraft({ channel, contactIds: pendingAttendeeIds })
   }
 
   async function saveEvent() {
@@ -659,6 +620,21 @@ export default function EventsPage() {
           done: locale === 'tr' ? 'Seç' : 'Select',
         }}
       />
+
+      {broadcastDraft && activeEvent && (
+        <EventBroadcastPreviewModal
+          open={Boolean(broadcastDraft)}
+          channel={broadcastDraft.channel}
+          event={activeEvent}
+          contacts={contacts}
+          initialContactIds={broadcastDraft.contactIds}
+          locale={locale}
+          onClose={() => setBroadcastDraft(null)}
+          onConfirmed={async (sentIds) => {
+            await syncInvitedContacts(sentIds, true)
+          }}
+        />
+      )}
 
     </motion.div>
   )
