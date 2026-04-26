@@ -99,7 +99,6 @@ export function EventBroadcastPreviewModal({
     text: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [groupAcknowledged, setGroupAcknowledged] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -113,7 +112,6 @@ export function EventBroadcastPreviewModal({
     setSentIds(new Set())
     setFeedback({ kind: 'idle', text: '' })
     setCopiedKey(null)
-    setGroupAcknowledged(false)
     setIsSubmitting(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, channel, event.id])
@@ -126,7 +124,6 @@ export function EventBroadcastPreviewModal({
       }),
     )
     setFeedback({ kind: 'idle', text: '' })
-    setGroupAcknowledged(false)
   }
 
   async function copyToClipboard(text: string, key: string) {
@@ -154,6 +151,10 @@ export function EventBroadcastPreviewModal({
       const next = new Set(current)
       next.add(contact.id)
       return next
+    })
+    // Mark the recipient as invited as soon as their chat is opened — no manual confirm step.
+    void Promise.resolve(onConfirmed([contact.id])).catch((error) => {
+      console.error('[EventBroadcastPreviewModal] individual confirm failed', error)
     })
   }
 
@@ -224,22 +225,12 @@ export function EventBroadcastPreviewModal({
 
       void navigator.clipboard.writeText(messageBody).catch(() => {})
 
-      setFeedback({ kind: 'info', text: labels.feedbackGroupOpened })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+      // Persist the broadcast against every participant — no manual confirm step.
+      void Promise.resolve(onConfirmed(eligibleContacts.map((contact) => contact.id))).catch((error) => {
+        console.error('[EventBroadcastPreviewModal] group confirm failed', error)
+      })
 
-  async function confirmGroupBroadcast() {
-    if (isSubmitting) return
-    setIsSubmitting(true)
-    try {
-      await onConfirmed(eligibleContacts.map((contact) => contact.id))
-      setGroupAcknowledged(true)
-      setFeedback({ kind: 'success', text: labels.feedbackGroupConfirmed(eligibleContacts.length) })
-    } catch (error) {
-      console.error('[EventBroadcastPreviewModal] group confirm failed', error)
-      setFeedback({ kind: 'error', text: labels.feedbackError })
+      setFeedback({ kind: 'info', text: labels.feedbackGroupOpened })
     } finally {
       setIsSubmitting(false)
     }
@@ -316,9 +307,7 @@ export function EventBroadcastPreviewModal({
             groupLink={groupLink}
             onGroupLinkChange={updateGroupLink}
             onPushToGroup={pushToGroup}
-            onConfirm={confirmGroupBroadcast}
             isSubmitting={isSubmitting}
-            acknowledged={groupAcknowledged}
             labels={labels}
           />
         )}
@@ -384,19 +373,6 @@ export function EventBroadcastPreviewModal({
             </Button>
           )}
 
-          {mode === 'individual' && (channel === 'whatsapp' || channel === 'telegram') && sentIds.size > 0 && (
-            <Button
-              type="button"
-              onClick={async () => {
-                await onConfirmed(Array.from(sentIds))
-                setFeedback({ kind: 'success', text: labels.feedbackIndividualSaved(sentIds.size) })
-              }}
-              icon={<CheckCircle2 className="h-4 w-4" />}
-            >
-              {labels.markSent(sentIds.size)}
-            </Button>
-          )}
-
           <Button
             type="button"
             variant="ghost"
@@ -448,18 +424,14 @@ function GroupModeBlock({
   groupLink,
   onGroupLinkChange,
   onPushToGroup,
-  onConfirm,
   isSubmitting,
-  acknowledged,
   labels,
 }: {
   channel: InviteChannel
   groupLink: string
   onGroupLinkChange: (next: string) => void
   onPushToGroup: () => void
-  onConfirm: () => Promise<void>
   isSubmitting: boolean
-  acknowledged: boolean
   labels: ReturnType<typeof getLabels>
 }) {
   const placeholder = channel === 'whatsapp' ? 'https://chat.whatsapp.com/...' : 'https://t.me/...'
@@ -484,26 +456,14 @@ function GroupModeBlock({
         />
       </label>
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          onClick={onPushToGroup}
-          disabled={isSubmitting}
-          icon={<Send className="h-4 w-4" />}
-        >
-          {labels.send}
-        </Button>
-
-        <Button
-          type="button"
-          variant={acknowledged ? 'success' : 'outline'}
-          onClick={onConfirm}
-          disabled={isSubmitting || acknowledged}
-          icon={<CheckCircle2 className="h-4 w-4" />}
-        >
-          {acknowledged ? labels.markedSent : labels.markGroupSent}
-        </Button>
-      </div>
+      <Button
+        type="button"
+        onClick={onPushToGroup}
+        disabled={isSubmitting}
+        icon={<Send className="h-4 w-4" />}
+      >
+        {labels.send}
+      </Button>
     </div>
   )
 }
@@ -731,17 +691,11 @@ function getLabels(locale: 'tr' | 'en', channel: InviteChannel) {
     whatsappGroupLabel: isTr ? 'WhatsApp Grup Linki' : 'WhatsApp Group Link',
     telegramGroupLabel: isTr ? 'Telegram Grup Linki' : 'Telegram Group Link',
     send: isTr ? 'Gönder' : 'Send',
-    markGroupSent: isTr ? 'Gruba gönderildi olarak işaretle' : 'Mark as sent to group',
-    markedSent: isTr ? 'Gönderildi olarak işaretlendi' : 'Marked as sent',
 
     individualListTitle: isTr ? 'Katılımcılar' : 'Participants',
     empty: isTr ? 'Bu etkinlikte katılımcı yok.' : 'No participants on this event.',
     openContact: isTr ? 'Aç' : 'Open',
     openAgain: isTr ? 'Tekrar aç' : 'Open again',
-    markSent: (count: number) =>
-      isTr ? `${count} kişiyi gönderildi olarak işaretle` : `Mark ${count} as sent`,
-    feedbackIndividualSaved: (count: number) =>
-      isTr ? `${count} katılımcı gönderildi olarak işaretlendi.` : `${count} participants marked as sent.`,
 
     singleEmailTitle: isTr ? 'Tek e-posta penceresi' : 'Single email window',
     singleEmailHint: (count: number) =>
@@ -761,8 +715,6 @@ function getLabels(locale: 'tr' | 'en', channel: InviteChannel) {
     feedbackGroupOpened: isTr
       ? `${channelName} grubu yeni sekmede açıldı. Mesaj panoya kopyalandı — gruba yapıştır (Cmd/Ctrl+V) ve Enter'a bas.`
       : `${channelName} group opened in a new tab. The message is on your clipboard — paste it (Cmd/Ctrl+V) and hit Enter.`,
-    feedbackGroupConfirmed: (count: number) =>
-      isTr ? `${count} katılımcı için davet gönderildi olarak kaydedildi.` : `Marked invitations as sent for ${count} participants.`,
     feedbackEmail: (count: number) =>
       isTr
         ? `${count} alıcı için tek e-posta penceresi açıldı; etkinlik kaydı güncellendi.`
