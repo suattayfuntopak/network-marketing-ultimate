@@ -15,6 +15,8 @@ export type ProductRow = Database['public']['Tables']['nmu_products']['Row']
 export type OrderRow = Database['public']['Tables']['nmu_orders']['Row']
 export type EventRow = Database['public']['Tables']['nmu_events']['Row']
 export type EventAttendeeRow = Database['public']['Tables']['nmu_event_attendees']['Row']
+export type UserProfileRow = Database['public']['Tables']['nmu_user_profiles']['Row']
+export type AiRateLimitRow = Database['public']['Tables']['nmu_ai_rate_limits']['Row']
 
 async function requireSessionUserId() {
   const {
@@ -886,6 +888,190 @@ export async function deleteEventAttendees(eventId: string, contactIds: string[]
     .eq('event_id', eventId)
     .in('contact_id', contactIds)
   if (error) throw error
+}
+
+// ─── USER PROFILE / AI USAGE / CUSTOMERS ──────────────────────
+
+export async function fetchUserProfile(): Promise<UserProfileRow | null> {
+  const userId = await requireSessionUserId()
+  const { data, error } = await supabase
+    .from('nmu_user_profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle()
+  if (error) {
+    if (isMissingRelationError(error)) return null
+    throw error
+  }
+  return (data as UserProfileRow | null) ?? null
+}
+
+const AI_DAILY_LIMIT = 50
+
+export interface AiRateLimitSummary {
+  used: number
+  limit: number
+  remaining: number
+  lastUsedAt: string | null
+}
+
+function aiDayWindow(reference: Date = new Date()) {
+  const start = new Date(reference)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+  return { startISO: start.toISOString(), endISO: end.toISOString() }
+}
+
+export async function fetchAiRateLimitsToday(): Promise<AiRateLimitSummary> {
+  const userId = await requireSessionUserId()
+  const { startISO, endISO } = aiDayWindow()
+  const { data, error } = await supabase
+    .from('nmu_ai_rate_limits')
+    .select('id, created_at')
+    .eq('user_id', userId)
+    .gte('created_at', startISO)
+    .lt('created_at', endISO)
+    .order('created_at', { ascending: false })
+  if (error) {
+    if (isMissingRelationError(error)) {
+      return { used: 0, limit: AI_DAILY_LIMIT, remaining: AI_DAILY_LIMIT, lastUsedAt: null }
+    }
+    throw error
+  }
+  const rows = (data ?? []) as Array<Pick<AiRateLimitRow, 'id' | 'created_at'>>
+  const used = rows.length
+  return {
+    used,
+    limit: AI_DAILY_LIMIT,
+    remaining: Math.max(0, AI_DAILY_LIMIT - used),
+    lastUsedAt: rows[0]?.created_at ?? null,
+  }
+}
+
+export interface AiUsagePoint {
+  date: string
+  count: number
+}
+
+export async function fetchAiUsageSeries(days = 14): Promise<AiUsagePoint[]> {
+  const userId = await requireSessionUserId()
+  const safeDays = Math.max(1, Math.floor(days))
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  start.setDate(start.getDate() - (safeDays - 1))
+  const { data, error } = await supabase
+    .from('nmu_ai_rate_limits')
+    .select('created_at')
+    .eq('user_id', userId)
+    .gte('created_at', start.toISOString())
+    .order('created_at', { ascending: true })
+  if (error) {
+    if (isMissingRelationError(error)) return []
+    throw error
+  }
+  const rows = (data ?? []) as Array<Pick<AiRateLimitRow, 'created_at'>>
+  const buckets = new Map<string, number>()
+  for (let i = 0; i < safeDays; i += 1) {
+    const day = new Date(start)
+    day.setDate(start.getDate() + i)
+    const key = day.toISOString().slice(0, 10)
+    buckets.set(key, 0)
+  }
+  for (const row of rows) {
+    const key = row.created_at.slice(0, 10)
+    buckets.set(key, (buckets.get(key) ?? 0) + 1)
+  }
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([date, count]) => ({ date, count }))
+}
+
+export interface ActiveCustomersSummary {
+  total: number
+  newLast30: number
+  customerIds: string[]
+}
+
+export async function fetchActiveCustomers(): Promise<ActiveCustomersSummary> {
+  const userId = await requireSessionUserId()
+  const { data, error } = await supabase
+    .from('nmu_customers')
+    .select('contact_id, became_customer_at, is_active')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+  if (error) {
+    if (isMissingRelationError(error)) return { total: 0, newLast30: 0, customerIds: [] }
+    throw error
+  }
+  const rows = (data ?? []) as Array<Pick<CustomerRegistryRow, 'contact_id' | 'became_customer_at' | 'is_active'>>
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+  let newLast30 = 0
+  const customerIds: string[] = []
+  for (const row of rows) {
+    customerIds.push(row.contact_id)
+    if (row.became_customer_at && new Date(row.became_customer_at).getTime() >= cutoff) {
+      newLast30 += 1
+    }
+  }
+  return { total: rows.length, newLast30, customerIds }
+}
+
+export interface ProductPerformanceItem {
+  productId: string | null
+  name: string
+  units: number
+  revenue: number
+  reorderCycleDays: number | null
+}
+
+interface OrderItemSummary {
+  product_id?: string | null
+  product_name?: string | null
+  name?: string | null
+  quantity?: number | null
+  unit_price_try?: number | null
+  total_try?: number | null
+  price_try?: number | null
+  unitPrice?: number | null
+}
+
+export async function fetchProductPerformance(limit = 10): Promise<ProductPerformanceItem[]> {
+  const [orders, products] = await Promise.all([fetchAllOrders(), fetchProducts()])
+  const productMap = new Map<string, ProductRow>()
+  for (const product of products) {
+    productMap.set(product.id, product)
+  }
+  const aggregate = new Map<string, ProductPerformanceItem>()
+  for (const order of orders) {
+    if (order.status === 'cancelled') continue
+    const items = Array.isArray(order.items) ? (order.items as OrderItemSummary[]) : []
+    for (const raw of items) {
+      const productId = raw.product_id ?? null
+      const product = productId ? productMap.get(productId) ?? null : null
+      const key = productId ?? `name:${(raw.product_name ?? raw.name ?? 'unknown').toLowerCase()}`
+      const name = product?.name ?? raw.product_name ?? raw.name ?? 'Unknown product'
+      const quantity = Number(raw.quantity ?? 0) || 0
+      const unitPrice = Number(raw.unit_price_try ?? raw.price_try ?? raw.unitPrice ?? 0) || 0
+      const lineRevenue = Number(raw.total_try ?? quantity * unitPrice) || 0
+      const existing = aggregate.get(key)
+      if (existing) {
+        existing.units += quantity
+        existing.revenue += lineRevenue
+      } else {
+        aggregate.set(key, {
+          productId,
+          name,
+          units: quantity,
+          revenue: lineRevenue,
+          reorderCycleDays: product?.reorder_cycle_days ?? null,
+        })
+      }
+    }
+  }
+  return Array.from(aggregate.values())
+    .sort((a, b) => b.revenue - a.revenue || b.units - a.units)
+    .slice(0, Math.max(1, limit))
 }
 
 export type { ContactActivityPayload } from './contactActivityLog'
