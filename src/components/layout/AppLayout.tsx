@@ -30,7 +30,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const setNotifications = useAppStore((state) => state.setNotifications)
   const [authReady, setAuthReady] = useState(false)
 
-  const isAuthRoute = pathname?.startsWith('/auth') || pathname === '/'
+  const isAuthRoute =
+    pathname?.startsWith('/auth') ||
+    pathname?.startsWith('/legal') ||
+    pathname === '/'
 
   const notificationsEnabled = authReady && Boolean(currentUser) && !isAuthRoute
 

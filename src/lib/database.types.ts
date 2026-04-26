@@ -420,6 +420,28 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['nmu_ai_rate_limits']['Insert']>
         Relationships: []
       }
+
+      // ─── LANDING WAITLIST ─────────────────────────────────
+      nmu_waitlist: {
+        Row: {
+          id: string
+          email: string
+          email_norm: string
+          source: string
+          locale: string | null
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          email: string
+          source?: string
+          locale?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['nmu_waitlist']['Insert']>
+        Relationships: []
+      }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }

@@ -1074,4 +1074,47 @@ export async function fetchProductPerformance(limit = 10): Promise<ProductPerfor
     .slice(0, Math.max(1, limit))
 }
 
+// ─── WAITLIST (LANDING) ──────────────────────────────────
+
+const WAITLIST_EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+export type WaitlistResult =
+  | { status: 'ok' }
+  | { status: 'duplicate' }
+  | { status: 'invalid' }
+  | { status: 'error'; message?: string }
+
+export async function submitWaitlistEmail(input: {
+  email: string
+  source?: string
+  locale?: string | null
+}): Promise<WaitlistResult> {
+  const trimmed = (input.email ?? '').trim()
+  if (!trimmed || trimmed.length < 4 || trimmed.length > 320 || !WAITLIST_EMAIL_REGEX.test(trimmed)) {
+    return { status: 'invalid' }
+  }
+
+  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 320) : null
+
+  const { error } = await supabase
+    .from('nmu_waitlist')
+    .insert({
+      email: trimmed,
+      source: input.source ?? 'landing-pricing',
+      locale: input.locale ?? null,
+      user_agent: userAgent,
+    })
+
+  if (!error) return { status: 'ok' }
+
+  const code = 'code' in error ? String(error.code) : ''
+  if (code === '23505') {
+    return { status: 'duplicate' }
+  }
+  if (isMissingRelationError(error)) {
+    return { status: 'error', message: 'waitlist-table-missing' }
+  }
+  return { status: 'error', message: error.message }
+}
+
 export type { ContactActivityPayload } from './contactActivityLog'

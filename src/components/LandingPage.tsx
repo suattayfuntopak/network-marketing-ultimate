@@ -30,6 +30,7 @@ import {
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useTheme } from '@/components/common/ThemeProvider'
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher'
+import { submitWaitlistEmail } from '@/lib/queries'
 
 interface LandingPageProps {
   onNavigateToRegister: () => void
@@ -74,7 +75,7 @@ const MODULE_GRID: ModuleEntry[] = [
 const FAQ_KEYS = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'] as const
 
 export default function LandingPage({ onNavigateToRegister, onNavigateToLogin }: LandingPageProps) {
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const { theme, setTheme } = useTheme()
   const [scrolled, setScrolled] = useState(false)
   const [openFaq, setOpenFaq] = useState<number | null>(0)
@@ -293,6 +294,7 @@ export default function LandingPage({ onNavigateToRegister, onNavigateToLogin }:
 
         <PricingSection
           labels={t.landing.pricing}
+          locale={locale}
           onPrimary={onNavigateToRegister}
         />
 
@@ -704,15 +706,74 @@ function MotivationMock({ title, body }: { title: string; body: string }) {
   )
 }
 
+type WaitlistFeedback =
+  | { kind: 'idle' }
+  | { kind: 'success' }
+  | { kind: 'duplicate' }
+  | { kind: 'invalid' }
+  | { kind: 'error' }
+
 function PricingSection({
   labels,
+  locale,
   onPrimary,
 }: {
   labels: ReturnType<typeof useLanguage>['t']['landing']['pricing']
+  locale: 'tr' | 'en'
   onPrimary: () => void
 }) {
   const [email, setEmail] = useState('')
-  const [submitted, setSubmitted] = useState(false)
+  const [feedback, setFeedback] = useState<WaitlistFeedback>({ kind: 'idle' })
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (submitting) return
+    if (!email.trim()) {
+      setFeedback({ kind: 'invalid' })
+      return
+    }
+    setSubmitting(true)
+    setFeedback({ kind: 'idle' })
+    try {
+      const result = await submitWaitlistEmail({
+        email,
+        source: 'landing-pricing',
+        locale,
+      })
+      if (result.status === 'ok') {
+        setFeedback({ kind: 'success' })
+        setEmail('')
+      } else if (result.status === 'duplicate') {
+        setFeedback({ kind: 'duplicate' })
+        setEmail('')
+      } else if (result.status === 'invalid') {
+        setFeedback({ kind: 'invalid' })
+      } else {
+        setFeedback({ kind: 'error' })
+      }
+    } catch {
+      setFeedback({ kind: 'error' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const feedbackMessage = (() => {
+    switch (feedback.kind) {
+      case 'success':
+        return { text: labels.notifySuccess, tone: 'text-success' }
+      case 'duplicate':
+        return { text: labels.notifyDuplicate, tone: 'text-success' }
+      case 'invalid':
+        return { text: labels.notifyInvalid, tone: 'text-warning' }
+      case 'error':
+        return { text: labels.notifyError, tone: 'text-error' }
+      default:
+        return { text: labels.notifyHint, tone: 'text-text-tertiary' }
+    }
+  })()
+
   return (
     <section id="pricing" className="relative px-4 py-24 sm:px-6 lg:py-32 border-t border-border-subtle">
       <div className="mx-auto max-w-4xl">
@@ -749,33 +810,36 @@ function PricingSection({
                 <MoveRight size={16} />
               </PrimaryButton>
               <form
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  if (!email) return
-                  setSubmitted(true)
-                }}
+                onSubmit={handleSubmit}
                 className="flex flex-col gap-2 sm:flex-row sm:items-stretch"
+                noValidate
               >
                 <label className="relative flex flex-1 items-center">
                   <Mail size={14} className="absolute left-3 text-text-tertiary" />
                   <input
                     type="email"
                     value={email}
-                    onChange={(event) => setEmail(event.target.value)}
+                    onChange={(event) => {
+                      setEmail(event.target.value)
+                      if (feedback.kind !== 'idle') setFeedback({ kind: 'idle' })
+                    }}
                     placeholder={labels.notifyPlaceholder}
-                    className="w-full rounded-xl border border-border-subtle bg-surface/60 py-2.5 pl-9 pr-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                    disabled={submitting}
+                    aria-invalid={feedback.kind === 'invalid' || feedback.kind === 'error'}
+                    className="w-full rounded-xl border border-border-subtle bg-surface/60 py-2.5 pl-9 pr-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:opacity-60"
                   />
                 </label>
                 <button
                   type="submit"
-                  className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-primary/50 hover:text-primary"
+                  disabled={submitting}
+                  className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-primary/50 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {labels.ctaSecondary}
+                  {submitting ? labels.ctaSubmitting : labels.ctaSecondary}
                 </button>
               </form>
-              <p className="text-[11px] text-text-tertiary">
-                {submitted ? '✓ ' : ''}
-                {labels.notifyHint}
+              <p className={`text-[11px] ${feedbackMessage.tone}`} aria-live="polite">
+                {feedback.kind === 'success' || feedback.kind === 'duplicate' ? '✓ ' : ''}
+                {feedbackMessage.text}
               </p>
             </div>
           </div>
@@ -821,9 +885,9 @@ function Footer({ footer }: { footer: ReturnType<typeof useLanguage>['t']['landi
         </FooterColumn>
 
         <FooterColumn title={footer.legal}>
-          <FooterLink href="#">{footer.legalLinks.privacy}</FooterLink>
-          <FooterLink href="#">{footer.legalLinks.terms}</FooterLink>
-          <FooterLink href="#">{footer.legalLinks.kvkk}</FooterLink>
+          <FooterLink href="/legal/privacy">{footer.legalLinks.privacy}</FooterLink>
+          <FooterLink href="/legal/terms">{footer.legalLinks.terms}</FooterLink>
+          <FooterLink href="/legal/kvkk">{footer.legalLinks.kvkk}</FooterLink>
         </FooterColumn>
       </div>
       <div className="border-t border-border-subtle">
