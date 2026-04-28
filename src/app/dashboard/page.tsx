@@ -7,13 +7,11 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
-  Award,
   Calendar,
   CheckCircle2,
   ChevronRight,
   Flame,
   Package,
-  Sparkles,
   TrendingUp,
   Users,
   UserRoundCheck,
@@ -403,20 +401,6 @@ export default function DashboardPage() {
               <p className="mt-3 text-sm font-medium text-text-tertiary sm:text-base">{heroDateLabel}</p>
             </div>
             <div className="flex flex-col items-stretch gap-3 lg:items-end">
-              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-warning/25 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning">
-                  <Flame className="h-3.5 w-3.5" />
-                  {currentUser?.streak ?? 0} {locale === 'tr' ? 'gün serisi' : 'day streak'}
-                </div>
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
-                  <Award className="h-3.5 w-3.5" />
-                  {t.dashboard.level} {currentUser?.level ?? 1}
-                </div>
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-secondary/25 bg-secondary/10 px-3 py-1.5 text-xs font-semibold text-secondary">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  {currentUser?.xp ?? 0} {t.dashboard.xp}
-                </div>
-              </div>
               <div className="w-full max-w-[260px] rounded-2xl border border-border-subtle bg-surface/40 p-3">
                 <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-text-tertiary">
                   <span>{t.dashboard.heroMomentum}</span>
