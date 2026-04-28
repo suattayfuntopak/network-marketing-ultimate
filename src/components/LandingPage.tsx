@@ -53,7 +53,6 @@ const MODULE_ICON: Record<string, LucideIcon> = {
   academy: GraduationCap,
   scripts: ScrollText,
   ai: Bot,
-  motivation: Heart,
   analytics: LineChart,
 }
 
@@ -68,7 +67,6 @@ const MODULE_GRID: ModuleEntry[] = [
   { key: 'academy', href: '/academy' },
   { key: 'scripts', href: '/scripts' },
   { key: 'ai', href: '/ai' },
-  { key: 'motivation', href: '/motivation' },
   { key: 'analytics', href: '/analytics' },
 ]
 
@@ -874,7 +872,6 @@ function Footer({ footer }: { footer: ReturnType<typeof useLanguage>['t']['landi
           <FooterLink href="/dashboard">{footer.productLinks.dashboard}</FooterLink>
           <FooterLink href="/pipeline">{footer.productLinks.pipeline}</FooterLink>
           <FooterLink href="/ai">{footer.productLinks.ai}</FooterLink>
-          <FooterLink href="/motivation">{footer.productLinks.motivation}</FooterLink>
           <FooterLink href="/analytics">{footer.productLinks.analytics}</FooterLink>
         </FooterColumn>
 

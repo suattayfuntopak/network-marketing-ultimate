@@ -7,7 +7,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Ca
 import { Badge } from '@/components/ui/Badge'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { usePersistentState } from '@/hooks/usePersistentState'
-import { DAILY_SUGGESTION_LINES } from '@/app/motivation/motivationData'
+import { DAILY_SUGGESTION_LINES } from '@/data/motivationData'
 
 type FavoriteMessage = { id: string; text: string; updatedAt: string }
 
@@ -82,7 +82,7 @@ export function MotivationPulse({ streak }: MotivationPulseProps) {
 
         <button
           type="button"
-          onClick={() => router.push('/motivation')}
+          onClick={() => router.push('/ai')}
           className="inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary-dim"
         >
           {t.dashboard.motivationOpen}

@@ -16,7 +16,7 @@ import {
   LayoutDashboard, Users, ShoppingBag, GitBranch, ListTodo,
   CalendarDays, GraduationCap, Calendar, BarChart3,
   Bot, ChevronLeft, ChevronRight,
-  Target, X, Package, Crown, Flame
+  Target, X, Package, Crown
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -56,7 +56,6 @@ export function Sidebar() {
     { divider: true },
     { label: t.nav.academy, href: '/academy', icon: GraduationCap },
     { label: t.nav.events, href: '/events', icon: Calendar },
-    { label: t.nav.motivation, href: '/motivation', icon: Flame },
     { divider: true },
     { label: t.nav.team, href: '/team', icon: Target },
     { label: t.nav.teamLeader, href: '/team/leader', icon: Crown },

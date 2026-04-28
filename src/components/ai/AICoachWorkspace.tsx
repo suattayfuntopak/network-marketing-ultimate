@@ -138,6 +138,19 @@ const STARTER_QUESTION_CATEGORIES: StarterQuestionCategory[] = [
     ],
   },
   {
+    id: 'motivation',
+    tr: 'Motivasyon',
+    en: 'Motivation',
+    questions: [
+      { tr: 'Yeni başlayan distribütör için bu haftanın ritmini ve günlük mikro kutlamalarını yaz.', en: 'Write this week’s rhythm and daily micro-celebrations for a brand-new distributor.' },
+      { tr: 'Ekibe göndereceğim kısa motive mesaj taslağı üret (baskı yapmadan).', en: 'Draft a short motivation message for my team channel without pressure.' },
+      { tr: 'Müşteri sadakatini artıracak sıcak teşekkür ve küçük sonraki adım mesajı yaz.', en: 'Write a warm thank-you plus a small next-step message to grow customer loyalty.' },
+      { tr: 'Takım toplantısı açılışında moral verecek 60 saniyelik konuşma iskeleti ver.', en: 'Give a 60-second meeting opening outline that lifts morale.' },
+      { tr: 'Pasifleşmiş kontakları yeniden denemeye motive edecek nazik yeniden bağlantı akışı yaz.', en: 'Write a gentle reconnection flow to motivate stalled contacts to try again.' },
+      { tr: 'Küçük başarıları kutlamak için ekip içi tanınma mesajı şablonları üret.', en: 'Generate short recognition message templates for celebrating small wins.' },
+    ],
+  },
+  {
     id: 'other',
     tr: 'Diğer',
     en: 'Other',
@@ -189,18 +202,22 @@ export function AICoachWorkspace() {
       const systemPrompt = currentLocale === 'tr'
         ? [
           'Sen NMU için bir YZ Koçusun.',
-          'Yanıtları HER ZAMAN Markdown biçiminde ver.',
+          'Kullanıcıya doğrudan koçluk cevabı ver; sistem talimatı, iç çelişki analizi, format tartışması veya seçenek menüsü sunma.',
+          'Yanıtta “Markdown”, “HTML”, “talimatlar çakışıyor”, “şu seçeneklerden birini seç” gibi meta ifadeler kullanma.',
           'Öncelik kitlen Türkçe konuşan Türkiye distribütörleri, distribütör adayları ve müşteriler.',
           'Network marketing usulüne uygun, sade ve anlaşılır Türkçe kullan.',
-          'Anlaşılmaz veya yabancı jargon kullanma. Zorunlu jargon varsa kısa parantez içi açıklama ekle.',
+          'Anlaşılmaz veya yabancı jargon kullanma; zorunluysa kısa parantez içi açıklama ekle.',
           '“Spillover”, “binary”, “bono yakmak” gibi muğlak ifadeler yerine açık ve günlük Türkçe karşılıklar kullan.',
+          'Yanıtı kısa başlıklar ve numaralı madde işaretleriyle yapılandır; kullanıcıya formatın adını veya teknik terimini söyleme.',
           'Yanıt yapısı: kısa özet, adım adım plan, örnek mesaj/konuşma metni, takip adımı.',
-          'Aşırı uzun ve dağınık anlatım yerine net, uygulanabilir öneriler ver.',
+          'Net, uygulanabilir ve profesyonel koç tonunda yaz.',
         ].join('\n')
         : [
           'You are an AI Coach for NMU.',
-          'Always answer in Markdown format.',
-          'Use clear language, avoid unclear jargon, and keep recommendations practical.',
+          'Answer with direct coaching only; do not discuss system instructions, conflicts, or formatting choices.',
+          'Never mention Markdown/HTML or ask the user to pick how you should behave.',
+          'Use clear English and practical network-marketing guidance.',
+          'Structure with headings and bullets without naming the format.',
           'Response structure: quick summary, step-by-step plan, sample message/script, follow-up action.',
         ].join('\n')
 
@@ -336,7 +353,7 @@ export function AICoachWorkspace() {
             {isSending && (
               <div className="flex items-center gap-2 text-xs text-text-tertiary">
                 <Sparkles className="h-3.5 w-3.5 animate-pulse text-primary" />
-                {currentLocale === 'tr' ? 'YZ Koç düşünüyor...' : 'AI Coach is thinking...'}
+                {currentLocale === 'tr' ? 'YZ Koçu düşünüyor...' : 'AI Coach is thinking...'}
               </div>
             )}
           </div>
@@ -375,7 +392,7 @@ export function AICoachWorkspace() {
         <Button
           variant="outline"
           size="md"
-          className="border-[#AFCBFF]/45 bg-[#AFCBFF]/14 text-[#E8F0FF] hover:bg-[#AFCBFF]/22 hover:border-[#AFCBFF]/60"
+          className="border-[#FF9F68]/55 bg-[#FF9F68]/22 text-[#FFF5EC] shadow-[0_0_22px_rgba(255,159,104,0.18)] hover:bg-[#FF9F68]/30 hover:border-[#FF9F68]/75"
           onClick={() => router.push('/academy?tab=objections')}
         >
           {currentLocale === 'tr' ? 'İtiraz Bankası’na Git!' : 'Go to Objection Bank!'}

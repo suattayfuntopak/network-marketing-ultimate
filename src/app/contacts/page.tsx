@@ -22,7 +22,6 @@ import { ContactTaskModal } from '@/components/contacts/ContactTaskModal'
 import {
   PIPELINE_STAGE_OPTIONS,
   addContactFormToInput,
-  parseCommaTags,
   stageMeta,
   type AddContactForm,
   type ContactTaskFormValues,
@@ -549,8 +548,10 @@ export default function ContactsPage() {
   useEffect(() => {
     if (!selected) return
     if (!routeAiOpen) return
-    setAiAutoGenerate(true)
-    setAiModalOpen(true)
+    queueMicrotask(() => {
+      setAiAutoGenerate(true)
+      setAiModalOpen(true)
+    })
   }, [routeAiOpen, selected])
 
   function openContactDetail(contactId: string) {
