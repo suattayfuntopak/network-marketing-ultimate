@@ -2,12 +2,15 @@
 
 import { FormEvent, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Input'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { postAiChat } from '@/lib/aiClient'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Bot, Lightbulb, Send, Sparkles, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -22,99 +25,151 @@ type ChatMessage = {
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 
+type StarterQuestionCategory = {
+  id: string
+  tr: string
+  en: string
+  questions: Array<{ tr: string; en: string }>
+}
+
+const STARTER_QUESTION_CATEGORIES: StarterQuestionCategory[] = [
+  {
+    id: 'prospect',
+    tr: 'Aday',
+    en: 'Prospect',
+    questions: [
+      { tr: 'Soğuk bir adayı ilk 3 temasla güvene taşıyacak plan ver.', en: 'Give me a 3-touch trust-building plan for a cold prospect.' },
+      { tr: 'Bugün yeni aday bulmak için 60 dakikalık en verimli rutin nedir?', en: 'What is the most effective 60-minute routine for finding new prospects today?' },
+      { tr: 'Sosyal medya profilimden gelen adayları hızlıca nitelendirme akışı oluştur.', en: 'Create a quick qualification flow for prospects coming from social media.' },
+      { tr: 'Adayın ihtiyacını keşfetmek için güçlü soru listesi hazırla.', en: 'Prepare a strong discovery-question list to uncover prospect needs.' },
+      { tr: 'Adayın “düşüneyim” demesini azaltacak konuşma çerçevesi ver.', en: 'Give me a conversation framework that reduces “let me think about it.”' },
+      { tr: 'Adayı satış baskısı olmadan bir sonraki adıma taşıyacak metin yaz.', en: 'Write a low-pressure message that moves a prospect to the next step.' },
+    ],
+  },
+  {
+    id: 'invite',
+    tr: 'Davet',
+    en: 'Invite',
+    questions: [
+      { tr: 'Online sunuma davet için kısa ve güçlü bir WhatsApp mesajı yaz.', en: 'Write a short and strong WhatsApp invite for an online presentation.' },
+      { tr: 'Adayın profiline göre 3 farklı davet metni üret.', en: 'Generate 3 invitation variations by prospect profile.' },
+      { tr: 'Reddedilmeden merak uyandıran davet cümleleri öner.', en: 'Suggest invitation lines that create curiosity without rejection.' },
+      { tr: 'Davet sonrası dönüş almayan kişiye nazik hatırlatma metni yaz.', en: 'Write a polite reminder for someone who has not replied after invitation.' },
+      { tr: 'Telefonla davet ederken 45 saniyelik konuşma akışı ver.', en: 'Give me a 45-second phone invitation script.' },
+      { tr: 'Etkinlik daveti için “değer odaklı” çağrı metni oluştur.', en: 'Create a value-led call script for event invitation.' },
+    ],
+  },
+  {
+    id: 'presentation',
+    tr: 'Sunum',
+    en: 'Presentation',
+    questions: [
+      { tr: '15 dakikalık network marketing sunumu için net akış çıkar.', en: 'Build a clear flow for a 15-minute network marketing presentation.' },
+      { tr: 'Sunumda ürün ve iş fırsatını dengeli anlatma planı ver.', en: 'Give me a balanced structure for product and business-opportunity presentation.' },
+      { tr: 'Sunum başında dikkat çeken giriş cümleleri üret.', en: 'Generate opening lines that capture attention at the start of a presentation.' },
+      { tr: 'Sunum sonunda aksiyon almaya yönlendiren kapanış metni yaz.', en: 'Write a closing script that leads to clear action after the presentation.' },
+      { tr: 'Sunum sırasında sıkılmayı önleyen etkileşim soruları öner.', en: 'Suggest engagement questions to prevent drop-off during presentation.' },
+      { tr: 'Sunumu adayın seviyesine göre sadeleştiren versiyon hazırla.', en: 'Prepare a simplified version of the presentation based on prospect level.' },
+    ],
+  },
+  {
+    id: 'sales-closing',
+    tr: 'Satış Kapama',
+    en: 'Sales Closing',
+    questions: [
+      { tr: 'Satış kapamada kararsız adayı net karara götüren soru seti ver.', en: 'Give me a question set that moves undecided prospects to decision.' },
+      { tr: '“Bugün başlayalım” dedirten yumuşak kapanış cümleleri üret.', en: 'Generate soft-closing lines that encourage starting today.' },
+      { tr: 'Fiyat odaklı itirazda değeri öne çıkaran kapama metni yaz.', en: 'Write a value-first closing response for price-focused objections.' },
+      { tr: 'Kapanış görüşmesinde hata yapmamak için kontrol listesi çıkar.', en: 'Create a closing-call checklist to avoid common mistakes.' },
+      { tr: 'Kapanış öncesi adayın hazır olup olmadığını ölçen sinyaller ver.', en: 'List signs to evaluate if a prospect is ready before closing.' },
+      { tr: 'Satış sonrası güveni koruyan teşekkür + ilk adım mesajı yaz.', en: 'Write a post-sale thank-you + first-step message that builds trust.' },
+    ],
+  },
+  {
+    id: 'follow-up',
+    tr: 'Takip',
+    en: 'Follow-up',
+    questions: [
+      { tr: 'Sunumdan sonra 5 günlük takip planı hazırla.', en: 'Prepare a 5-day follow-up plan after presentation.' },
+      { tr: 'Cevap vermeyen aday için 4 temaslık yeniden bağ kurma akışı yaz.', en: 'Write a 4-touch reconnection flow for non-responsive prospects.' },
+      { tr: 'Takip mesajlarında baskı oluşturmadan ilerleme sağlayan şablon ver.', en: 'Give me a follow-up template that moves forward without pressure.' },
+      { tr: 'Takipleri CRM düzeninde aksatmadan yürütmek için rutin oluştur.', en: 'Create a routine to run follow-ups consistently in CRM order.' },
+      { tr: '“Daha sonra konuşalım” diyen kişiye uygun takip senaryosu yaz.', en: 'Write a follow-up scenario for someone who says “let us talk later.”' },
+      { tr: 'Takip performansımı artırmak için ölçmem gereken KPI listesi ver.', en: 'Provide KPIs I should track to improve follow-up performance.' },
+    ],
+  },
+  {
+    id: 'team',
+    tr: 'Ekip',
+    en: 'Team',
+    questions: [
+      { tr: 'Yeni ekip üyesi için ilk 7 gün onboarding planı çıkar.', en: 'Build a first-7-days onboarding plan for a new team member.' },
+      { tr: 'Ekipte düşük motivasyon yaşayan üyeye koçluk görüşmesi akışı yaz.', en: 'Write a coaching conversation flow for low-motivation team members.' },
+      { tr: 'Ekip liderleri için haftalık takip toplantısı şablonu oluştur.', en: 'Create a weekly team-leader check-in template.' },
+      { tr: 'Ekipte çoğaltmayı hızlandıracak eğitim konusu sıralaması ver.', en: 'Give me a training sequence that accelerates duplication in the team.' },
+      { tr: 'Pasif kalan ekip üyelerini tekrar aktive etmek için plan hazırla.', en: 'Prepare a reactivation plan for inactive team members.' },
+      { tr: 'Ekip içi iletişimi güçlendiren kısa günlük mesaj formatı üret.', en: 'Generate a short daily message format to improve team communication.' },
+    ],
+  },
+  {
+    id: 'customer',
+    tr: 'Müşteri',
+    en: 'Customer',
+    questions: [
+      { tr: 'Yeni müşteri için ilk 14 gün memnuniyet ve tekrar sipariş planı ver.', en: 'Give me a 14-day satisfaction and reorder plan for new customers.' },
+      { tr: 'Müşteri sadakatini artıracak aylık temas takvimi hazırla.', en: 'Prepare a monthly touchpoint calendar to increase customer loyalty.' },
+      { tr: 'Müşteriden referans isterken kullanılacak doğal mesaj yaz.', en: 'Write a natural message for asking customers for referrals.' },
+      { tr: 'Yeniden sipariş zamanı gelen müşteri için nazik hatırlatma metni üret.', en: 'Generate a polite reorder reminder for customers who are due.' },
+      { tr: 'Müşteri şikayetini fırsata çeviren iletişim akışı ver.', en: 'Provide a communication flow that turns complaints into opportunities.' },
+      { tr: 'Müşteri segmentine göre çapraz satış öneri planı çıkar.', en: 'Build a cross-sell recommendation plan by customer segment.' },
+    ],
+  },
+  {
+    id: 'objections',
+    tr: 'İtirazlar',
+    en: 'Objections',
+    questions: [
+      { tr: '“Bu iş bana göre değil” itirazına etkili ama nazik cevap yaz.', en: 'Write an effective but gentle response to “this is not for me.”' },
+      { tr: '“Vaktim yok” diyen aday için gerçekçi çözüm odaklı yanıt üret.', en: 'Generate a realistic, solution-focused response for “I have no time.”' },
+      { tr: '“Param yok” itirazında güven oluşturan konuşma planı ver.', en: 'Give me a trust-building response plan for “I have no money.”' },
+      { tr: '“Eşim/ailem istemiyor” itirazına empatik yanıt akışı yaz.', en: 'Write an empathetic response flow for “my spouse/family does not want it.”' },
+      { tr: '“Daha önce denedim olmadı” itirazı için yeniden çerçeveleme metni ver.', en: 'Provide a reframing response for “I tried before and it did not work.”' },
+      { tr: 'İtirazı tartışmaya çevirmeden ilerleten soru tekniği öner.', en: 'Suggest a question technique that advances objections without arguing.' },
+    ],
+  },
+  {
+    id: 'other',
+    tr: 'Diğer',
+    en: 'Other',
+    questions: [
+      { tr: 'Bu ay için net hedef, ritim ve değerlendirme planı hazırlamamı sağla.', en: 'Help me prepare a monthly plan with clear goals, cadence, and review.' },
+      { tr: 'Günlük 30-60-90 dakikalık çalışma bloklarına göre görev dağılımı yap.', en: 'Distribute tasks across 30-60-90 minute daily work blocks.' },
+      { tr: 'Kendime uygun network marketing çalışma sistemi kurmama yardım et.', en: 'Help me build a network marketing operating system that fits me.' },
+      { tr: 'Verim düşüklüğünde hızlı toparlanma için 3 günlük reset planı yaz.', en: 'Write a 3-day reset plan for recovering from low productivity.' },
+      { tr: 'Haftalık kapanışta performansımı analiz etmek için kontrol listesi ver.', en: 'Provide a weekly review checklist to analyze my performance.' },
+      { tr: 'Önümüzdeki 90 gün için büyüme yol haritası oluştur.', en: 'Create a 90-day growth roadmap for me.' },
+    ],
+  },
+]
+
 export function AICoachWorkspace() {
   const { locale } = useLanguage()
   const h = useHeadingCase()
+  const router = useRouter()
   const currentLocale: 'tr' | 'en' = locale === 'tr' ? 'tr' : 'en'
 
-  const starterQuestions = useMemo(() => {
-    const questions = [
-      {
-        tr: 'Bu hafta için günlük 60 dakikalık en yüksek etkili çalışma planımı çıkar.',
-        en: 'Build my highest-impact 60-minute daily execution plan for this week.',
-      },
-      {
-        tr: 'Sıcak adayları 48 saat içinde karar aşamasına taşıyacak takip akışı ver.',
-        en: 'Give me a follow-up sequence to move hot prospects to decision within 48 hours.',
-      },
-      {
-        tr: 'Soğuk adayları yeniden ısıtmak için 7 günlük mesaj ve temas planı oluştur.',
-        en: 'Create a 7-day reactivation plan for cold prospects with messages and touchpoints.',
-      },
-      {
-        tr: 'İtirazları azaltmak için ilk görüşmede kullanacağım soru setini hazırla.',
-        en: 'Prepare a first-call question set to reduce objections early.',
-      },
-      {
-        tr: '“Vaktim yok” itirazına karşı 3 farklı kısa cevap yaz.',
-        en: 'Write 3 short responses for the “I have no time” objection.',
-      },
-      {
-        tr: '“Para yok” itirazına karşı güven veren bir konuşma akışı ver.',
-        en: 'Give me a trust-building response flow for the “I have no money” objection.',
-      },
-      {
-        tr: 'Yeni ekip üyesi için ilk 7 gün onboarding kontrol listesi çıkar.',
-        en: 'Create a first-7-days onboarding checklist for a new team member.',
-      },
-      {
-        tr: 'Ekipte düşük motivasyon yaşayan üyeyi toparlamak için koçluk planı yaz.',
-        en: 'Write a coaching plan for a team member with low motivation.',
-      },
-      {
-        tr: 'Ekip liderleri için haftalık kontrol toplantısı gündemi oluştur.',
-        en: 'Create a weekly check-in agenda for team leaders.',
-      },
-      {
-        tr: 'Günlük, haftalık ve aylık KPI hedeflerimi role göre belirle.',
-        en: 'Define daily, weekly, and monthly KPI targets by role.',
-      },
-      {
-        tr: 'Takipleri aksatmadan iş-özel hayat dengesini korumak için sistem kur.',
-        en: 'Design a system to protect work-life balance without missing follow-ups.',
-      },
-      {
-        tr: 'Toplantıdan sonra dönüş oranını artıran 3 mesaj şablonu üret.',
-        en: 'Generate 3 follow-up templates that increase post-meeting conversion.',
-      },
-      {
-        tr: 'İlk temas mesajını daha doğal ve satış baskısı olmadan yeniden yaz.',
-        en: 'Rewrite my first outreach message to feel natural and non-pushy.',
-      },
-      {
-        tr: 'Müşteriden ekip üyesine geçiş için etik ve etkili konuşma planı ver.',
-        en: 'Give me an ethical and effective transition script from customer to team member.',
-      },
-      {
-        tr: 'Etkinlik daveti için davet, hatırlatma ve teyit mesajlarını hazırla.',
-        en: 'Prepare invite, reminder, and confirmation messages for an event.',
-      },
-      {
-        tr: 'Etkinlik sonrası 5 günlük takip planı ile dönüşümü artır.',
-        en: 'Increase conversion with a 5-day post-event follow-up plan.',
-      },
-      {
-        tr: 'Sosyal medyadan gelen sıcak leadleri hızlıca nitelendirme akışı ver.',
-        en: 'Give me a quick qualification flow for hot leads from social media.',
-      },
-      {
-        tr: 'Verimsiz görüşmeleri azaltmak için ön eleme soruları üret.',
-        en: 'Produce pre-qualification questions to reduce low-quality meetings.',
-      },
-      {
-        tr: 'Bu ay ekip hacmini artırmak için 3 odak alanı ve ölçüm planı ver.',
-        en: 'Give me 3 focus areas and a tracking plan to grow team volume this month.',
-      },
-      {
-        tr: 'Haftalık kapanışta kendimi değerlendirmek için koçluk soruları hazırla.',
-        en: 'Prepare coaching reflection questions for my weekly review.',
-      },
-    ]
-    return questions.map((entry) => (currentLocale === 'tr' ? entry.tr : entry.en))
-  }, [currentLocale])
+  const starterQuestionGroups = useMemo(
+    () => STARTER_QUESTION_CATEGORIES.map((group) => ({
+      id: group.id,
+      label: currentLocale === 'tr' ? group.tr : group.en,
+      questions: group.questions.map((question) => (currentLocale === 'tr' ? question.tr : question.en)),
+    })),
+    [currentLocale],
+  )
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [prompt, setPrompt] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedQuestion, setSelectedQuestion] = useState('')
   const [error, setError] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -132,8 +187,22 @@ export function AICoachWorkspace() {
 
     try {
       const systemPrompt = currentLocale === 'tr'
-        ? 'Sen NMU için bir YZ Koçusun. Cevapların kısa, uygulanabilir ve network marketing odaklı olsun. Gerekirse adım adım eylem planı, mesaj taslağı ve takip adımı ver.'
-        : 'You are an AI Coach for NMU. Keep answers practical and concise. Focus on network marketing execution with concrete next steps.'
+        ? [
+          'Sen NMU için bir YZ Koçusun.',
+          'Yanıtları HER ZAMAN Markdown biçiminde ver.',
+          'Öncelik kitlen Türkçe konuşan Türkiye distribütörleri, distribütör adayları ve müşteriler.',
+          'Network marketing usulüne uygun, sade ve anlaşılır Türkçe kullan.',
+          'Anlaşılmaz veya yabancı jargon kullanma. Zorunlu jargon varsa kısa parantez içi açıklama ekle.',
+          '“Spillover”, “binary”, “bono yakmak” gibi muğlak ifadeler yerine açık ve günlük Türkçe karşılıklar kullan.',
+          'Yanıt yapısı: kısa özet, adım adım plan, örnek mesaj/konuşma metni, takip adımı.',
+          'Aşırı uzun ve dağınık anlatım yerine net, uygulanabilir öneriler ver.',
+        ].join('\n')
+        : [
+          'You are an AI Coach for NMU.',
+          'Always answer in Markdown format.',
+          'Use clear language, avoid unclear jargon, and keep recommendations practical.',
+          'Response structure: quick summary, step-by-step plan, sample message/script, follow-up action.',
+        ].join('\n')
 
       const payload = [
         { role: 'user' as const, content: systemPrompt },
@@ -175,14 +244,27 @@ export function AICoachWorkspace() {
         <Card className="border-primary/20 bg-gradient-to-br from-primary/12 to-secondary/5">
           <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
             <Lightbulb className="h-4 w-4 text-primary" />
-            {currentLocale === 'tr' ? 'Hızlı başlangıç soruları' : 'Quick starter prompts'}
+            {currentLocale === 'tr' ? 'Hızlı başlangıç soruları (50+)' : 'Quick starter prompts (50+)'}
           </div>
           <p className="mt-3 text-xs text-text-secondary">
             {currentLocale === 'tr'
               ? 'Listeden yardım alabilir ya da kendi sorunu aşağıdaki kutucuğa yazabilirsin!'
               : 'Pick from the list or write your own question in the box below.'}
           </p>
-          <div className="mt-2">
+          <div className="mt-2 grid gap-2 sm:grid-cols-[220px_minmax(0,1fr)]">
+            <select
+              value={selectedCategory}
+              onChange={(event) => {
+                setSelectedCategory(event.target.value)
+                setSelectedQuestion('')
+              }}
+              className="w-full rounded-xl border border-border-strong bg-surface/45 px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+            >
+              <option value="all">{currentLocale === 'tr' ? 'Tüm kategoriler' : 'All categories'}</option>
+              {starterQuestionGroups.map((group) => (
+                <option key={group.id} value={group.id}>{group.label}</option>
+              ))}
+            </select>
             <select
               value={selectedQuestion}
               onChange={(event) => {
@@ -195,9 +277,15 @@ export function AICoachWorkspace() {
               <option value="">
                 {currentLocale === 'tr' ? 'Bir soru seç...' : 'Select a starter question...'}
               </option>
-              {starterQuestions.map((question) => (
-                <option key={question} value={question}>{question}</option>
-              ))}
+              {starterQuestionGroups
+                .filter((group) => selectedCategory === 'all' || selectedCategory === group.id)
+                .map((group) => (
+                  <optgroup key={group.id} label={group.label}>
+                    {group.questions.map((question) => (
+                      <option key={`${group.id}-${question}`} value={question}>{question}</option>
+                    ))}
+                  </optgroup>
+                ))}
             </select>
           </div>
         </Card>
@@ -221,7 +309,26 @@ export function AICoachWorkspace() {
                     ? <Bot className="h-4 w-4 text-primary" />
                     : <User className="h-4 w-4 text-text-secondary" />}
                 </div>
-                <p className="whitespace-pre-wrap text-sm leading-6 text-text-primary">{message.content}</p>
+                {message.role === 'assistant' ? (
+                  <div className="min-w-0 flex-1 text-sm leading-6 text-text-primary">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h1: ({ children }) => <h1 className="text-base font-semibold mb-2">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-sm font-semibold mt-3 mb-2">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-1">{children}</h3>,
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
+                        code: ({ children }) => <code className="rounded bg-background/60 px-1 py-0.5 text-xs">{children}</code>,
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-text-primary">{message.content}</p>
+                )}
               </div>
             ))}
             {isSending && (
@@ -252,6 +359,15 @@ export function AICoachWorkspace() {
             </div>
           </form>
         </Card>
+      </motion.div>
+
+      <motion.div variants={item} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Button variant="outline" size="md" onClick={() => router.push('/academy')}>
+          {currentLocale === 'tr' ? 'Akademi’ye Git!' : 'Go to Academy!'}
+        </Button>
+        <Button variant="outline" size="md" onClick={() => router.push('/scripts')}>
+          {currentLocale === 'tr' ? 'İtiraz Bankası’na Git!' : 'Go to Objection Bank!'}
+        </Button>
       </motion.div>
     </motion.div>
   )
