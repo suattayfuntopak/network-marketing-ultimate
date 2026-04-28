@@ -1,6 +1,6 @@
 'use client'
 
-import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { endOfWeek, isWithinInterval, startOfWeek } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -37,7 +37,6 @@ import {
   isProspectStage,
   lastTouchLabel,
   localCalendarYmd,
-  parseCsvRecords,
   tagSurfaceClass,
   validSegments,
   type SegmentKey,
@@ -71,7 +70,6 @@ import {
   Contact,
   Pencil,
   MoreVertical,
-  Download,
   Flame,
   LayoutGrid,
   LayoutList,
@@ -97,7 +95,6 @@ export default function ContactsPage() {
   const qc = useQueryClient()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const importInputRef = useRef<HTMLInputElement>(null)
 
   const selectedId = searchParams.get('contact')
   const requestedSegment = searchParams.get('segment')
@@ -117,8 +114,6 @@ export default function ContactsPage() {
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [form, setForm] = useState<AddContactForm>(() => createEmptyForm(activeSegment))
   const [formError, setFormError] = useState('')
-  const [importing, setImporting] = useState(false)
-  const [importMessage, setImportMessage] = useState('')
   const [interactionError, setInteractionError] = useState('')
   const [taskError, setTaskError] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
@@ -670,86 +665,6 @@ export default function ContactsPage() {
     URL.revokeObjectURL(url)
   }
 
-  async function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file || !currentUser) return
-
-    setImporting(true)
-    setImportMessage('')
-
-    try {
-      const text = await file.text()
-      const parsedRows = parseCsvRecords(text)
-      if (parsedRows.length === 0) throw new Error(currentLocale === 'tr' ? 'CSV boş.' : 'CSV is empty.')
-
-      const [headerRow, ...lines] = parsedRows
-      const headers = headerRow.map((header) => header.trim())
-      if (!headers.includes('full_name')) {
-        throw new Error(currentLocale === 'tr' ? 'CSV içinde full_name kolonu zorunludur.' : 'CSV must include a full_name column.')
-      }
-      const importedRows = lines
-        .map((values) =>
-          headers.reduce<Record<string, string>>((accumulator, header, index) => {
-            accumulator[header] = (values[index] ?? '').trim()
-            return accumulator
-          }, {}),
-        )
-        .filter((row) => row.full_name?.trim())
-
-      if (importedRows.length === 0) {
-        throw new Error(currentLocale === 'tr'
-          ? 'İçe aktarılacak geçerli kayıt bulunamadı.'
-          : 'No valid records found for import.')
-      }
-
-      for (const row of importedRows) {
-        const scoreRaw = row.temperature_score?.trim()
-        const parsedScore = scoreRaw !== undefined && scoreRaw !== '' ? Number(scoreRaw) : undefined
-        const goalsBlock = (row.goals ?? row.goals_comma ?? '').trim()
-        const notesBlock = (row.notes ?? '').trim()
-        const goals_notes =
-          goalsBlock && notesBlock
-            ? `${goalsBlock}\n\n${notesBlock}`
-            : goalsBlock || notesBlock || undefined
-        await addContact(currentUser.id, {
-          full_name: row.full_name.trim(),
-          phone: row.phone || undefined,
-          email: row.email || undefined,
-          profession: row.profession || undefined,
-          location: row.location || undefined,
-          nickname: row.nickname || undefined,
-          whatsapp_username: row.whatsapp_username || row.whatsapp || undefined,
-          telegram_username: row.telegram_username || row.telegram || undefined,
-          instagram_username: row.instagram_username || row.instagram || undefined,
-          relationship_type: row.relationship_type || undefined,
-          birthday: row.birthday || undefined,
-          family_notes: row.family_notes || undefined,
-          interests: row.interests || undefined,
-          pain_points: row.pain_points || undefined,
-          goals_notes,
-          tags: row.tags ? parseCommaTags(row.tags) : undefined,
-          temperature: (row.temperature as ContactRow['temperature']) || undefined,
-          temperature_score: Number.isFinite(parsedScore) ? parsedScore : undefined,
-          interest_type: (row.interest_type as AddContactForm['interest_type']) || 'unknown',
-          source: row.source || undefined,
-          pipeline_stage: row.pipeline_stage || undefined,
-        })
-      }
-
-      await qc.invalidateQueries({ queryKey: ['contacts'] })
-      setImportMessage(currentLocale === 'tr'
-        ? `${importedRows.length} kontak içe aktarıldı.`
-        : `${importedRows.length} contacts imported.`)
-    } catch (error) {
-      setImportMessage(error instanceof Error ? error.message : (currentLocale === 'tr'
-        ? 'İçe aktarma sırasında hata oluştu.'
-        : 'Import failed.'))
-    } finally {
-      setImporting(false)
-      event.target.value = ''
-    }
-  }
-
   async function handleAddContact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!currentUser) return
@@ -968,23 +883,7 @@ export default function ContactsPage() {
             <p className="text-sm text-text-secondary mt-0.5">{contacts.length} {t.contacts.subtitle}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <input
-              ref={importInputRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={handleImportFile}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<Upload className="w-3.5 h-3.5" />}
-              onClick={() => importInputRef.current?.click()}
-              loading={importing}
-            >
-              {currentLocale === 'tr' ? 'İçe Aktar' : 'Import'}
-            </Button>
-            <Button variant="outline" size="sm" icon={<Download className="w-3.5 h-3.5" />} onClick={exportContacts}>
+            <Button variant="outline" size="sm" icon={<Upload className="w-3.5 h-3.5" />} onClick={exportContacts}>
               {currentLocale === 'tr' ? 'Dışa Aktar' : 'Export'}
             </Button>
             <Button size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={openAddModal}>
@@ -992,14 +891,6 @@ export default function ContactsPage() {
             </Button>
           </div>
         </motion.div>
-
-        {importMessage && (
-          <motion.div variants={item}>
-            <div className="rounded-xl border border-border bg-surface/50 px-4 py-3 text-sm text-text-secondary">
-              {importMessage}
-            </div>
-          </motion.div>
-        )}
 
         <motion.div variants={item} className="space-y-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -1,5 +1,5 @@
-import { AIMessageWorkspace } from '@/components/ai/AIMessageWorkspace'
+import { AICoachWorkspace } from '@/components/ai/AICoachWorkspace'
 
 export default function AIPage() {
-  return <AIMessageWorkspace />
+  return <AICoachWorkspace />
 }
