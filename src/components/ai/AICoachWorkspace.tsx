@@ -27,33 +27,95 @@ export function AICoachWorkspace() {
   const h = useHeadingCase()
   const currentLocale: 'tr' | 'en' = locale === 'tr' ? 'tr' : 'en'
 
-  const starterQuestions = useMemo(
-    () => (currentLocale === 'tr'
-      ? [
-          'Bugün sıcak adaylarımı satışa yaklaştırmak için 3 adımlı plan ver.',
-          'Ekibimde motivasyonu düşen üyeyi toparlamak için koçluk akışı yaz.',
-          'Bu hafta görevler, takvim ve etkinlikleri tek plana dönüştür.',
-          'Yeni başlayan bir üyeye 7 günlük onboarding planı çıkar.',
-        ]
-      : [
-          'Give me a 3-step plan to move hot prospects toward a sale today.',
-          'Write a coaching flow for a team member with low motivation.',
-          'Turn this week tasks, calendar, and events into one action plan.',
-          'Create a 7-day onboarding plan for a new team member.',
-        ]),
-    [currentLocale],
-  )
+  const starterQuestions = useMemo(() => {
+    const questions = [
+      {
+        tr: 'Bu hafta için günlük 60 dakikalık en yüksek etkili çalışma planımı çıkar.',
+        en: 'Build my highest-impact 60-minute daily execution plan for this week.',
+      },
+      {
+        tr: 'Sıcak adayları 48 saat içinde karar aşamasına taşıyacak takip akışı ver.',
+        en: 'Give me a follow-up sequence to move hot prospects to decision within 48 hours.',
+      },
+      {
+        tr: 'Soğuk adayları yeniden ısıtmak için 7 günlük mesaj ve temas planı oluştur.',
+        en: 'Create a 7-day reactivation plan for cold prospects with messages and touchpoints.',
+      },
+      {
+        tr: 'İtirazları azaltmak için ilk görüşmede kullanacağım soru setini hazırla.',
+        en: 'Prepare a first-call question set to reduce objections early.',
+      },
+      {
+        tr: '“Vaktim yok” itirazına karşı 3 farklı kısa cevap yaz.',
+        en: 'Write 3 short responses for the “I have no time” objection.',
+      },
+      {
+        tr: '“Para yok” itirazına karşı güven veren bir konuşma akışı ver.',
+        en: 'Give me a trust-building response flow for the “I have no money” objection.',
+      },
+      {
+        tr: 'Yeni ekip üyesi için ilk 7 gün onboarding kontrol listesi çıkar.',
+        en: 'Create a first-7-days onboarding checklist for a new team member.',
+      },
+      {
+        tr: 'Ekipte düşük motivasyon yaşayan üyeyi toparlamak için koçluk planı yaz.',
+        en: 'Write a coaching plan for a team member with low motivation.',
+      },
+      {
+        tr: 'Ekip liderleri için haftalık kontrol toplantısı gündemi oluştur.',
+        en: 'Create a weekly check-in agenda for team leaders.',
+      },
+      {
+        tr: 'Günlük, haftalık ve aylık KPI hedeflerimi role göre belirle.',
+        en: 'Define daily, weekly, and monthly KPI targets by role.',
+      },
+      {
+        tr: 'Takipleri aksatmadan iş-özel hayat dengesini korumak için sistem kur.',
+        en: 'Design a system to protect work-life balance without missing follow-ups.',
+      },
+      {
+        tr: 'Toplantıdan sonra dönüş oranını artıran 3 mesaj şablonu üret.',
+        en: 'Generate 3 follow-up templates that increase post-meeting conversion.',
+      },
+      {
+        tr: 'İlk temas mesajını daha doğal ve satış baskısı olmadan yeniden yaz.',
+        en: 'Rewrite my first outreach message to feel natural and non-pushy.',
+      },
+      {
+        tr: 'Müşteriden ekip üyesine geçiş için etik ve etkili konuşma planı ver.',
+        en: 'Give me an ethical and effective transition script from customer to team member.',
+      },
+      {
+        tr: 'Etkinlik daveti için davet, hatırlatma ve teyit mesajlarını hazırla.',
+        en: 'Prepare invite, reminder, and confirmation messages for an event.',
+      },
+      {
+        tr: 'Etkinlik sonrası 5 günlük takip planı ile dönüşümü artır.',
+        en: 'Increase conversion with a 5-day post-event follow-up plan.',
+      },
+      {
+        tr: 'Sosyal medyadan gelen sıcak leadleri hızlıca nitelendirme akışı ver.',
+        en: 'Give me a quick qualification flow for hot leads from social media.',
+      },
+      {
+        tr: 'Verimsiz görüşmeleri azaltmak için ön eleme soruları üret.',
+        en: 'Produce pre-qualification questions to reduce low-quality meetings.',
+      },
+      {
+        tr: 'Bu ay ekip hacmini artırmak için 3 odak alanı ve ölçüm planı ver.',
+        en: 'Give me 3 focus areas and a tracking plan to grow team volume this month.',
+      },
+      {
+        tr: 'Haftalık kapanışta kendimi değerlendirmek için koçluk soruları hazırla.',
+        en: 'Prepare coaching reflection questions for my weekly review.',
+      },
+    ]
+    return questions.map((entry) => (currentLocale === 'tr' ? entry.tr : entry.en))
+  }, [currentLocale])
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: currentLocale === 'tr'
-        ? 'Merhaba, ben YZ Koçun. Network marketing, ekip yönetimi, süreç takibi, görevler, etkinlikler ve motivasyon konularında net, uygulanabilir öneriler verebilirim.'
-        : 'Hi, I am your AI Coach. I can help with network marketing, team leadership, pipeline execution, tasks, events, and motivation with practical advice.',
-    },
-  ])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [prompt, setPrompt] = useState('')
+  const [selectedQuestion, setSelectedQuestion] = useState('')
   const [error, setError] = useState('')
   const [isSending, setIsSending] = useState(false)
 
@@ -70,7 +132,7 @@ export function AICoachWorkspace() {
 
     try {
       const systemPrompt = currentLocale === 'tr'
-        ? 'Sen NMU icin bir YZ Kocusun. Cevaplarin kisa, uygulanabilir, network marketing odakli olsun. Gerekirse adim adim eylem plani, mesaj taslagi ve takip adimi ver.'
+        ? 'Sen NMU için bir YZ Koçusun. Cevapların kısa, uygulanabilir ve network marketing odaklı olsun. Gerekirse adım adım eylem planı, mesaj taslağı ve takip adımı ver.'
         : 'You are an AI Coach for NMU. Keep answers practical and concise. Focus on network marketing execution with concrete next steps.'
 
       const payload = [
@@ -78,16 +140,16 @@ export function AICoachWorkspace() {
         ...nextMessages.map((message) => ({ role: message.role, content: message.content })),
       ]
       const response = await postAiChat(payload)
-      if (!response.ok) throw new Error(currentLocale === 'tr' ? 'YZ yaniti alinamadi.' : 'Could not get AI response.')
+      if (!response.ok) throw new Error(currentLocale === 'tr' ? 'YZ yanıtı alınamadı.' : 'Could not get AI response.')
       const assistantText = (await response.text()).trim()
-      if (!assistantText) throw new Error(currentLocale === 'tr' ? 'Bos yanit dondu.' : 'Empty response.')
+      if (!assistantText) throw new Error(currentLocale === 'tr' ? 'Boş yanıt döndü.' : 'Empty response.')
 
       setMessages((current) => [
         ...current,
         { id: crypto.randomUUID(), role: 'assistant', content: assistantText },
       ])
     } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : (currentLocale === 'tr' ? 'Bir hata olustu.' : 'Something went wrong.'))
+      setError(sendError instanceof Error ? sendError.message : (currentLocale === 'tr' ? 'Bir hata oluştu.' : 'Something went wrong.'))
     } finally {
       setIsSending(false)
     }
@@ -101,13 +163,10 @@ export function AICoachWorkspace() {
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
       <motion.div variants={item} className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.18em] text-text-tertiary">
-          {currentLocale === 'tr' ? 'YZ Koçu' : 'AI Coach'}
-        </p>
         <h1 className="text-2xl font-bold text-text-primary">{h(currentLocale === 'tr' ? 'YZ Koçu' : 'AI Coach')}</h1>
         <p className="text-sm text-text-secondary">
           {currentLocale === 'tr'
-            ? 'Sorunu yaz, net bir eylem plani al. Bu alan network marketing akisinin tamamina koçluk eder.'
+            ? 'İşini büyütmek için dilediğini sor, net bir plan al!'
             : 'Ask anything and get a practical action plan. This space coaches your full network marketing flow.'}
         </p>
       </motion.div>
@@ -116,19 +175,30 @@ export function AICoachWorkspace() {
         <Card className="border-primary/20 bg-gradient-to-br from-primary/12 to-secondary/5">
           <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
             <Lightbulb className="h-4 w-4 text-primary" />
-            {currentLocale === 'tr' ? 'Hizli baslangic sorulari' : 'Quick starter prompts'}
+            {currentLocale === 'tr' ? 'Hızlı başlangıç soruları' : 'Quick starter prompts'}
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {starterQuestions.map((question) => (
-              <button
-                key={question}
-                type="button"
-                onClick={() => setPrompt(question)}
-                className="rounded-full border border-border-strong bg-surface/45 px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-primary/40 hover:text-text-primary"
-              >
-                {question}
-              </button>
-            ))}
+          <p className="mt-3 text-xs text-text-secondary">
+            {currentLocale === 'tr'
+              ? 'Listeden yardım alabilir ya da kendi sorunu aşağıdaki kutucuğa yazabilirsin!'
+              : 'Pick from the list or write your own question in the box below.'}
+          </p>
+          <div className="mt-2">
+            <select
+              value={selectedQuestion}
+              onChange={(event) => {
+                const nextValue = event.target.value
+                setSelectedQuestion(nextValue)
+                if (nextValue) setPrompt(nextValue)
+              }}
+              className="w-full rounded-xl border border-border-strong bg-surface/45 px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+            >
+              <option value="">
+                {currentLocale === 'tr' ? 'Bir soru seç...' : 'Select a starter question...'}
+              </option>
+              {starterQuestions.map((question) => (
+                <option key={question} value={question}>{question}</option>
+              ))}
+            </select>
           </div>
         </Card>
       </motion.div>
@@ -157,7 +227,7 @@ export function AICoachWorkspace() {
             {isSending && (
               <div className="flex items-center gap-2 text-xs text-text-tertiary">
                 <Sparkles className="h-3.5 w-3.5 animate-pulse text-primary" />
-                {currentLocale === 'tr' ? 'YZ Koç dusunuyor...' : 'AI Coach is thinking...'}
+                {currentLocale === 'tr' ? 'YZ Koç düşünüyor...' : 'AI Coach is thinking...'}
               </div>
             )}
           </div>
@@ -167,9 +237,10 @@ export function AICoachWorkspace() {
               <Textarea
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
-                rows={4}
+                rows={8}
+                className="min-h-[180px]"
                 placeholder={currentLocale === 'tr'
-                  ? 'Ornek: Bu hafta ekip, kontaklar, gorevler ve etkinliklerim icin tek bir calisma plani ver.'
+                  ? 'Örnek: Bu hafta ekip, kontaklar, görevler ve etkinliklerim için tek bir çalışma planı ver.'
                   : 'Example: Build one execution plan for my team, contacts, tasks, and events this week.'}
               />
               {error && <p className="text-xs text-error">{error}</p>}
