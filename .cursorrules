@@ -1,0 +1,13 @@
+## Knowledge Base — My Brain Vault
+
+Path: ~/Brain/my-brain
+
+When you need context, read in this order — stop when you have enough:
+1. ~/Brain/my-brain/wiki/hot.md
+2. ~/Brain/my-brain/wiki/index.md
+3. ~/Brain/my-brain/wiki/projects/nmu/_index.md
+4. ~/Brain/my-brain/wiki/tech/_index.md
+
+Do NOT read the entire vault. Stop as soon as you have enough context.
+
+When you finish a session, update ~/Brain/my-brain/wiki/hot.md with what was done and what's next.
