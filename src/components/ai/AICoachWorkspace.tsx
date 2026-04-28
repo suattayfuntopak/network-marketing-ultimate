@@ -244,7 +244,7 @@ export function AICoachWorkspace() {
         <Card className="border-primary/20 bg-gradient-to-br from-primary/12 to-secondary/5">
           <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
             <Lightbulb className="h-4 w-4 text-primary" />
-            {currentLocale === 'tr' ? 'Hızlı başlangıç soruları (50+)' : 'Quick starter prompts (50+)'}
+            {currentLocale === 'tr' ? 'Hızlı Başlangıç Soruları' : 'Quick Starter Prompts'}
           </div>
           <p className="mt-3 text-xs text-text-secondary">
             {currentLocale === 'tr'
@@ -314,13 +314,15 @@ export function AICoachWorkspace() {
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
-                        h1: ({ children }) => <h1 className="text-base font-semibold mb-2">{children}</h1>,
-                        h2: ({ children }) => <h2 className="text-sm font-semibold mt-3 mb-2">{children}</h2>,
-                        h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-1">{children}</h3>,
-                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                        ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
+                        h1: ({ children }) => <h1 className="text-base font-semibold mb-2 leading-6">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-sm font-semibold mt-3 mb-2 leading-6">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-1 leading-6">{children}</h3>,
+                        p: ({ children }) => <p className="mb-2 last:mb-0 leading-6 text-text-primary">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1.5">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1.5">{children}</ol>,
+                        hr: () => null,
                         code: ({ children }) => <code className="rounded bg-background/60 px-1 py-0.5 text-xs">{children}</code>,
+                        blockquote: ({ children }) => <blockquote className="border-l-2 border-primary/40 pl-3 italic text-text-secondary">{children}</blockquote>,
                       }}
                     >
                       {message.content}
@@ -362,10 +364,20 @@ export function AICoachWorkspace() {
       </motion.div>
 
       <motion.div variants={item} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Button variant="outline" size="md" onClick={() => router.push('/academy')}>
+        <Button
+          variant="outline"
+          size="md"
+          className="border-[#95D5B2]/45 bg-[#95D5B2]/14 text-[#DFF7E8] hover:bg-[#95D5B2]/22 hover:border-[#95D5B2]/60"
+          onClick={() => router.push('/academy')}
+        >
           {currentLocale === 'tr' ? 'Akademi’ye Git!' : 'Go to Academy!'}
         </Button>
-        <Button variant="outline" size="md" onClick={() => router.push('/scripts')}>
+        <Button
+          variant="outline"
+          size="md"
+          className="border-[#AFCBFF]/45 bg-[#AFCBFF]/14 text-[#E8F0FF] hover:bg-[#AFCBFF]/22 hover:border-[#AFCBFF]/60"
+          onClick={() => router.push('/academy?tab=objections')}
+        >
           {currentLocale === 'tr' ? 'İtiraz Bankası’na Git!' : 'Go to Objection Bank!'}
         </Button>
       </motion.div>
