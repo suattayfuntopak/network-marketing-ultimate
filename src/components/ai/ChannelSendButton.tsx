@@ -10,12 +10,14 @@ import { ChevronDown, MessageSquare, SendHorizontal } from 'lucide-react'
 const CHANNELS: readonly {
   id: MessageSendChannel
   iconUrl?: string
+  /** Etkinlikler detayındaki “Kişilere Gönder” menüsü ile aynı: Instagram henüz kapalı */
+  disabled?: boolean
 }[] = [
   { id: 'whatsapp', iconUrl: 'https://cdn.simpleicons.org/whatsapp/25D366' },
   { id: 'telegram', iconUrl: 'https://cdn.simpleicons.org/telegram/26A5E4' },
   { id: 'email', iconUrl: 'https://cdn.simpleicons.org/gmail/EA4335' },
   { id: 'sms' },
-  { id: 'instagram', iconUrl: 'https://cdn.simpleicons.org/instagram/E4405F' },
+  { id: 'instagram', iconUrl: 'https://cdn.simpleicons.org/instagram/E4405F', disabled: true },
 ] as const
 
 type Props = {
@@ -38,6 +40,8 @@ type Props = {
   buttonClassName?: string
   /** Varsayılan: aşağı (top-full). Sadece alt kenarda taşma varsa `up` kullanın. */
   menuPlacement?: 'up' | 'down'
+  /** Etkinlik detayı vb. ile aynı hizada tetikleyicide köşeye yaslama */
+  menuAlign?: 'start' | 'end'
 }
 
 function labelFor(channel: MessageSendChannel, locale: 'tr' | 'en') {
@@ -121,6 +125,7 @@ export function ChannelSendButton({
   className,
   buttonClassName,
   menuPlacement = 'down',
+  menuAlign = 'start',
 }: Props) {
   const [open, setOpen] = useState(false)
   const [pickerChannel, setPickerChannel] = useState<'whatsapp' | 'sms' | null>(null)
@@ -186,12 +191,15 @@ export function ChannelSendButton({
       {open && hasDraft && (
         <ul
           className={cn(
-            'absolute z-50 w-full min-w-[12rem] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-xl sm:left-0 sm:right-auto',
+            'absolute z-50 overflow-hidden rounded-3xl border border-border bg-card py-2 shadow-xl',
+            menuAlign === 'end'
+              ? 'right-0 left-auto w-56'
+              : 'left-0 right-auto w-full min-w-[12rem] sm:w-56',
             menuPlacement === 'up' ? 'bottom-full mb-1' : 'top-full mt-1',
           )}
         >
           {CHANNELS.map((c) => {
-            const dis = channelDisabled(c.id, linkMode, canUsePhone)
+            const dis = Boolean(c.disabled) || channelDisabled(c.id, linkMode, canUsePhone)
             return (
               <li key={c.id}>
                 <button
@@ -206,14 +214,17 @@ export function ChannelSendButton({
                     multiPhonePick && (c.id === 'whatsapp' || c.id === 'sms'),
                   )}
                   disabled={dis}
-                  onClick={() => pick(c.id)}
-                  className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-text-primary transition enabled:hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => {
+                    if (c.disabled) return
+                    pick(c.id)
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-text-primary transition enabled:hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-text-tertiary/60"
                 >
                   {c.iconUrl ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={c.iconUrl} alt="" className="h-4 w-4 shrink-0" width={16} height={16} />
+                    <img src={c.iconUrl} alt="" className="h-5 w-5 shrink-0" width={20} height={20} />
                   ) : (
-                    <MessageSquare className="h-4 w-4 shrink-0 text-cyan-300" />
+                    <MessageSquare className="h-5 w-5 shrink-0 text-cyan-300" />
                   )}
                   <span>{labelFor(c.id, locale)}</span>
                 </button>

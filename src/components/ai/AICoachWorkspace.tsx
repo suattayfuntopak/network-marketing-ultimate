@@ -1,17 +1,18 @@
 'use client'
 
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Input'
+import { ChannelSendButton } from '@/components/ai/ChannelSendButton'
 import { useLanguage } from '@/components/common/LanguageProvider'
 import { useHeadingCase } from '@/hooks/useHeadingCase'
 import { postAiChat } from '@/lib/aiClient'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Bot, Lightbulb, Send, Sparkles, User } from 'lucide-react'
+import { Bot, Check, Copy, Lightbulb, RefreshCcw, RefreshCw, Send, Sparkles, SquarePen, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type ChatRole = 'user' | 'assistant'
@@ -24,6 +25,18 @@ type ChatMessage = {
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
+
+/** Rough plain-text extraction for clipboard / external sends (WhatsApp, SMS, …). */
+function coachReplyPlain(markdown: string): string {
+  return markdown
+    .replace(/\r\n/g, '\n')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/^[-*]\s+/gm, '• ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
 
 type StarterQuestionCategory = {
   id: string
@@ -186,6 +199,61 @@ export function AICoachWorkspace() {
   const [selectedQuestion, setSelectedQuestion] = useState('')
   const [error, setError] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const lastAssistantMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i]
+      if (message?.role === 'assistant') return message
+    }
+    return null
+  }, [messages])
+
+  const plainAssistantBody = lastAssistantMessage ? coachReplyPlain(lastAssistantMessage.content) : ''
+
+  const showComposer = !messages.some((m) => m.role === 'assistant') && !isSending
+
+  const showReplyToolbar = Boolean(lastAssistantMessage) && !isSending
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => setCopied(false), 2000)
+    return () => window.clearTimeout(timer)
+  }, [copied])
+
+  async function fetchAssistantReply(conversationSlice: ChatMessage[]): Promise<string> {
+    const systemPrompt = currentLocale === 'tr'
+      ? [
+        'Sen NMU için bir YZ Koçusun.',
+        'Kullanıcıya doğrudan koçluk cevabı ver; sistem talimatı, iç çelişki analizi, format tartışması veya seçenek menüsü sunma.',
+        'Yanıtta “Markdown”, “HTML”, “talimatlar çakışıyor”, “şu seçeneklerden birini seç” gibi meta ifadeler kullanma.',
+        'Öncelik kitlen Türkçe konuşan Türkiye distribütörleri, distribütör adayları ve müşteriler.',
+        'Network marketing usulüne uygun, sade ve anlaşılır Türkçe kullan.',
+        'Anlaşılmaz veya yabancı jargon kullanma; zorunluysa kısa parantez içi açıklama ekle.',
+        '“Spillover”, “binary”, “bono yakmak” gibi muğlak ifadeler yerine açık ve günlük Türkçe karşılıklar kullan.',
+        'Yanıtı kısa başlıklar ve numaralı madde işaretleriyle yapılandır; kullanıcıya formatın adını veya teknik terimini söyleme.',
+        'Yanıt yapısı: kısa özet, adım adım plan, örnek mesaj/konuşma metni, takip adımı.',
+        'Net, uygulanabilir ve profesyonel koç tonunda yaz.',
+      ].join('\n')
+      : [
+        'You are an AI Coach for NMU.',
+        'Answer with direct coaching only; do not discuss system instructions, conflicts, or formatting choices.',
+        'Never mention Markdown/HTML or ask the user to pick how you should behave.',
+        'Use clear English and practical network-marketing guidance.',
+        'Structure with headings and bullets without naming the format.',
+        'Response structure: quick summary, step-by-step plan, sample message/script, follow-up action.',
+      ].join('\n')
+
+    const payload = [
+      { role: 'user' as const, content: systemPrompt },
+      ...conversationSlice.map((message) => ({ role: message.role, content: message.content })),
+    ]
+    const response = await postAiChat(payload)
+    if (!response.ok) throw new Error(currentLocale === 'tr' ? 'YZ yanıtı alınamadı.' : 'Could not get AI response.')
+    const assistantText = (await response.text()).trim()
+    if (!assistantText) throw new Error(currentLocale === 'tr' ? 'Boş yanıt döndü.' : 'Empty response.')
+    return assistantText
+  }
 
   async function sendMessage(text: string) {
     const cleanText = text.trim()
@@ -199,37 +267,7 @@ export function AICoachWorkspace() {
     setIsSending(true)
 
     try {
-      const systemPrompt = currentLocale === 'tr'
-        ? [
-          'Sen NMU için bir YZ Koçusun.',
-          'Kullanıcıya doğrudan koçluk cevabı ver; sistem talimatı, iç çelişki analizi, format tartışması veya seçenek menüsü sunma.',
-          'Yanıtta “Markdown”, “HTML”, “talimatlar çakışıyor”, “şu seçeneklerden birini seç” gibi meta ifadeler kullanma.',
-          'Öncelik kitlen Türkçe konuşan Türkiye distribütörleri, distribütör adayları ve müşteriler.',
-          'Network marketing usulüne uygun, sade ve anlaşılır Türkçe kullan.',
-          'Anlaşılmaz veya yabancı jargon kullanma; zorunluysa kısa parantez içi açıklama ekle.',
-          '“Spillover”, “binary”, “bono yakmak” gibi muğlak ifadeler yerine açık ve günlük Türkçe karşılıklar kullan.',
-          'Yanıtı kısa başlıklar ve numaralı madde işaretleriyle yapılandır; kullanıcıya formatın adını veya teknik terimini söyleme.',
-          'Yanıt yapısı: kısa özet, adım adım plan, örnek mesaj/konuşma metni, takip adımı.',
-          'Net, uygulanabilir ve profesyonel koç tonunda yaz.',
-        ].join('\n')
-        : [
-          'You are an AI Coach for NMU.',
-          'Answer with direct coaching only; do not discuss system instructions, conflicts, or formatting choices.',
-          'Never mention Markdown/HTML or ask the user to pick how you should behave.',
-          'Use clear English and practical network-marketing guidance.',
-          'Structure with headings and bullets without naming the format.',
-          'Response structure: quick summary, step-by-step plan, sample message/script, follow-up action.',
-        ].join('\n')
-
-      const payload = [
-        { role: 'user' as const, content: systemPrompt },
-        ...nextMessages.map((message) => ({ role: message.role, content: message.content })),
-      ]
-      const response = await postAiChat(payload)
-      if (!response.ok) throw new Error(currentLocale === 'tr' ? 'YZ yanıtı alınamadı.' : 'Could not get AI response.')
-      const assistantText = (await response.text()).trim()
-      if (!assistantText) throw new Error(currentLocale === 'tr' ? 'Boş yanıt döndü.' : 'Empty response.')
-
+      const assistantText = await fetchAssistantReply(nextMessages)
       setMessages((current) => [
         ...current,
         { id: crypto.randomUUID(), role: 'assistant', content: assistantText },
@@ -241,9 +279,67 @@ export function AICoachWorkspace() {
     }
   }
 
+  async function handleRegenerateReply() {
+    if (isSending) return
+    let lastAssistantIndex = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === 'assistant') {
+        lastAssistantIndex = i
+        break
+      }
+    }
+    if (lastAssistantIndex < 0) return
+
+    const conversationBeforeAssistant = messages.slice(0, lastAssistantIndex)
+    const snapshot = [...messages]
+    setMessages(conversationBeforeAssistant)
+    setError('')
+    setIsSending(true)
+
+    try {
+      const assistantText = await fetchAssistantReply(conversationBeforeAssistant)
+      setMessages([
+        ...conversationBeforeAssistant,
+        { id: crypto.randomUUID(), role: 'assistant', content: assistantText },
+      ])
+    } catch (sendError) {
+      setMessages(snapshot)
+      setError(sendError instanceof Error ? sendError.message : (currentLocale === 'tr' ? 'Bir hata oluştu.' : 'Something went wrong.'))
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     void sendMessage(prompt)
+  }
+
+  async function handleCopyReply() {
+    if (!plainAssistantBody) return
+    try {
+      await navigator.clipboard.writeText(plainAssistantBody)
+      setCopied(true)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function handleEditReply() {
+    if (!lastAssistantMessage) return
+    setPrompt(coachReplyPlain(lastAssistantMessage.content))
+    setMessages([])
+    setSelectedQuestion('')
+    setError('')
+  }
+
+  function handleRefreshCoach() {
+    setMessages([])
+    setPrompt('')
+    setSelectedCategory('all')
+    setSelectedQuestion('')
+    setError('')
+    setCopied(false)
   }
 
   return (
@@ -358,25 +454,80 @@ export function AICoachWorkspace() {
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="border-t border-border p-4 sm:p-5">
-            <div className="space-y-3">
-              <Textarea
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                rows={8}
-                className="min-h-[180px]"
-                placeholder={currentLocale === 'tr'
-                  ? 'Örnek: Bu hafta ekip, kontaklar, görevler ve etkinliklerim için tek bir çalışma planı ver.'
-                  : 'Example: Build one execution plan for my team, contacts, tasks, and events this week.'}
+          {showReplyToolbar && (
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-3 sm:px-5">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                icon={copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                onClick={() => void handleCopyReply()}
+              >
+                {currentLocale === 'tr' ? 'Kopyala' : 'Copy'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                icon={<SquarePen className="h-3.5 w-3.5" />}
+                onClick={handleEditReply}
+              >
+                {currentLocale === 'tr' ? 'Düzenle' : 'Edit'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                icon={<RefreshCcw className="h-3.5 w-3.5" />}
+                onClick={() => void handleRegenerateReply()}
+              >
+                {currentLocale === 'tr' ? 'Yeniden Üret' : 'Regenerate'}
+              </Button>
+              <ChannelSendButton
+                body={plainAssistantBody}
+                label={currentLocale === 'tr' ? 'Gönder' : 'Send'}
+                locale={currentLocale}
+                linkMode="loose"
+                size="sm"
+                variant="secondary"
+                menuPlacement="up"
+                menuAlign="end"
+                className="inline-flex w-auto min-w-[7.5rem] max-w-[14rem] shrink-0"
+                buttonClassName="rounded-full bg-teal-400/90 text-neutral-900 hover:bg-teal-400 dark:bg-teal-500/85 dark:text-neutral-950 dark:hover:bg-teal-400/90"
               />
-              {error && <p className="text-xs text-error">{error}</p>}
-              <div className="flex items-center justify-end">
-                <Button type="submit" size="sm" icon={<Send className="h-3.5 w-3.5" />} loading={isSending}>
-                  {currentLocale === 'tr' ? 'Koça Sor' : 'Ask Coach'}
-                </Button>
-              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                icon={<RefreshCw className="h-3.5 w-3.5" />}
+                onClick={handleRefreshCoach}
+              >
+                {currentLocale === 'tr' ? 'Yenile' : 'Refresh'}
+              </Button>
             </div>
-          </form>
+          )}
+
+          {showComposer && (
+            <form onSubmit={handleSubmit} className="border-t border-border p-4 sm:p-5">
+              <div className="space-y-3">
+                <Textarea
+                  value={prompt}
+                  onChange={(event) => setPrompt(event.target.value)}
+                  rows={8}
+                  className="min-h-[180px]"
+                  placeholder={currentLocale === 'tr'
+                    ? 'Örnek: Bu hafta ekip, kontaklar, görevler ve etkinliklerim için tek bir çalışma planı ver.'
+                    : 'Example: Build one execution plan for my team, contacts, tasks, and events this week.'}
+                />
+                {error && <p className="text-xs text-error">{error}</p>}
+                <div className="flex items-center justify-end">
+                  <Button type="submit" size="sm" icon={<Send className="h-3.5 w-3.5" />} loading={isSending}>
+                    {currentLocale === 'tr' ? 'Koça Sor' : 'Ask Coach'}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          )}
         </Card>
       </motion.div>
 
@@ -384,7 +535,7 @@ export function AICoachWorkspace() {
         <Button
           variant="outline"
           size="md"
-          className="border-[#95D5B2]/45 bg-[#95D5B2]/14 text-[#DFF7E8] hover:bg-[#95D5B2]/22 hover:border-[#95D5B2]/60"
+          className="border-emerald-600/30 bg-emerald-500/15 text-emerald-950 hover:bg-emerald-500/22 hover:border-emerald-700/45 dark:border-emerald-400/40 dark:bg-emerald-500/14 dark:text-emerald-50 dark:hover:bg-emerald-500/22"
           onClick={() => router.push('/academy')}
         >
           {currentLocale === 'tr' ? 'Akademi’ye Git!' : 'Go to Academy!'}
@@ -392,7 +543,7 @@ export function AICoachWorkspace() {
         <Button
           variant="outline"
           size="md"
-          className="border-[#FF9F68]/55 bg-[#FF9F68]/22 text-[#FFF5EC] shadow-[0_0_22px_rgba(255,159,104,0.18)] hover:bg-[#FF9F68]/30 hover:border-[#FF9F68]/75"
+          className="border-orange-400/50 bg-orange-400/18 text-orange-950 shadow-sm hover:bg-orange-400/26 hover:border-orange-500/60 dark:border-orange-400/45 dark:bg-orange-500/18 dark:text-orange-50 dark:shadow-[0_0_22px_rgba(255,159,104,0.18)] dark:hover:bg-orange-500/26"
           onClick={() => router.push('/academy?tab=objections')}
         >
           {currentLocale === 'tr' ? 'İtiraz Bankası’na Git!' : 'Go to Objection Bank!'}
