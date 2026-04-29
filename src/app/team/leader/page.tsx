@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -13,9 +13,8 @@ import { stageMeta } from '@/components/contacts/contactLabels'
 import { useAppStore } from '@/store/appStore'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { AIMessageGeneratorModal } from '@/components/ai/AIMessageGeneratorModal'
-import { queueAIMessageDraftPreset } from '@/lib/clientStorage'
-import { addInteraction, deleteInteraction, fetchContacts, fetchInteractionsByContact, updateInteraction } from '@/lib/queries'
-import type { ContactRow, InteractionRow } from '@/lib/queries'
+import { fetchContacts } from '@/lib/queries'
+import type { ContactRow } from '@/lib/queries'
 import { Check, Copy, Crown, Pencil, Search, Sparkles, Trash2, Users, ShoppingBag, Target, NotebookPen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -23,7 +22,6 @@ const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { st
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }
 
 type LeaderListKey = 'contacts' | 'team' | 'customers' | null
-const LEADER_NOTE_PREFIX = '[LIDER_NOTU]'
 
 export default function LeaderPage() {
   const { locale } = useLanguage()
@@ -31,10 +29,10 @@ export default function LeaderPage() {
   const currentLocale = locale === 'tr' ? 'tr' : 'en'
   const { currentUser } = useAppStore()
   const router = useRouter()
-  const qc = useQueryClient()
   const [selectedContactId, setSelectedContactId] = useState<string>('self')
   const [draftNote, setDraftNote] = useState('')
   const [generalLeaderNote, setGeneralLeaderNote] = usePersistentState<string>('nmu-leader-general-note', '', { version: 1 })
+  const [leaderNotesByContact, setLeaderNotesByContact] = usePersistentState<Record<string, string>>('nmu-leader-notes-by-contact', {}, { version: 1 })
   const [activeList, setActiveList] = useState<LeaderListKey>(null)
   const [isEditingSavedNote, setIsEditingSavedNote] = useState(false)
   const [savedNoteDraft, setSavedNoteDraft] = useState('')
@@ -65,62 +63,11 @@ export default function LeaderPage() {
     [sortedContacts],
   )
 
-  const { data: selectedLeaderNotes = [] } = useQuery<InteractionRow[]>({
-    queryKey: ['leader-contact-notes', selectedContact?.id],
-    queryFn: () => fetchInteractionsByContact(selectedContact!.id),
-    enabled: Boolean(selectedContact?.id),
-  })
-
   const latestLeaderNote = useMemo(() => {
     if (isGeneralNoteSelected) return generalLeaderNote.trim()
     if (!selectedContact) return ''
-    const rows = selectedLeaderNotes
-      .filter((entry) => entry.type === 'note' && entry.content.startsWith(LEADER_NOTE_PREFIX))
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    if (!rows.length) return ''
-    return rows[0].content.replace(LEADER_NOTE_PREFIX, '').trim()
-  }, [isGeneralNoteSelected, selectedContact, selectedLeaderNotes, generalLeaderNote])
-
-  const latestLeaderNoteRow = useMemo(() => {
-    const rows = selectedLeaderNotes
-      .filter((entry) => entry.type === 'note' && entry.content.startsWith(LEADER_NOTE_PREFIX))
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    return rows[0] ?? null
-  }, [selectedLeaderNotes])
-
-  const addLeaderNoteMutation = useMutation({
-    mutationFn: (payload: { contactId: string; note: string }) =>
-      addInteraction(currentUser!.id, {
-        contact_id: payload.contactId,
-        type: 'note',
-        channel: 'manual',
-        content: `${LEADER_NOTE_PREFIX} ${payload.note}`,
-        date: new Date().toISOString(),
-      }),
-    onSuccess: (_data, variables) => {
-      qc.invalidateQueries({ queryKey: ['leader-contact-notes', variables.contactId] })
-      qc.invalidateQueries({ queryKey: ['contact-interactions', variables.contactId] })
-    },
-  })
-
-  const updateLeaderNoteMutation = useMutation({
-    mutationFn: (payload: { interactionId: string; note: string }) =>
-      updateInteraction(payload.interactionId, { content: `${LEADER_NOTE_PREFIX} ${payload.note}` }),
-    onSuccess: () => {
-      if (!selectedContact?.id) return
-      qc.invalidateQueries({ queryKey: ['leader-contact-notes', selectedContact.id] })
-      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedContact.id] })
-    },
-  })
-
-  const deleteLeaderNoteMutation = useMutation({
-    mutationFn: (interactionId: string) => deleteInteraction(interactionId),
-    onSuccess: () => {
-      if (!selectedContact?.id) return
-      qc.invalidateQueries({ queryKey: ['leader-contact-notes', selectedContact.id] })
-      qc.invalidateQueries({ queryKey: ['contact-interactions', selectedContact.id] })
-    },
-  })
+    return leaderNotesByContact[selectedContact.id]?.trim() ?? ''
+  }, [isGeneralNoteSelected, selectedContact, generalLeaderNote, leaderNotesByContact])
 
   function saveNote() {
     const note = draftNote.trim()
@@ -131,7 +78,7 @@ export default function LeaderPage() {
       return
     }
     if (!selectedContact) return
-    addLeaderNoteMutation.mutate({ contactId: selectedContact.id, note })
+    setLeaderNotesByContact((current) => ({ ...current, [selectedContact.id]: note }))
     setDraftNote('')
   }
 
@@ -149,8 +96,8 @@ export default function LeaderPage() {
       setIsEditingSavedNote(false)
       return
     }
-    if (!latestLeaderNoteRow) return
-    updateLeaderNoteMutation.mutate({ interactionId: latestLeaderNoteRow.id, note })
+    if (!selectedContact) return
+    setLeaderNotesByContact((current) => ({ ...current, [selectedContact.id]: note }))
     setIsEditingSavedNote(false)
   }
 
@@ -171,38 +118,17 @@ export default function LeaderPage() {
       })
       return
     }
-    if (!latestLeaderNoteRow) return
+    if (!selectedContact) return
     requestDelete({
       detail: latestLeaderNote?.trim().slice(0, 160),
       onConfirm: () => {
-        deleteLeaderNoteMutation.mutate(latestLeaderNoteRow.id)
+        setLeaderNotesByContact((current) => {
+          const next = { ...current }
+          delete next[selectedContact.id]
+          return next
+        })
       },
     })
-  }
-
-  function openAiForPerson() {
-    const context = selectedContact
-      ? [
-          `Kişi: ${selectedContact.full_name}`,
-          selectedContact.profession ? `Meslek: ${selectedContact.profession}` : '',
-          selectedContact.location ? `Lokasyon: ${selectedContact.location}` : '',
-          selectedContact.interests ? `İlgi alanları: ${selectedContact.interests}` : '',
-          selectedContact.pain_points ? `Sıkıntılar: ${selectedContact.pain_points}` : '',
-          latestLeaderNote ? `Lider Notu: ${latestLeaderNote}` : '',
-        ]
-          .filter(Boolean)
-          .join('\n')
-      : currentLocale === 'tr'
-        ? 'Lider için genel ekip iletişim mesajı üret.'
-        : 'Generate a general team communication message for the leader.'
-
-    queueAIMessageDraftPreset({
-      category: 'follow_up',
-      tone: 'friendly',
-      extraContext: context,
-      ...(selectedContact && !isGeneralNoteSelected ? { contactId: selectedContact.id } : {}),
-    })
-    router.push('/ai')
   }
 
   const totalCustomers = contacts.filter((contact) => contact.pipeline_stage === 'became_customer').length
@@ -239,16 +165,7 @@ export default function LeaderPage() {
   }
 
   async function openAiForListContact(contact: ContactRow) {
-    let latestLeaderForContact = ''
-    try {
-      const rows = await fetchInteractionsByContact(contact.id)
-      const noteRows = rows
-        .filter((entry) => entry.type === 'note' && entry.content.startsWith(LEADER_NOTE_PREFIX))
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      if (noteRows[0]) latestLeaderForContact = noteRows[0].content.replace(LEADER_NOTE_PREFIX, '').trim()
-    } catch {
-      // ignore: still open AI with contact fields
-    }
+    const latestLeaderForContact = leaderNotesByContact[contact.id]?.trim() ?? ''
     const context = [
       `Kişi: ${contact.full_name}`,
       contact.profession ? `Meslek: ${contact.profession}` : '',
@@ -359,7 +276,7 @@ export default function LeaderPage() {
               onChange={(event) => {
                 const nextValue = event.target.value
                 setSelectedContactId(nextValue)
-                setDraftNote(nextValue === 'self' ? generalLeaderNote : '')
+                setDraftNote(nextValue === 'self' ? generalLeaderNote : (leaderNotesByContact[nextValue] ?? ''))
               }}
               className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none"
             >
@@ -383,9 +300,6 @@ export default function LeaderPage() {
             <div className="flex flex-wrap gap-2">
               <Button size="sm" icon={<NotebookPen className="w-4 h-4" />} onClick={saveNote}>
                 {currentLocale === 'tr' ? 'Notu Kaydet' : 'Save Note'}
-              </Button>
-              <Button size="sm" variant="outline" icon={<Sparkles className="w-4 h-4" />} onClick={openAiForPerson}>
-                {currentLocale === 'tr' ? 'YZ ile Mesaj Üret' : 'Generate with AI'}
               </Button>
             </div>
 
