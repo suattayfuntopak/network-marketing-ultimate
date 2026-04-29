@@ -13,7 +13,7 @@ import { stageMeta } from '@/components/contacts/contactLabels'
 import { useAppStore } from '@/store/appStore'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { AIMessageGeneratorModal } from '@/components/ai/AIMessageGeneratorModal'
-import { addInteraction, deleteInteraction, fetchContacts, fetchInteractionsByContact, updateInteraction } from '@/lib/queries'
+import { addInteraction, deleteInteraction, fetchAllInteractions, fetchContacts, fetchInteractionsByContact, updateInteraction } from '@/lib/queries'
 import type { ContactRow, InteractionRow } from '@/lib/queries'
 import { Check, Copy, Crown, Pencil, Search, Sparkles, Trash2, Users, ShoppingBag, Target, NotebookPen } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -42,10 +42,16 @@ export default function LeaderPage() {
   const [listAiModalOpen, setListAiModalOpen] = useState(false)
   const [listAiContact, setListAiContact] = useState<ContactRow | null>(null)
   const [listAiExtraContext, setListAiExtraContext] = useState('')
+  const [notesPage, setNotesPage] = useState(1)
 
   const { data: contacts = [] } = useQuery<ContactRow[]>({
     queryKey: ['contacts'],
     queryFn: fetchContacts,
+  })
+
+  const { data: allInteractions = [] } = useQuery<InteractionRow[]>({
+    queryKey: ['leader-all-notes'],
+    queryFn: fetchAllInteractions,
   })
 
   const isGeneralNoteSelected = selectedContactId === 'self'
@@ -205,6 +211,33 @@ export default function LeaderPage() {
     })
     return filtered.sort((a, b) => a.full_name.localeCompare(b.full_name, currentLocale === 'tr' ? 'tr' : 'en'))
   }, [listSearch, selectedPool, currentLocale])
+
+  const allLeaderNotes = useMemo(() => {
+    const byId = new Map(contacts.map((contact) => [contact.id, contact.full_name]))
+    return allInteractions
+      .filter((entry) => entry.type === 'note' && entry.content.startsWith(LEADER_NOTE_PREFIX))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .map((entry) => ({
+        id: entry.id,
+        contactName: byId.get(entry.contact_id) ?? (currentLocale === 'tr' ? 'Silinmiş kişi' : 'Deleted contact'),
+        note: entry.content.replace(LEADER_NOTE_PREFIX, '').trim(),
+        createdAt: entry.created_at,
+      }))
+      .filter((entry) => Boolean(entry.note))
+  }, [allInteractions, contacts, currentLocale])
+
+  const totalNotesPages = Math.max(1, Math.ceil(allLeaderNotes.length / 10))
+  const currentNotesPage = Math.min(notesPage, totalNotesPages)
+
+  const pagedLeaderNotes = useMemo(() => {
+    const start = (currentNotesPage - 1) * 10
+    return allLeaderNotes.slice(start, start + 10)
+  }, [allLeaderNotes, currentNotesPage])
+
+  const pageTabs = useMemo(
+    () => Array.from({ length: totalNotesPages }, (_, idx) => idx + 1),
+    [totalNotesPages],
+  )
 
   function openLeaderContactDetail(contactId: string) {
     if (!activeList) return
@@ -500,6 +533,58 @@ export default function LeaderPage() {
                   )
                 })}
               </ul>
+            )}
+          </div>
+        </Card>
+      </motion.div>
+
+      <motion.div variants={item}>
+        <Card>
+          <CardHeader>
+            <CardTitle>{currentLocale === 'tr' ? 'Kişilere Ait Notlarım' : 'My Notes for Contacts'}</CardTitle>
+            <CardDescription>
+              {currentLocale === 'tr'
+                ? 'Tüm kişi notların burada en yeni kayıttan başlayarak listelenir.'
+                : 'All contact notes are listed here from newest to oldest.'}
+            </CardDescription>
+          </CardHeader>
+          <div className="space-y-3">
+            {pagedLeaderNotes.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-border-subtle bg-surface/30 px-4 py-8 text-center text-sm text-text-tertiary">
+                {currentLocale === 'tr' ? 'Henüz kaydedilmiş kişi notu yok.' : 'No saved contact notes yet.'}
+              </p>
+            ) : (
+              pagedLeaderNotes.map((entry) => (
+                <div key={entry.id} className="rounded-xl border border-border-subtle bg-surface/35 p-3">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-text-primary">{entry.contactName}</p>
+                    <p className="text-xs text-text-tertiary">
+                      {new Date(entry.createdAt).toLocaleString(currentLocale === 'tr' ? 'tr-TR' : 'en-US')}
+                    </p>
+                  </div>
+                  <p className="whitespace-pre-wrap text-sm text-text-secondary">{entry.note}</p>
+                </div>
+              ))
+            )}
+
+            {totalNotesPages > 1 && (
+              <div className="flex flex-wrap items-center justify-center gap-1.5 border-t border-border pt-3">
+                {pageTabs.map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => setNotesPage(pageNum)}
+                    className={cn(
+                      'h-8 min-w-8 rounded-md px-2 text-xs font-semibold transition',
+                      currentNotesPage === pageNum
+                        ? 'bg-primary text-obsidian'
+                        : 'bg-surface text-text-secondary hover:bg-surface-hover hover:text-text-primary',
+                    )}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </Card>
